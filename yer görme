@@ -1,33 +1,33 @@
---//Toggle\--
+--//Toggle\\--
 getgenv().Toggle = true -- This toggles the esp, turning it to false will turn it off
 getgenv().TC = false -- This toggles team check, turning it on will turn on team check
 local PlayerName = "Name" -- You can decide if you want the Player's name to be a display name which is "DisplayName", or username which is "Name"
 
---//Variables\--
+--//Variables\\--
 local P = game:GetService("Players")
 local LP = P.LocalPlayer
 
---//Debounce\--
+--//Debounce\\--
 local DB = false
 
---//Notification\--
--- game.StarterGui:SetCore("SendNotification", {
--- 	Title = "",
--- 	Text = "Erdem noob?" ,
--- 	Button1 = "Evet",
--- 	Button2 = "Evet",
--- 	Duration = math.huge
--- })
+--//Notification\\--
+game.StarterGui:SetCore("SendNotification", {
+	Title = "",
+	Text = "Erdem noob?" ,
+	Button1 = "Evet",
+	Button2 = "Evet",
+	Duration = math.huge
+})
 
--- game.StarterGui:SetCore("SendNotification", {
--- 	Title = "",
--- 	Text = "Wia Best?" ,
--- 	Button1 = "Evet",
--- 	Button2 = "Evet",
--- 	Duration = math.huge
--- })
+game.StarterGui:SetCore("SendNotification", {
+	Title = "",
+	Text = "Wia Best?" ,
+	Button1 = "Evet",
+	Button2 = "Evet",
+	Duration = math.huge
+})
 
---//Loop\--
+--//Loop\\--
 while task.wait() do
 	if not getgenv().Toggle then
 		break
@@ -47,7 +47,7 @@ while task.wait() do
 						-- Credits to Infinite Yield for this part (pos) ^^^^^^
 
 						if v.Character:FindFirstChild("Totally NOT Esp") == nil and v.Character:FindFirstChild("Icon") == nil and getgenv().TC == false then
-							--//ESP-Highlight\--
+							--//ESP-Highlight\\--
 							local ESP = Instance.new("Highlight", v.Character)
 
 							ESP.Name = "Totally NOT Esp"
@@ -60,7 +60,7 @@ while task.wait() do
 							ESP.OutlineColor = Color3.fromRGB(255, 255, 255)
 							ESP.OutlineTransparency = 0
 
-							--//ESP-Text\--
+							--//ESP-Text\\--
 							local Icon = Instance.new("BillboardGui", v.Character)
 							local ESPText = Instance.new("TextLabel")
 
@@ -84,7 +84,7 @@ while task.wait() do
 							ESPText.TextWrapped = true
 						else
 							if v.TeamColor ~= LP.TeamColor and v.Character:FindFirstChild("Totally NOT Esp") == nil and v.Character:FindFirstChild("Icon") == nil and getgenv().TC == true then
-								--//ESP-Highlight\--
+								--//ESP-Highlight\\--
 								local ESP = Instance.new("Highlight", v.Character)
 
 								ESP.Name = "Totally NOT Esp"
@@ -97,7 +97,7 @@ while task.wait() do
 								ESP.OutlineColor = Color3.fromRGB(255, 255, 255)
 								ESP.OutlineTransparency = 0
 
-								--//ESP-Text\--
+								--//ESP-Text\\--
 								local Icon = Instance.new("BillboardGui", v.Character)
 								local ESPText = Instance.new("TextLabel")
 
@@ -127,22 +127,19 @@ while task.wait() do
 									if v.Character:FindFirstChild("Totally NOT Esp").Enabled == false and v.Character:FindFirstChild("Icon").Enabled == false then
 										v.Character:FindFirstChild("Totally NOT Esp").Enabled = true
 										v.Character:FindFirstChild("Icon").Enabled = true
-								else
-									if v.Character:FindFirstChild("Icon") then
-										v.Character:FindFirstChild("Icon")["ESP Text"].Text = v[PlayerName].." | Distance: "..pos
+									else
+										if v.Character:FindFirstChild("Icon") then
+											v.Character:FindFirstChild("Icon")["ESP Text"].Text = v[PlayerName].." | Distance: "..pos
+										end
 									end
+								end
 							end
 						end
-						end
-						end
-						end
 					end
-					end
-				end
-				end
 				end
 			end
-		end)
+		end
+	end)
 
 	wait()
 
