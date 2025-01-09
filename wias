@@ -2274,11 +2274,18 @@ draggable(MAIN)
 
 -- to check fps (not mine function so yeah) --
 spawn(function()
-	print(:v)
-	end
+	local TimeFunction = RunService:IsRunning() and time or os.clock
+	local LastIteration, Start
+	local FrameUpdateTable = {}
+	local function HeartbeatUpdate()
+		LastIteration = TimeFunction()
+		for Index = #FrameUpdateTable, 1, -1 do
+			FrameUpdateTable[Index + 1] = FrameUpdateTable[Index] >= LastIteration - 1 and FrameUpdateTable[Index] or nil
+		end
 
-	Start = TimeFunction()
-	RunService.Heartbeat:Connect(HeartbeatUpdate)
+		FrameUpdateTable[1] = LastIteration
+		library.fps = tostring(math.floor(TimeFunction() - Start >= 1 and #FrameUpdateTable or #FrameUpdateTable / (TimeFunction() - Start))) .. " FPS"
+		UPPERLABEL.Text = library.fps
 end)
 library.GUI = PCR_1 
 
