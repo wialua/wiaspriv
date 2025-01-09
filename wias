@@ -2286,6 +2286,10 @@ spawn(function()
 		FrameUpdateTable[1] = LastIteration
 		library.fps = tostring(math.floor(TimeFunction() - Start >= 1 and #FrameUpdateTable or #FrameUpdateTable / (TimeFunction() - Start))) .. " FPS"
 		UPPERLABEL.Text = library.fps
+	end
+
+	Start = TimeFunction()
+	RunService.Heartbeat:Connect(HeartbeatUpdate)
 end)
 library.GUI = PCR_1 
 
