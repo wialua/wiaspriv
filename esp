@@ -1,0 +1,66 @@
+--//Toggle\\--
+getgenv().Toggle = true
+getgenv().TC = false
+local PlayerName = "Name"
+
+--//Variables\\--
+local P = game:GetService("Players")
+local LP = P.LocalPlayer
+
+--//Debounce\\--
+local DB = false
+
+--//Loop\\--
+while task.wait(0.1) do
+    if not getgenv().Toggle then
+        break
+    end
+    if DB then 
+        return 
+    end
+    DB = true
+
+    pcall(function()
+        for i, v in pairs(P:GetChildren()) do
+            if v:IsA("Player") then
+                if v ~= LP then
+                    if v.Character then
+                        -- Mesafeyi hesapla (600m mesafe)
+                        local pos = math.floor(((LP.Character:FindFirstChild("HumanoidRootPart")).Position - (v.Character:FindFirstChild("HumanoidRootPart")).Position).magnitude)
+
+                        -- Mesafe 600 metreden küçükse ESP göster
+                        if pos <= 600 then
+                            -- Eğer daha önce ESP eklenmemişse
+                            if not v.Character:FindFirstChild("Totally NOT Esp") then
+                                --//ESP-Text (Label)\\--
+                                local Icon = Instance.new("BillboardGui", v.Character)
+                                local ESPText = Instance.new("TextLabel")
+                                
+                                Icon.Name = "Totally NOT Esp"
+                                Icon.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                                Icon.Active = true
+                                Icon.AlwaysOnTop = true
+                                Icon.Size = UDim2.new(0, 100, 0, 50) -- Daha küçük boyut
+                                Icon.ExtentsOffset = Vector3.new(0, 2, 0) -- Üstteki mesafeyi ayarla
+                                
+                                ESPText.Name = "ESP Text"
+                                ESPText.Parent = Icon
+                                ESPText.BackgroundTransparency = 1
+                                ESPText.Size = UDim2.new(0, 100, 0, 50)
+                                ESPText.Font = Enum.Font.SciFi
+                                ESPText.Text = v[PlayerName]
+                                ESPText.TextColor3 = v.TeamColor.Color -- Takım rengini kullan
+                                ESPText.TextSize = 16
+                                ESPText.TextWrapped = true
+                                ESPText.TextStrokeTransparency = 0.8 -- Metin etrafında ince bir çizgi
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    wait()
+    DB = false
+end
