@@ -1,4 +1,4 @@
--- New example script written by wally
+--  script written by wia
 
 local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
 
