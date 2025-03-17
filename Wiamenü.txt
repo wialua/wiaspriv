@@ -32,6 +32,16 @@ LeftGroupBox:AddButton({
 })
 
 LeftGroupBox:AddButton({
+    Text = 'ESP',
+    Func = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/esp"))();
+    end,
+    DoubleClick = false,
+    Tooltip = 'ESP'
+})
+
+
+LeftGroupBox:AddButton({
     Text = 'Keycard',
     Func = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))();
