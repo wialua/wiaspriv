@@ -1,4 +1,4 @@
-local _a = {Price = 4000000, MaxAltitude = 650, MaxSpeed = 240, Acceleration = 1, DampeningAcceleration = 0.8, MaxVerticalTilt = 10, VerticalTiltUpSpeed = 1, VerticalTiltDownSpeed = 1, VerticalTiltDampening = 0.95, VerticalSpeedLimit = 30, HorizontalTiltSpeed = 3.5, MaxSideTilt = 25, SideTiltSpeed = 1.5, SideTiltDampening = 0.95, TurnSpeed = 3.5, HideCharacter = true, CameraOffset = 50, Missiles = true, Bombs = true, Stealth = true, MissileTargetRange = 540, MissileCooldown = 6, MissileLock = 0}
+local _a = {Price = 4000000, MaxAltitude = 650, MaxSpeed = 240, Acceleration = 1, DampeningAcceleration = 0.8, MaxVerticalTilt = 10, VerticalTiltUpSpeed = 1, VerticalTiltDownSpeed = 1, VerticalTiltDampening = 0.95, VerticalSpeedLimit = 30, HorizontalTiltSpeed = 3.5, MaxSideTilt = 25, SideTiltSpeed = 1.5, SideTiltDampening = 0.95, TurnSpeed = 3.5, HideCharacter = true, CameraOffset = 50, Missiles = true, Bombs = true, Stealth = true, MissileTargetRange = 540, MissileCooldown = 0, MissileLock = 0}
 
 for i, v in pairs(getgc(true)) do
     if type(v) == "table" then
