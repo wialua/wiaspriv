@@ -1,0 +1,6 @@
+-- // Settings
+-- How to Use "false" = Disabled, "true" = Enabled,
+getgenv().fps = false-- Makes The Map Invisable To Increase Fps
+getgenv().whitescreen = false -- Enables A White-Screen
+getgenv().Arrest = false -- Arrests Most Players Before AutoRobbing
+loadstring(game:HttpGet("https://raw.githubusercontent.com/AdminEvilDRagon/smallAR/refs/heads/main/SmallAR.lua", true))()
