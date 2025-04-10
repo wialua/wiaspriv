@@ -1,5 +1,6 @@
 local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
-local Wait = library.subs.Wait
+local RunService = game:GetService('RunService')
+local Players = game:GetService('Players')
 
 local PepsisWorld = library:CreateWindow({
     Name = "",
@@ -97,3 +98,173 @@ Ekstra2Section:AddButton({
         loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))()
     end
 })
+
+local HitboxTab = PepsisWorld:CreateTab({
+    Name = "Hitbox"
+})
+
+local HitboxSection = HitboxTab:CreateSection({
+    Name = "Head Hitbox"
+})
+
+local isHitboxEnabled = false
+local lastSize = 3.8
+local lastTransparency = 0.5
+local lastColor = Color3.fromRGB(255, 0, 0)
+local HitboxConnection
+
+local function applyHitboxToAllPlayers()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character:FindFirstChild("Head")
+            if player ~= Players.LocalPlayer then
+                head.Size = Vector3.new(lastSize, lastSize, lastSize)
+                head.Transparency = lastTransparency
+                head.BrickColor = BrickColor.new(lastColor)
+            end
+        end
+    end
+end
+
+local function resetHitboxForAllPlayers()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character:FindFirstChild("Head")
+            if player ~= Players.LocalPlayer then
+                head.Size = Vector3.new(2, 1, 1)
+                head.Transparency = 0
+                head.BrickColor = BrickColor.new("Bright red")
+            end
+        end
+    end
+end
+
+local selectedTeams = {}
+local teams = {"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
+local TeamCheckboxSection = HitboxTab:CreateSection({
+    Name = "Takım Seçimi"
+})
+
+for _, team in ipairs(teams) do
+    TeamCheckboxSection:AddToggle({
+        Name = team,
+        Value = false,
+        Callback = function(value)
+            if value then
+                table.insert(selectedTeams, team)
+            else
+                for i, t in ipairs(selectedTeams) do
+                    if t == team then
+                        table.remove(selectedTeams, i)
+                        break
+                    end
+                end
+            end
+        end
+    })
+end
+
+local function expandHitboxForSelectedTeams()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer then
+            if player.Character and player.Character:FindFirstChild("Head") then
+                local head = player.Character:FindFirstChild("Head")
+                for _, selectedTeam in ipairs(selectedTeams) do
+                    if player.Team and player.Team.Name == selectedTeam then
+                        head.Size = Vector3.new(lastSize, lastSize, lastSize)
+                        head.Transparency = lastTransparency
+                        head.BrickColor = BrickColor.new(lastColor)
+                    end
+                end
+            end
+        end
+    end
+end
+
+HitboxSection:AddToggle({
+    Name = "Hitbox Aç/Kapa",
+    Value = isHitboxEnabled,
+    Callback = function(value)
+        isHitboxEnabled = value
+        if isHitboxEnabled then
+            if HitboxConnection then HitboxConnection:Disconnect() end
+            HitboxConnection = RunService.Heartbeat:Connect(function()  
+                applyHitboxToAllPlayers()
+            end)
+        else
+            if HitboxConnection then
+                HitboxConnection:Disconnect()
+                HitboxConnection = nil
+            end
+            resetHitboxForAllPlayers()
+        end
+    end
+})
+
+HitboxSection:AddToggle({
+    Name = "Birden Fazla Takım Hitbox'ı Aç/Kapa",
+    Value = false,
+    Callback = function(value)
+        isHitboxExpanded = value
+        if isHitboxExpanded then
+            if HitboxConnection then HitboxConnection:Disconnect() end
+            HitboxConnection = RunService.Heartbeat:Connect(function()
+                expandHitboxForSelectedTeams()
+            end)
+        else
+            if HitboxConnection then
+                HitboxConnection:Disconnect()
+                HitboxConnection = nil
+            end
+            resetHitboxForAllPlayers()
+        end
+    end
+})
+
+HitboxSection:AddSlider({
+    Name = "Hitbox Boyutu",
+    Min = 3.7,
+    Max = 100,
+    Value = lastSize,
+    Callback = function(value)
+        lastSize = value
+        if isHitboxEnabled then
+            applyHitboxToAllPlayers()
+        end
+    end
+})
+
+HitboxSection:AddSlider({
+    Name = "Hitbox Şeffaflık",
+    Min = 0,
+    Max = 1,
+    Value = lastTransparency,
+    Callback = function(value)
+        lastTransparency = value
+        if isHitboxEnabled then
+            applyHitboxToAllPlayers()
+        end
+    end
+})
+
+HitboxSection:AddColorPicker({
+    Name = "Hitbox Rengi",
+    Value = lastColor,
+    Callback = function(value)
+        lastColor = value
+        if isHitboxEnabled then
+            applyHitboxToAllPlayers()
+        end
+    end
+})
+
+game.Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        if isHitboxEnabled then
+            local head = character:WaitForChild("Head")
+            head.Size = Vector3.new(lastSize, lastSize, lastSize)
+            head.Transparency = lastTransparency
+            head.BrickColor = BrickColor.new(lastColor)
+        end
+    end)
+end)
