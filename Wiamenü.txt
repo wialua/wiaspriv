@@ -202,7 +202,7 @@ HitboxSection:AddToggle({
 })
 
 HitboxSection:AddToggle({
-    Name = "Birden Fazla Takım Hitbox'ı Aç/Kapa",
+    Name = "Seçtiğin Takımlara Hitbox",
     Value = false,
     Callback = function(value)
         isHitboxExpanded = value
