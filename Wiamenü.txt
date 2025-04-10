@@ -1,1 +1,99 @@
+local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
+local Wait = library.subs.Wait
 
+local PepsisWorld = library:CreateWindow({
+    Name = "Pepsi's World",
+    Themeable = {
+        Info = "Discord Server: VzYTJ7Y"
+    }
+})
+
+local MadCityTab = PepsisWorld:CreateTab({
+    Name = "Mad City"
+})
+
+local PVPSection = MadCityTab:CreateSection({
+    Name = "🗡PVP🗡"
+})
+
+PVPSection:AddButton({
+    Name = "ESP",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdsp"))()
+    end
+})
+
+PVPSection:AddButton({
+    Name = "ESP Kapat",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdspclo"))()
+    end
+})
+
+PVPSection:AddButton({
+    Name = "Aim Lock",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/erdemscripterxd/wia/refs/heads/main/aimlck"))()
+    end
+})
+
+local DigerSection = MadCityTab:CreateSection({
+    Name = "Araç/Uçak Hileleri"
+})
+
+DigerSection:AddButton({
+    Name = "Hızlı Night Dönme",  
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/ilfafl"))()
+    end
+})
+
+DigerSection:AddButton({
+    Name = "Suda Araç Sürme",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/drve"))()
+    end
+})
+
+DigerSection:AddButton({
+    Name = "Super Car",  
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crspdorsm"))()
+    end
+})
+
+local EkstraSection = MadCityTab:CreateSection({
+    Name = "Ekstra"
+})
+
+EkstraSection:AddButton({
+    Name = "XP Scripti",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/exp"))()
+    end
+})
+
+EkstraSection:AddButton({
+    Name = "Crash",  
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crsh"))()
+    end
+})
+
+EkstraSection:AddButton({
+    Name = "Auto Farm (para)",  
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/auto%20farm%20(%20para%20)"))()
+    end
+})
+
+local Ekstra2Section = MadCityTab:CreateSection({
+    Name = "Ekstra2"
+})
+
+Ekstra2Section:AddButton({
+    Name = "Polis Keycard",  
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))()
+    end
+})
