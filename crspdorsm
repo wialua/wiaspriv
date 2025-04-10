@@ -1,0 +1,4 @@
+local a={Price=150000,Bounce=1,Height=3.5,Sway=2,Suspension=20,TurnSpeed=2,Torque=2,MaxSpeed=900,BrakeForce=1,SpeedDecay=0.2,Boost=true,BoostParticles="Middle",Drift=true,VelLerp=0.2,RotLerp=0.2,DriftVelLerp=0.1,DriftRotLerp=0.2,HideCharacter=true,CameraOffset=26}
+for b,c in pairs(getgc(true))do if type(c)=="table"then for d,e in pairs(a)do if rawget(c,d)~=nil then c[d]=e end end end end
+local f=workspace.ObjectSelection:FindFirstChild(game.Players.LocalPlayer.Name.."'s Vehicle")
+if f then pcall(function() local g=f:FindFirstChild("CarChassis") if g then local h=g:FindFirstChild("Boost") if h then h.Value=20 end end end) end
