@@ -1,5 +1,3 @@
--- Mad City Script Menü Entegrasyonu
-
 local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
 local RunService = game:GetService('RunService')
 local Players = game:GetService('Players')
@@ -17,7 +15,6 @@ local MadCityTab = PepsisWorld:CreateTab({
     Name = "Mad City"
 })
 
--- PVP Section
 local PVPSection = MadCityTab:CreateSection({
     Name = "🗡PVP🗡"
 })
@@ -40,7 +37,6 @@ PVPSection:AddButton({
     end
 })
 
--- Vehicle Hacks Section
 local DigerSection = MadCityTab:CreateSection({
     Name = "Araç/Uçak Hileleri"
 })
@@ -63,7 +59,6 @@ DigerSection:AddButton({
     end
 })
 
--- Extra Section
 local EkstraSection = MadCityTab:CreateSection({
     Name = "Ekstra"
 })
@@ -86,7 +81,6 @@ EkstraSection:AddButton({
     end
 })
 
--- Additional Extra Section
 local Ekstra2Section = MadCityTab:CreateSection({
     Name = "Ekstra2"
 })
@@ -97,7 +91,6 @@ Ekstra2Section:AddButton({
     end
 })
 
--- Hitbox Section
 local HitboxTab = PepsisWorld:CreateTab({
     Name = "Hitbox"
 })
@@ -118,53 +111,18 @@ local TeamCheckboxSection = HitboxTab:CreateSection({
     Name = "Takım Seçimi"
 })
 
-for _, team in ipairs(teams) do
-    TeamCheckboxSection:AddToggle({
-        Name = team,
-        Value = false,
-        Callback = function(value)
-            if value then
-                table.insert(selectedTeams, team)
-            else
-                for i, t in ipairs(selectedTeams) do
-                    if t == team then
-                        table.remove(selectedTeams, i)
-                        break
-                    end
-                end
-            end
-        end
-    })
-end
-
--- Functions for Hitbox
-local function applyHitboxToAllPlayers()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character and player.Character:FindFirstChild("Head") then
-            local head = player.Character:FindFirstChild("Head")
-            if player ~= Players.LocalPlayer then
-                head.Size = Vector3.new(lastSize, lastSize, lastSize)
-                head.Transparency = lastTransparency
-                head.BrickColor = BrickColor.new(lastColor)
-            end
+local function resetHitboxForTeam(player, teamName)
+    if player.Character and player.Character:FindFirstChild("Head") then
+        local head = player.Character:FindFirstChild("Head")
+        if player.Team and player.Team.Name == teamName then
+            head.Size = Vector3.new(2, 1, 1)
+            head.Transparency = 0
+            head.BrickColor = BrickColor.new("Bright red")
         end
     end
 end
 
-local function resetHitboxForAllPlayers()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character and player.Character:FindFirstChild("Head") then
-            local head = player.Character:FindFirstChild("Head")
-            if player ~= Players.LocalPlayer then
-                head.Size = Vector3.new(2, 1, 1)
-                head.Transparency = 0
-                head.BrickColor = BrickColor.new("Bright red")
-            end
-        end
-    end
-end
-
-local function expandHitboxForSelectedTeams()
+local function updateHitboxForSelectedTeams()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= Players.LocalPlayer then
             if player.Character and player.Character:FindFirstChild("Head") then
@@ -181,6 +139,34 @@ local function expandHitboxForSelectedTeams()
     end
 end
 
+for _, team in ipairs(teams) do
+    TeamCheckboxSection:AddToggle({
+        Name = team,
+        Value = false,
+        Callback = function(value)
+            if value then
+                table.insert(selectedTeams, team)
+            else
+                for i, t in ipairs(selectedTeams) do
+                    if t == team then
+                        table.remove(selectedTeams, i)
+                        break
+                    end
+                end
+            end
+
+            if isHitboxExpanded then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player.Team and player.Team.Name == team then
+                        resetHitboxForTeam(player, team)
+                    end
+                end
+                updateHitboxForSelectedTeams()
+            end
+        end
+    })
+end
+
 HitboxSection:AddToggle({
     Name = "Hitbox Aç/Kapa",
     Value = isHitboxEnabled,
@@ -189,7 +175,7 @@ HitboxSection:AddToggle({
         if isHitboxEnabled then
             if HitboxConnection then HitboxConnection:Disconnect() end
             HitboxConnection = RunService.Heartbeat:Connect(function()  
-                applyHitboxToAllPlayers()
+                updateHitboxForSelectedTeams()
             end)
         else
             if HitboxConnection then
@@ -209,7 +195,7 @@ HitboxSection:AddToggle({
         if isHitboxExpanded then
             if HitboxConnection then HitboxConnection:Disconnect() end
             HitboxConnection = RunService.Heartbeat:Connect(function()
-                expandHitboxForSelectedTeams()
+                updateHitboxForSelectedTeams()
             end)
         else
             if HitboxConnection then
@@ -229,7 +215,7 @@ HitboxSection:AddSlider({
     Callback = function(value)
         lastSize = value
         if isHitboxEnabled then
-            applyHitboxToAllPlayers()
+            updateHitboxForSelectedTeams()
         end
     end
 })
@@ -242,7 +228,7 @@ HitboxSection:AddSlider({
     Callback = function(value)
         lastTransparency = value
         if isHitboxEnabled then
-            applyHitboxToAllPlayers()
+            updateHitboxForSelectedTeams()
         end
     end
 })
@@ -253,7 +239,7 @@ HitboxSection:AddColorPicker({
     Callback = function(value)
         lastColor = value
         if isHitboxEnabled then
-            applyHitboxToAllPlayers()
+            updateHitboxForSelectedTeams()
         end
     end
 })
@@ -269,7 +255,6 @@ game.Players.PlayerAdded:Connect(function(player)
     end)
 end)
 
--- Aimbot Section
 local AimbotTab = PepsisWorld:CreateTab({
     Name = "Aimbot"
 })
