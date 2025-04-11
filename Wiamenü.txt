@@ -209,8 +209,8 @@ HitboxSection:AddToggle({
 
 HitboxSection:AddSlider({
     Name = "Hitbox Boyutu",
-    Min = 3.7,
-    Max = 100,
+    Min = 0,
+    Max = 3.8,
     Value = lastSize,
     Callback = function(value)
         lastSize = value
@@ -253,81 +253,4 @@ game.Players.PlayerAdded:Connect(function(player)
             head.BrickColor = BrickColor.new(lastColor)
         end
     end)
-end)
-
-local AimbotTab = PepsisWorld:CreateTab({
-    Name = "Aimbot"
-})
-
-local AimbotSection = AimbotTab:CreateSection({
-    Name = "Aimbot Kontrolleri"
-})
-
-local isAimbotActive = false
-local selectedAimbotTeams = {}
-local AimbotConnection
-
-local TeamBasedAimbotSection = AimbotTab:CreateSection({
-    Name = "Takım Bazlı Aimbot"
-})
-
-for _, team in ipairs(teams) do
-    TeamBasedAimbotSection:AddToggle({
-        Name = team,
-        Value = false,
-        Callback = function(value)
-            if value then
-                table.insert(selectedAimbotTeams, team)
-            else
-                for i, t in ipairs(selectedAimbotTeams) do
-                    if t == team then
-                        table.remove(selectedAimbotTeams, i)
-                        break
-                    end
-                end
-            end
-        end
-    })
-end
-
-AimbotSection:AddToggle({
-    Name = "Aimbot Aç/Kapa",
-    Value = isAimbotActive,
-    Callback = function(value)
-        isAimbotActive = value
-    end
-})
-
-local isAimbotLocked = false
-
-local function aimAtPlayer(player)
-    if player.Character and player.Character:FindFirstChild("UpperTorso") then
-        local torso = player.Character.UpperTorso
-        local targetPos = torso.Position
-        game.Workspace.CurrentCamera.CFrame = CFrame.new(game.Workspace.CurrentCamera.CFrame.Position, targetPos)
-    end
-end
-
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.E then
-        if isAimbotActive then
-            isAimbotLocked = not isAimbotLocked
-            if isAimbotLocked then
-                AimbotConnection = RunService.RenderStepped:Connect(function()
-                    for _, player in pairs(Players:GetPlayers()) do
-                        if player ~= Players.LocalPlayer then
-                            if player.Team and table.find(selectedAimbotTeams, player.Team.Name) then
-                                aimAtPlayer(player)
-                            end
-                        end
-                    end
-                end)
-            else
-                if AimbotConnection then
-                    AimbotConnection:Disconnect()
-                    AimbotConnection = nil
-                end
-            end
-        end
-    end
 end)
