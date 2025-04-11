@@ -1,2 +1,17 @@
-game:GetService("Lighting").GlobalShadows = false
+local lighting = game:GetService("Lighting")
+
+if lighting.SunRays then
+    lighting.SunRays.Enabled = false
+end
+
+if lighting.Blur then
+    lighting.Blur.Enabled = false
+end
+
+if lighting.ColorCorrection then
+    lighting.ColorCorrection.Enabled = false
+end
+
+lighting.GlobalShadows = false
+
 loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt"))()
