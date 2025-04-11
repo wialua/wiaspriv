@@ -168,7 +168,7 @@ for _, team in ipairs(teams) do
 end
 
 HitboxSection:AddToggle({
-    Name = "Hitbox Aç/Kapa",
+    Name = "Hitboxu Herkeste Genişlet",
     Value = isHitboxEnabled,
     Callback = function(value)
         isHitboxEnabled = value
