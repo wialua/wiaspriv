@@ -14,4 +14,8 @@ end
 
 lighting.GlobalShadows = false
 
+lighting.FogStart = 100000
+lighting.FogEnd = 100000
+lighting.FogColor = Color3.fromRGB(255, 255, 255)
+
 loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt"))()
