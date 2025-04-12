@@ -105,7 +105,7 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
 end
 
 -- ☠️ Auto Kill V2 (BM + Buzzard)
-local AutoKillV2Section = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (BM + Buzzard)" })
+local AutoKillV2Section = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (Fps Düşüren Versiyon)" })
 local function createAutoKillV2(teamName)
     local team = TeamsService:WaitForChild(teamName)
     local connection = nil
