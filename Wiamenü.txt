@@ -1,5 +1,4 @@
--- MadCity Menü (Geliştirilmiş Sekmeli Sürüm - Tüm Kodlar Korundu)
--- Tab'lar: PVP, Araçlar, Ekstra, Auto Kill, Hitbox
+-- MadCity Menü (Geliştirilmiş Sekmeli Sürüm - Araç Spawnlama Dahil Edildi)
 
 local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
 local RunService = game:GetService('RunService')
@@ -9,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Event = ReplicatedStorage:WaitForChild("Event")
 local Mouse = Players.LocalPlayer:GetMouse()
 local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 
 local PepsisWorld = library:CreateWindow({
     Name = "",
@@ -34,6 +34,41 @@ VehicleSection:AddButton({ Name = "Hızlı Night Dönme", Callback = function() 
 VehicleSection:AddButton({ Name = "Suda Araç Sürme", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/drve"))() end })
 VehicleSection:AddButton({ Name = "Super Car", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crspdorsm"))() end })
 
+local VehicleSpawnSection = VehicleTab:CreateSection({ Name = "Araç Spawnlama" })
+local selectedVehicle = "Nighthawk"
+VehicleSpawnSection:AddDropdown({
+    Name = "Araç Seç",
+    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
+    Callback = function(v)
+        selectedVehicle = v
+    end
+})
+VehicleSpawnSection:AddButton({
+    Name = "Seçilen Araca Bin",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local HRP = char.HumanoidRootPart
+        local btp = Instance.new("Vector3Value", LocalPlayer)
+        btp.Name = "btp"
+        btp.Value = HRP.Position
+        HRP.CFrame = Workspace.VehicleSpawns[selectedVehicle].Pos.CFrame
+        wait()
+        HRP.CFrame = CFrame.new(btp.Value)
+        wait()
+        local vehicle = Workspace.ObjectSelection[selectedVehicle]
+        if vehicle then
+            vehicle.DriveSeat.Disabled = false
+            vehicle:MoveTo(HRP.Position)
+            wait()
+            HRP.CFrame = vehicle.DriveSeat.CFrame
+            wait()
+            vehicle.DriveSeat.Disabled = true
+        end
+        btp:Destroy()
+    end
+})
+
 -- 💰 Ekstra
 local XPSection = ExtraTab:CreateSection({ Name = "XP & Para" })
 XPSection:AddButton({ Name = "XP Scripti", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/exp"))() end })
@@ -41,14 +76,12 @@ XPSection:AddButton({ Name = "Auto Farm (Para)", Callback = function() loadstrin
 XPSection:AddButton({ Name = "Crash", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crsh"))() end })
 XPSection:AddButton({ Name = "Polis Keycard", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))() end })
 
--- ☠️ Auto Kill (Yeniden Yapılandırılmış Toggle Callback'li - Kodlar korunarak)
+-- ☠️ Auto Kill
 local AutoKillSection = AutoKillTab:CreateSection({ Name = "Takımlara Göre" })
-
 local function createAutoKillToggle(teamName)
     local team = TeamsService:WaitForChild(teamName)
     local isEnabled = false
     local connection = nil
-
     AutoKillSection:AddToggle({
         Name = teamName,
         Value = false,
@@ -69,7 +102,6 @@ local function createAutoKillToggle(teamName)
         end
     })
 end
-
 for _, teamName in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
     createAutoKillToggle(teamName)
 end
@@ -127,7 +159,6 @@ HitboxSection:AddToggle({
         end
     end
 })
-
 HitboxSection:AddSlider({ Name = "Boyut", Min = 0, Max = 5, Value = lastSize, Callback = function(v) lastSize = v end })
 HitboxSection:AddSlider({ Name = "Şeffaflık", Min = 0, Max = 1, Value = lastTransparency, Callback = function(v) lastTransparency = v end })
 HitboxSection:AddColorPicker({ Name = "Renk", Value = lastColor, Callback = function(v) lastColor = v end })
