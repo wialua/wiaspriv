@@ -67,6 +67,28 @@ VehicleSpawnSection:AddButton({
     end
 })
 
+-- 🚗 Araç Spawnlama (Event Sistemiyle)
+local VehicleSpawnEventSection = VehicleTab:CreateSection({ Name = "Araç Spawn (Sende Olanlar)" })
+local selectedSpawnVehicle = "Fury"
+
+VehicleSpawnEventSection:AddDropdown({
+    Name = "Spawnlanacak Araç",
+    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
+    Callback = function(v) selectedSpawnVehicle = v end
+})
+
+VehicleSpawnEventSection:AddButton({
+    Name = "Araç Spawn (Sende Olanlar)",
+    Callback = function()
+        local args = {
+            [1] = "SpawnVehicle",
+            [2] = selectedSpawnVehicle
+        }
+        Event:FireServer(unpack(args))
+    end
+})
+
+
 -- 💰 Ekstra
 local XPSection = ExtraTab:CreateSection({ Name = "XP & Para" })
 XPSection:AddButton({ Name = "XP Scripti", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/exp"))() end })
