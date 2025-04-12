@@ -39,9 +39,7 @@ local selectedVehicle = "Nighthawk"
 VehicleSpawnSection:AddDropdown({
     Name = "Araç Seç",
     List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
-    Callback = function(v)
-        selectedVehicle = v
-    end
+    Callback = function(v) selectedVehicle = v end
 })
 VehicleSpawnSection:AddButton({
     Name = "Seçilen Araca Bin",
@@ -144,7 +142,7 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
     createAutoKillV2(team)
 end
 
--- 🎯 Hitbox
+-- 🎯 Hitbox (Gelişmiş ve Stabil)
 local HitboxSection = HitboxTab:CreateSection({ Name = "Ayarlar" })
 local selectedTeams = {}
 local isHitboxEnabled = false
@@ -160,22 +158,24 @@ local function applyHitbox(player)
         head.Transparency = lastTransparency
         head.BrickColor = BrickColor.new(lastColor)
         head.CanCollide = false
+        head.Material = Enum.Material.ForceField
     end
 end
 
 local function resetHitbox(player)
-    if player and player.Character and player:FindFirstChild("Head") then
+    if player and player.Character and player.Character:FindFirstChild("Head") then
         local head = player.Character.Head
         head.Size = Vector3.new(2, 1, 1)
         head.Transparency = 0
         head.BrickColor = BrickColor.new("Medium stone grey")
         head.CanCollide = true
+        head.Material = Enum.Material.Plastic
     end
 end
 
 local function updateHitboxes()
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and table.find(selectedTeams, player.Team and player.Team.Name) then
+        if player ~= LocalPlayer and player.Team and table.find(selectedTeams, player.Team.Name) then
             applyHitbox(player)
         else
             resetHitbox(player)
@@ -186,18 +186,24 @@ end
 HitboxSection:AddToggle({
     Name = "Hitbox Aktif",
     Value = false,
-    Callback = function(v)
-        isHitboxEnabled = v
-        if v then
+    Callback = function(state)
+        isHitboxEnabled = state
+        if state then
             if hitboxConnection then hitboxConnection:Disconnect() end
             hitboxConnection = RunService.Heartbeat:Connect(updateHitboxes)
         else
-            if hitboxConnection then hitboxConnection:Disconnect() hitboxConnection = nil end
-            for _, player in ipairs(Players:GetPlayers()) do resetHitbox(player) end
+            if hitboxConnection then
+                hitboxConnection:Disconnect()
+                hitboxConnection = nil
+            end
+            for _, player in ipairs(Players:GetPlayers()) do
+                resetHitbox(player)
+            end
         end
     end
 })
-HitboxSection:AddSlider({ Name = "Boyut", Min = 0, Max = 5, Value = lastSize, Callback = function(v) lastSize = v end })
+
+HitboxSection:AddSlider({ Name = "Boyut", Min = 1, Max = 5, Value = lastSize, Callback = function(v) lastSize = v end })
 HitboxSection:AddSlider({ Name = "Şeffaflık", Min = 0, Max = 1, Value = lastTransparency, Callback = function(v) lastTransparency = v end })
 HitboxSection:AddColorPicker({ Name = "Renk", Value = lastColor, Callback = function(v) lastColor = v end })
 
@@ -208,11 +214,19 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
         Value = false,
         Callback = function(value)
             if value then
-                table.insert(selectedTeams, team)
+                if not table.find(selectedTeams, team) then
+                    table.insert(selectedTeams, team)
+                end
             else
                 for i, t in ipairs(selectedTeams) do
-                    if t == team then table.remove(selectedTeams, i) break end
+                    if t == team then
+                        table.remove(selectedTeams, i)
+                        break
+                    end
                 end
+            end
+            if isHitboxEnabled then
+                updateHitboxes()
             end
         end
     })
