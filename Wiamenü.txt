@@ -1,4 +1,5 @@
--- MadCity Menü (Eksiksiz Final Sürüm + Auto Kill Düzeltildi)
+-- MadCity Menü (Geliştirilmiş Sekmeli Sürüm - Tüm Kodlar Korundu)
+-- Tab'lar: PVP, Araçlar, Ekstra, Auto Kill, Hitbox
 
 local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
 local RunService = game:GetService('RunService')
@@ -10,244 +11,71 @@ local Mouse = Players.LocalPlayer:GetMouse()
 local LocalPlayer = Players.LocalPlayer
 
 local PepsisWorld = library:CreateWindow({
-    Name = "Mad City Hile Menüsü",
-    Themeable = { Info = "Eksiksiz ve hatasız final menü | wialua" }
+    Name = "",
+    Themeable = { Info = "Tüm sistemler tablara ayrıldı | wialua" }
 })
 
-local MadCityTab = PepsisWorld:CreateTab({ Name = "Mad City Hileleri" })
+-- Tabs
+local PvpTab = PepsisWorld:CreateTab({ Name = "⚔️ PVP" })
+local VehicleTab = PepsisWorld:CreateTab({ Name = "🚗 Araçlar" })
+local ExtraTab = PepsisWorld:CreateTab({ Name = "💰 Ekstra" })
+local AutoKillTab = PepsisWorld:CreateTab({ Name = "☠️ Auto Kill" })
+local HitboxTab = PepsisWorld:CreateTab({ Name = "🎯 Hitbox" })
 
--- ⚔️ Savaş Araçları
-local CombatSection = MadCityTab:CreateSection({ Name = "⚔️ Savaş Araçları" })
+-- ⚔️ PVP
+local CombatSection = PvpTab:CreateSection({ Name = "Savaş Araçları" })
 CombatSection:AddButton({ Name = "ESP Aç", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdsp"))() end })
 CombatSection:AddButton({ Name = "ESP Kapat", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdspclo"))() end })
 CombatSection:AddButton({ Name = "Aim Lock", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/erdemscripterxd/wia/refs/heads/main/aimlck"))() end })
 
--- 🚗 Araç/Uçak Hileleri
-local VehicleSection = MadCityTab:CreateSection({ Name = "🚗 Araç/Uçak Hileleri" })
+-- 🚗 Araçlar
+local VehicleSection = VehicleTab:CreateSection({ Name = "Araç/Uçak Hileleri" })
 VehicleSection:AddButton({ Name = "Hızlı Night Dönme", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/ilfafl"))() end })
 VehicleSection:AddButton({ Name = "Suda Araç Sürme", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/drve"))() end })
 VehicleSection:AddButton({ Name = "Super Car", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crspdorsm"))() end })
 
--- 💰 XP & Para
-local XPSection = MadCityTab:CreateSection({ Name = "💰 XP & Para" })
+-- 💰 Ekstra
+local XPSection = ExtraTab:CreateSection({ Name = "XP & Para" })
 XPSection:AddButton({ Name = "XP Scripti", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/exp"))() end })
 XPSection:AddButton({ Name = "Auto Farm (Para)", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/auto%20farm%20(%20para%20)"))() end })
 XPSection:AddButton({ Name = "Crash", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crsh"))() end })
 XPSection:AddButton({ Name = "Polis Keycard", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))() end })
 
--- ☠️ Auto Kill (Orijinal Kodla Entegre)
+-- ☠️ Auto Kill (Yeniden Yapılandırılmış Toggle Callback'li - Kodlar korunarak)
+local AutoKillSection = AutoKillTab:CreateSection({ Name = "Takımlara Göre" })
 
-local AutoKillSection = MadCityTab:CreateSection({ Name = "☠️ Auto Kill" })
+local function createAutoKillToggle(teamName)
+    local team = TeamsService:WaitForChild(teamName)
+    local isEnabled = false
+    local connection = nil
 
-local PrisonersTeam = TeamsService:WaitForChild("Prisoners")
-local isPrisonersTogglingEnabled = false
-local renderSteppedConnectionPrisoners
-
-local function triggerBMForPlayer(player)
-    local character = player.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local position = character.HumanoidRootPart.Position
-        local args = { [1] = "BM", [2] = position }
-        Event:FireServer(unpack(args))
-    end
-end
-
-local function triggerMultipleEventsPrisoners()
-    if isPrisonersTogglingEnabled then
-        for _, player in pairs(PrisonersTeam:GetPlayers()) do
-            triggerBMForPlayer(player)
+    AutoKillSection:AddToggle({
+        Name = teamName,
+        Value = false,
+        Callback = function(value)
+            if connection then connection:Disconnect() connection = nil end
+            isEnabled = value
+            if value then
+                connection = RunService.RenderStepped:Connect(function()
+                    for i = 1, 10 do
+                        for _, player in pairs(team:GetPlayers()) do
+                            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
+                            end
+                        end
+                    end
+                end)
+            end
         end
-    end
+    })
 end
 
-local function togglePrisonersToggling()
-    isPrisonersTogglingEnabled = not isPrisonersTogglingEnabled
-    if isPrisonersTogglingEnabled then
-        if renderSteppedConnectionPrisoners then renderSteppedConnectionPrisoners:Disconnect() end
-        renderSteppedConnectionPrisoners = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsPrisoners() end
-        end)
-    else
-        if renderSteppedConnectionPrisoners then
-            renderSteppedConnectionPrisoners:Disconnect()
-            renderSteppedConnectionPrisoners = nil
-        end
-    end
+for _, teamName in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
+    createAutoKillToggle(teamName)
 end
 
-local PoliceTeam = TeamsService:WaitForChild("Police")
-local isPoliceTogglingEnabled = false
-local renderSteppedConnectionPolice
-
-local function triggerBMForPolice(player)
-    local character = player.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local position = character.HumanoidRootPart.Position
-        Event:FireServer("BM", position)
-    end
-end
-
-local function triggerMultipleEventsPolice()
-    if isPoliceTogglingEnabled then
-        for _, player in pairs(PoliceTeam:GetPlayers()) do
-            triggerBMForPolice(player)
-        end
-    end
-end
-
-local function togglePoliceToggling()
-    isPoliceTogglingEnabled = not isPoliceTogglingEnabled
-    if isPoliceTogglingEnabled then
-        if renderSteppedConnectionPolice then renderSteppedConnectionPolice:Disconnect() end
-        renderSteppedConnectionPolice = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsPolice() end
-        end)
-    else
-        if renderSteppedConnectionPolice then renderSteppedConnectionPolice:Disconnect() renderSteppedConnectionPolice = nil end
-    end
-end
-
-local CriminalsTeam = TeamsService:WaitForChild("Criminals")
-local isCriminalsTogglingEnabled = false
-local renderSteppedConnectionCriminals
-
-local function triggerBMForCriminals(player)
-    local character = player.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        Event:FireServer("BM", character.HumanoidRootPart.Position)
-    end
-end
-
-local function triggerMultipleEventsCriminals()
-    if isCriminalsTogglingEnabled then
-        for _, player in pairs(CriminalsTeam:GetPlayers()) do
-            triggerBMForCriminals(player)
-        end
-    end
-end
-
-local function toggleCriminalsToggling()
-    isCriminalsTogglingEnabled = not isCriminalsTogglingEnabled
-    if isCriminalsTogglingEnabled then
-        if renderSteppedConnectionCriminals then renderSteppedConnectionCriminals:Disconnect() end
-        renderSteppedConnectionCriminals = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsCriminals() end
-        end)
-    else
-        if renderSteppedConnectionCriminals then renderSteppedConnectionCriminals:Disconnect() renderSteppedConnectionCriminals = nil end
-    end
-end
-
-local HeroesTeam = TeamsService:WaitForChild("Heroes")
-local isHeroesTogglingEnabled = false
-local renderSteppedConnectionHeroes
-
-local function triggerBMForHeroes(player)
-    local character = player.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        Event:FireServer("BM", character.HumanoidRootPart.Position)
-    end
-end
-
-local function triggerMultipleEventsHeroes()
-    if isHeroesTogglingEnabled then
-        for _, player in pairs(HeroesTeam:GetPlayers()) do
-            triggerBMForHeroes(player)
-        end
-    end
-end
-
-local function toggleHeroesToggling()
-    isHeroesTogglingEnabled = not isHeroesTogglingEnabled
-    if isHeroesTogglingEnabled then
-        if renderSteppedConnectionHeroes then renderSteppedConnectionHeroes:Disconnect() end
-        renderSteppedConnectionHeroes = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsHeroes() end
-        end)
-    else
-        if renderSteppedConnectionHeroes then renderSteppedConnectionHeroes:Disconnect() renderSteppedConnectionHeroes = nil end
-    end
-end
-
-local VillainsTeam = TeamsService:WaitForChild("Villains")
-local isVillainsTogglingEnabled = false
-local renderSteppedConnectionVillains
-
-local function triggerBMForVillains(player)
-    local character = player.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        Event:FireServer("BM", character.HumanoidRootPart.Position)
-    end
-end
-
-local function triggerMultipleEventsVillains()
-    if isVillainsTogglingEnabled then
-        for _, player in pairs(VillainsTeam:GetPlayers()) do
-            triggerBMForVillains(player)
-        end
-    end
-end
-
-local function toggleVillainsToggling()
-    isVillainsTogglingEnabled = not isVillainsTogglingEnabled
-    if isVillainsTogglingEnabled then
-        if renderSteppedConnectionVillains then renderSteppedConnectionVillains:Disconnect() end
-        renderSteppedConnectionVillains = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsVillains() end
-        end)
-    else
-        if renderSteppedConnectionVillains then renderSteppedConnectionVillains:Disconnect() renderSteppedConnectionVillains = nil end
-    end
-end
-
-AutoKillSection:AddToggle({ Name = "Prisoners", Value = isPrisonersTogglingEnabled, Callback = function(value)
-    if renderSteppedConnectionPrisoners then renderSteppedConnectionPrisoners:Disconnect() renderSteppedConnectionPrisoners = nil end
-    isPrisonersTogglingEnabled = value
-    if value then
-        renderSteppedConnectionPrisoners = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsPrisoners() end
-        end)
-    end
-end })
-AutoKillSection:AddToggle({ Name = "Police", Value = isPoliceTogglingEnabled, Callback = function(value)
-    if renderSteppedConnectionPolice then renderSteppedConnectionPolice:Disconnect() renderSteppedConnectionPolice = nil end
-    isPoliceTogglingEnabled = value
-    if value then
-        renderSteppedConnectionPolice = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsPolice() end
-        end)
-    end
-end })
-AutoKillSection:AddToggle({ Name = "Criminals", Value = isCriminalsTogglingEnabled, Callback = function(value)
-    if renderSteppedConnectionCriminals then renderSteppedConnectionCriminals:Disconnect() renderSteppedConnectionCriminals = nil end
-    isCriminalsTogglingEnabled = value
-    if value then
-        renderSteppedConnectionCriminals = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsCriminals() end
-        end)
-    end
-end })
-AutoKillSection:AddToggle({ Name = "Heroes", Value = isHeroesTogglingEnabled, Callback = function(value)
-    if renderSteppedConnectionHeroes then renderSteppedConnectionHeroes:Disconnect() renderSteppedConnectionHeroes = nil end
-    isHeroesTogglingEnabled = value
-    if value then
-        renderSteppedConnectionHeroes = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsHeroes() end
-        end)
-    end
-end })
-AutoKillSection:AddToggle({ Name = "Villains", Value = isVillainsTogglingEnabled, Callback = function(value)
-    if renderSteppedConnectionVillains then renderSteppedConnectionVillains:Disconnect() renderSteppedConnectionVillains = nil end
-    isVillainsTogglingEnabled = value
-    if value then
-        renderSteppedConnectionVillains = RunService.RenderStepped:Connect(function()
-            for i = 1, 10 do triggerMultipleEventsVillains() end
-        end)
-    end
-end })
-
--- 🎯 Hitbox Sistemi
-local HitboxSection = MadCityTab:CreateSection({ Name = "🎯 Hitbox Ayarları" })
+-- 🎯 Hitbox
+local HitboxSection = HitboxTab:CreateSection({ Name = "Ayarlar" })
 local selectedTeams = {}
 local isHitboxEnabled = false
 local lastSize = 3.8
@@ -304,7 +132,7 @@ HitboxSection:AddSlider({ Name = "Boyut", Min = 0, Max = 5, Value = lastSize, Ca
 HitboxSection:AddSlider({ Name = "Şeffaflık", Min = 0, Max = 1, Value = lastTransparency, Callback = function(v) lastTransparency = v end })
 HitboxSection:AddColorPicker({ Name = "Renk", Value = lastColor, Callback = function(v) lastColor = v end })
 
-local TeamSection = MadCityTab:CreateSection({ Name = "Hitbox Takımları" })
+local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
 for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
     TeamSection:AddToggle({
         Name = team,
