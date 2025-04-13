@@ -1,1 +1,323 @@
-game.Players.LocalPlayer:kick("Menü güncelleniyor ")
+local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
+local RunService = game:GetService('RunService')
+local Players = game:GetService('Players')
+local TeamsService = game:GetService("Teams")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Event = ReplicatedStorage:WaitForChild("Event")
+local Mouse = Players.LocalPlayer:GetMouse()
+local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+
+local PepsisWorld = library:CreateWindow({
+    Name = "Gelişmiş Menü",
+    Themeable = { Info = "Tüm sistemler tablara ayrıldı | wialua" }
+})
+
+-- Sekmeler
+local PvpTab = PepsisWorld:CreateTab({ Name = "⚔️" })
+local VehicleTab = PepsisWorld:CreateTab({ Name = "🚗" })
+local ExtraTab = PepsisWorld:CreateTab({ Name = "💰" })
+local AutoKillTab = PepsisWorld:CreateTab({ Name = "☠️" })
+local HitboxTab = PepsisWorld:CreateTab({ Name = "🎯" })
+local TeleportTab = PepsisWorld:CreateTab({ Name = "🔮" })
+
+-- ⚔️ PVP
+local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
+CombatSection:AddButton({ Name = "ESP Aç", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdsp"))() end })
+CombatSection:AddButton({ Name = "ESP Kapat", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdspclo"))() end })
+CombatSection:AddButton({ Name = "Aim Lock", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/erdemscripterxd/wia/refs/heads/main/aimlck"))() end })
+
+-- 🚗 Araçlar
+local VehicleSection = VehicleTab:CreateSection({ Name = "Araç/Uçak Hileleri" })
+VehicleSection:AddButton({ Name = "Hızlı Night Dönme", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/ilfafl"))() end })
+VehicleSection:AddButton({ Name = "Suda Araç Sürme", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/drve"))() end })
+VehicleSection:AddButton({ Name = "Super Car", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crspdorsm"))() end })
+
+-- 🚗 Araç Spawnlama
+local VehicleSpawnSection = VehicleTab:CreateSection({ Name = "Araç Spawnlama" })
+local selectedVehicle = "Nighthawk"
+VehicleSpawnSection:AddDropdown({
+    Name = "Araç Seç",
+    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
+    Callback = function(v) selectedVehicle = v end
+})
+VehicleSpawnSection:AddButton({
+    Name = "Seçilen Araca Bin",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local HRP = char.HumanoidRootPart
+        local btp = Instance.new("Vector3Value", LocalPlayer)
+        btp.Name = "btp"
+        btp.Value = HRP.Position
+        HRP.CFrame = Workspace.VehicleSpawns[selectedVehicle].Pos.CFrame
+        wait()
+        HRP.CFrame = CFrame.new(btp.Value)
+        wait()
+        local vehicle = Workspace.ObjectSelection[selectedVehicle]
+        if vehicle then
+            vehicle.DriveSeat.Disabled = false
+            vehicle:MoveTo(HRP.Position)
+            wait()
+            HRP.CFrame = vehicle.DriveSeat.CFrame
+            wait()
+            vehicle.DriveSeat.Disabled = true
+        end
+        btp:Destroy()
+    end
+})
+
+-- 🚗 Araç Spawnlama (Event Sistemiyle)
+local VehicleSpawnEventSection = VehicleTab:CreateSection({ Name = "Araç Spawn (Sende Olanlar)" })
+local selectedSpawnVehicle = "Fury"
+
+VehicleSpawnEventSection:AddDropdown({
+    Name = "Spawnlanacak Araç",
+    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
+    Callback = function(v) selectedSpawnVehicle = v end
+})
+
+VehicleSpawnEventSection:AddButton({
+    Name = "Araç Spawn (Sende Olanlar)",
+    Callback = function()
+        local args = {
+            [1] = "SpawnVehicle",
+            [2] = selectedSpawnVehicle
+        }
+        Event:FireServer(unpack(args))
+    end
+})
+
+-- 💰 Ekstra
+local XPSection = ExtraTab:CreateSection({ Name = "XP & Para" })
+XPSection:AddButton({ Name = "XP Scripti", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/exp"))() end })
+XPSection:AddButton({ Name = "Auto Farm", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/auto%20farm%20(%20para%20)"))() end })
+XPSection:AddButton({ Name = "Crash", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crsh"))() end })
+XPSection:AddButton({ Name = "Polis Keycard", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))() end })
+
+-- ☠️ Auto Kill V1 (BM Hızlandırılmış, Toggle Kapalıyken Devre Dışı)
+local AutoKillSection = AutoKillTab:CreateSection({ Name = "Auto Kill V1 (BM - Hızlandırılmış)" })
+local function createAutoKillToggle(teamName)
+    local team = TeamsService:WaitForChild(teamName)
+    local connection = nil
+    AutoKillSection:AddToggle({
+        Name = teamName,
+        Value = false,
+        Callback = function(value)
+            if connection then
+                connection:Disconnect()  -- Önceki bağlantıyı kes
+                connection = nil
+            end
+
+            if value then
+                -- Toggle aktif olduğunda, task.wait(0) ile sürekli tetikleme başlat
+                connection = task.spawn(function()
+                    while true do
+                        -- Eğer toggle kapalıysa, döngüyü sonlandır
+                        if not value then
+                            break
+                        end
+
+                        for _, player in pairs(team:GetPlayers()) do
+                            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
+                            end
+                        end
+                        task.wait(0)
+                    end
+                end)
+            end
+        end
+    })
+end
+for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
+    createAutoKillToggle(team)
+end
+
+-- ☠️ Auto Kill V2 (BM Tetikleme)
+local AutoKillV2Section = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (BM Tetikle)" })
+local function createAutoKillV2(teamName)
+    local team = TeamsService:WaitForChild(teamName)
+    local connection = nil
+    AutoKillV2Section:AddToggle({
+        Name = "V2: " .. teamName,
+        Value = false,
+        Callback = function(enabled)
+            if connection then
+                connection:Disconnect()  -- Önceki bağlantıyı kes
+                connection = nil
+            end
+
+            if enabled then
+                connection = RunService.Heartbeat:Connect(function()
+                    for _, player in ipairs(team:GetPlayers()) do
+                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
+                        end
+                    end
+                end)
+            end
+        end
+    })
+end
+for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
+    createAutoKillV2(team)
+end
+
+-- ☠️ Auto Kill V3 (Seçilen Oyuncuya Göre Toggle ile Kill)
+local AutoKillPlayerSection = AutoKillTab:CreateSection({ Name = "Oyuncuya Göre Auto Kill" })
+local selectedPlayerName = ""  -- Başlangıçta boş bir oyuncu seçili
+local autoKillConnection = nil
+
+local function triggerBM(targetHRP)
+    local targetPos = targetHRP.Position
+    -- BM event'ini 2 kez tetikleyelim
+    Event:FireServer("BM", targetPos)
+    Event:FireServer("BM", targetPos)
+end
+
+local function triggerAttack(targetPlayerName)
+    local targetPlayer = Players:FindFirstChild(targetPlayerName)
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetHRP = targetPlayer.Character.HumanoidRootPart
+        task.spawn(function()
+            triggerBM(targetHRP)
+        end)
+    end
+end
+
+-- Menüdeki Dropdown'u güncelleme
+local function updatePlayerList()
+    local playerNames = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name ~= LocalPlayer.Name then
+            table.insert(playerNames, player.Name)
+        end
+    end
+    return playerNames
+end
+
+-- Auto Kill Player Toggle ekleyelim
+AutoKillPlayerSection:AddDropdown({
+    Name = "Oyuncu Seç",
+    List = updatePlayerList(),  -- Oyuncu listesi her zaman güncel olacak
+    Callback = function(selectedPlayer)
+        selectedPlayerName = selectedPlayer  -- Seçilen oyuncuyu al
+    end
+})
+
+AutoKillPlayerSection:AddToggle({
+    Name = "Auto Kill Aktif",
+    Value = false,  -- Başlangıçta kapalı
+    Callback = function(enabled)
+        if enabled then
+            -- Toggle aktif olduğunda, sürekli tetiklemeyi başlat
+            if selectedPlayerName ~= "" then
+                if autoKillConnection then
+                    autoKillConnection:Disconnect()  -- Önceden var olan bağlantıyı kes
+                end
+                autoKillConnection = RunService.Heartbeat:Connect(function()
+                    triggerAttack(selectedPlayerName)  -- Seçilen oyuncuya BM tetikle
+                end)
+            end
+        else
+            -- Toggle kapalı olduğunda, bağlantıyı kes
+            if autoKillConnection then
+                autoKillConnection:Disconnect()
+                autoKillConnection = nil
+            end
+        end
+    end
+})
+
+-- 🎯 Hitbox (Gelişmiş ve Stabil)
+local HitboxSection = HitboxTab:CreateSection({ Name = "Ayarlar" })
+local selectedTeams = {}
+local isHitboxEnabled = false
+local lastSize = 3.8
+local lastTransparency = 0.5
+local lastColor = Color3.fromRGB(255, 0, 0)
+local hitboxConnection
+
+local function applyHitbox(player)
+    if player and player.Character and player.Character:FindFirstChild("Head") then
+        local head = player.Character.Head
+        head.Size = Vector3.new(lastSize, lastSize, lastSize)
+        head.Transparency = lastTransparency
+        head.BrickColor = BrickColor.new(lastColor)
+        head.CanCollide = false
+        head.Material = Enum.Material.ForceField
+    end
+end
+
+local function resetHitbox(player)
+    if player and player.Character and player.Character:FindFirstChild("Head") then
+        local head = player.Character.Head
+        head.Size = Vector3.new(2, 1, 1)
+        head.Transparency = 0
+        head.BrickColor = BrickColor.new("Medium stone grey")
+        head.CanCollide = true
+        head.Material = Enum.Material.Plastic
+    end
+end
+
+local function updateHitboxes()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team and table.find(selectedTeams, player.Team.Name) then
+            applyHitbox(player)
+        else
+            resetHitbox(player)
+        end
+    end
+end
+
+HitboxSection:AddToggle({
+    Name = "Hitbox Aktif",
+    Value = false,
+    Callback = function(state)
+        isHitboxEnabled = state
+        if state then
+            if hitboxConnection then hitboxConnection:Disconnect() end
+            hitboxConnection = RunService.Heartbeat:Connect(updateHitboxes)
+        else
+            if hitboxConnection then
+                hitboxConnection:Disconnect()
+                hitboxConnection = nil
+            end
+            for _, player in ipairs(Players:GetPlayers()) do
+                resetHitbox(player)
+            end
+        end
+    end
+})
+
+HitboxSection:AddSlider({ Name = "Boyut", Min = 1, Max = 5, Value = lastSize, Callback = function(v) lastSize = v end })
+HitboxSection:AddSlider({ Name = "Şeffaflık", Min = 0, Max = 1, Value = lastTransparency, Callback = function(v) lastTransparency = v end })
+HitboxSection:AddColorPicker({ Name = "Renk", Value = lastColor, Callback = function(v) lastColor = v end })
+
+local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
+for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
+    TeamSection:AddToggle({
+        Name = team,
+        Value = false,
+        Callback = function(value)
+            if value then
+                if not table.find(selectedTeams, team) then
+                    table.insert(selectedTeams, team)
+                end
+            else
+                for i, t in ipairs(selectedTeams) do
+                    if t == team then
+                        table.remove(selectedTeams, i)
+                        break
+                    end
+                end
+            end
+            if isHitboxEnabled then
+                updateHitboxes()
+            end
+        end
+    })
+end
+
+PepsisWorld:Display()
