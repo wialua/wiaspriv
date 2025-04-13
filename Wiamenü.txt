@@ -1,5 +1,3 @@
--- MadCity Menü (Gelişmiş Sekmeli Sürüm - Eksiksiz Versiyon)
-
 local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
 local RunService = game:GetService('RunService')
 local Players = game:GetService('Players')
@@ -88,7 +86,6 @@ VehicleSpawnEventSection:AddButton({
     end
 })
 
-
 -- 💰 Ekstra
 local XPSection = ExtraTab:CreateSection({ Name = "XP & Para" })
 XPSection:AddButton({ Name = "XP Scripti", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/exp"))() end })
@@ -96,8 +93,8 @@ XPSection:AddButton({ Name = "Auto Farm (Para)", Callback = function() loadstrin
 XPSection:AddButton({ Name = "Crash", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crsh"))() end })
 XPSection:AddButton({ Name = "Polis Keycard", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))() end })
 
--- ☠️ Auto Kill V1
-local AutoKillSection = AutoKillTab:CreateSection({ Name = "Auto Kill V1 (BM)" })
+-- ☠️ Auto Kill V1 (BM Hızlandırılmış, Toggle Kapalıyken Devre Dışı)
+local AutoKillSection = AutoKillTab:CreateSection({ Name = "Auto Kill V1 (BM - Hızlandırılmış)" })
 local function createAutoKillToggle(teamName)
     local team = TeamsService:WaitForChild(teamName)
     local connection = nil
@@ -105,15 +102,26 @@ local function createAutoKillToggle(teamName)
         Name = teamName,
         Value = false,
         Callback = function(value)
-            if connection then connection:Disconnect() connection = nil end
+            if connection then
+                connection:Disconnect()  -- Önceki bağlantıyı kes
+                connection = nil
+            end
+
             if value then
-                connection = RunService.RenderStepped:Connect(function()
-                    for i = 1, 10 do
+                -- Toggle aktif olduğunda, task.wait(0) ile sürekli tetikleme başlat
+                connection = task.spawn(function()
+                    while true do
+                        -- Eğer toggle kapalıysa, döngüyü sonlandır
+                        if not value then
+                            break
+                        end
+
                         for _, player in pairs(team:GetPlayers()) do
                             if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                                 Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
                             end
                         end
+                        task.wait(0)  -- Sürekli tetikleme (task.wait(0) kullanarak her frame'de)
                     end
                 end)
             end
@@ -124,8 +132,8 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
     createAutoKillToggle(team)
 end
 
--- ☠️ Auto Kill V2 (BM + Buzzard)
-local AutoKillV2Section = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (Fps Düşüren Versiyon)" })
+-- ☠️ Auto Kill V2 (BM Tetikleme)
+local AutoKillV2Section = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (BM Tetikle)" })
 local function createAutoKillV2(teamName)
     local team = TeamsService:WaitForChild(teamName)
     local connection = nil
@@ -133,26 +141,16 @@ local function createAutoKillV2(teamName)
         Name = "V2: " .. teamName,
         Value = false,
         Callback = function(enabled)
-            if connection then connection:Disconnect() connection = nil end
+            if connection then
+                connection:Disconnect()  -- Önceki bağlantıyı kes
+                connection = nil
+            end
+
             if enabled then
                 connection = RunService.Heartbeat:Connect(function()
                     for _, player in ipairs(team:GetPlayers()) do
                         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                            local target = player.Character.HumanoidRootPart
-                            Event:FireServer("BM", target.Position)
-                            local vehicleName = LocalPlayer.Name .. "'s Vehicle"
-                            local vehicle = Workspace:FindFirstChild("ObjectSelection"):FindFirstChild(vehicleName)
-                            if vehicle and vehicle:FindFirstChild("Body") and vehicle.Body:FindFirstChild("RightMissile") then
-                                local args = {
-                                    [1] = "ShootBuzzardMissiles",
-                                    [2] = Workspace:FindFirstChild(LocalPlayer.Name),
-                                    [3] = vehicle:FindFirstChild("Body"),
-                                    [4] = target,
-                                    [5] = vehicle.Body:FindFirstChild("RightMissile"),
-                                    [6] = 3
-                                }
-                                Event:FireServer(unpack(args))
-                            end
+                            Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
                         end
                     end
                 end)
@@ -163,6 +161,72 @@ end
 for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
     createAutoKillV2(team)
 end
+
+-- ☠️ Auto Kill V3 (Seçilen Oyuncuya Göre Toggle ile Kill)
+local AutoKillPlayerSection = AutoKillTab:CreateSection({ Name = "Oyuncuya Göre Auto Kill" })
+local selectedPlayerName = ""  -- Başlangıçta boş bir oyuncu seçili
+local autoKillConnection = nil
+
+local function triggerBM(targetHRP)
+    local targetPos = targetHRP.Position
+    -- BM event'ini 2 kez tetikleyelim
+    Event:FireServer("BM", targetPos)
+    Event:FireServer("BM", targetPos)
+end
+
+local function triggerAttack(targetPlayerName)
+    local targetPlayer = Players:FindFirstChild(targetPlayerName)
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetHRP = targetPlayer.Character.HumanoidRootPart
+        task.spawn(function()
+            triggerBM(targetHRP)
+        end)
+    end
+end
+
+-- Menüdeki Dropdown'u güncelleme
+local function updatePlayerList()
+    local playerNames = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name ~= LocalPlayer.Name then
+            table.insert(playerNames, player.Name)
+        end
+    end
+    return playerNames
+end
+
+-- Auto Kill Player Toggle ekleyelim
+AutoKillPlayerSection:AddDropdown({
+    Name = "Oyuncu Seç",
+    List = updatePlayerList(),  -- Oyuncu listesi her zaman güncel olacak
+    Callback = function(selectedPlayer)
+        selectedPlayerName = selectedPlayer  -- Seçilen oyuncuyu al
+    end
+})
+
+AutoKillPlayerSection:AddToggle({
+    Name = "Auto Kill Aktif",
+    Value = false,  -- Başlangıçta kapalı
+    Callback = function(enabled)
+        if enabled then
+            -- Toggle aktif olduğunda, sürekli tetiklemeyi başlat
+            if selectedPlayerName ~= "" then
+                if autoKillConnection then
+                    autoKillConnection:Disconnect()  -- Önceden var olan bağlantıyı kes
+                end
+                autoKillConnection = RunService.Heartbeat:Connect(function()
+                    triggerAttack(selectedPlayerName)  -- Seçilen oyuncuya BM tetikle
+                end)
+            end
+        else
+            -- Toggle kapalı olduğunda, bağlantıyı kes
+            if autoKillConnection then
+                autoKillConnection:Disconnect()
+                autoKillConnection = nil
+            end
+        end
+    end
+})
 
 -- 🎯 Hitbox (Gelişmiş ve Stabil)
 local HitboxSection = HitboxTab:CreateSection({ Name = "Ayarlar" })
