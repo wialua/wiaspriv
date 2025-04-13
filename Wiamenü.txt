@@ -9,19 +9,20 @@ local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 
 local PepsisWorld = library:CreateWindow({
-    Name = "",
+    Name = "Gelişmiş Menü",
     Themeable = { Info = "Tüm sistemler tablara ayrıldı | wialua" }
 })
 
--- Tabs
-local PvpTab = PepsisWorld:CreateTab({ Name = "⚔️ PVP" })
-local VehicleTab = PepsisWorld:CreateTab({ Name = "🚗 Araçlar" })
-local ExtraTab = PepsisWorld:CreateTab({ Name = "💰 Ekstra" })
-local AutoKillTab = PepsisWorld:CreateTab({ Name = "☠️ Auto Kill" })
-local HitboxTab = PepsisWorld:CreateTab({ Name = "🎯 Hitbox" })
+-- Sekmeler
+local PvpTab = PepsisWorld:CreateTab({ Name = "⚔️" })
+local VehicleTab = PepsisWorld:CreateTab({ Name = "🚗" })
+local ExtraTab = PepsisWorld:CreateTab({ Name = "💰" })
+local AutoKillTab = PepsisWorld:CreateTab({ Name = "☠️" })
+local HitboxTab = PepsisWorld:CreateTab({ Name = "🎯" })
+local TeleportTab = PepsisWorld:CreateTab({ Name = "🔮" })
 
 -- ⚔️ PVP
-local CombatSection = PvpTab:CreateSection({ Name = "Savaş Araçları" })
+local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
 CombatSection:AddButton({ Name = "ESP Aç", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdsp"))() end })
 CombatSection:AddButton({ Name = "ESP Kapat", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdspclo"))() end })
 CombatSection:AddButton({ Name = "Aim Lock", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/erdemscripterxd/wia/refs/heads/main/aimlck"))() end })
@@ -32,6 +33,7 @@ VehicleSection:AddButton({ Name = "Hızlı Night Dönme", Callback = function() 
 VehicleSection:AddButton({ Name = "Suda Araç Sürme", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/drve"))() end })
 VehicleSection:AddButton({ Name = "Super Car", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crspdorsm"))() end })
 
+-- 🚗 Araç Spawnlama
 local VehicleSpawnSection = VehicleTab:CreateSection({ Name = "Araç Spawnlama" })
 local selectedVehicle = "Nighthawk"
 VehicleSpawnSection:AddDropdown({
@@ -89,7 +91,7 @@ VehicleSpawnEventSection:AddButton({
 -- 💰 Ekstra
 local XPSection = ExtraTab:CreateSection({ Name = "XP & Para" })
 XPSection:AddButton({ Name = "XP Scripti", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/exp"))() end })
-XPSection:AddButton({ Name = "Auto Farm (Para)", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/auto%20farm%20(%20para%20)"))() end })
+XPSection:AddButton({ Name = "Auto Farm", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/auto%20farm%20(%20para%20)"))() end })
 XPSection:AddButton({ Name = "Crash", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crsh"))() end })
 XPSection:AddButton({ Name = "Polis Keycard", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))() end })
 
@@ -121,7 +123,7 @@ local function createAutoKillToggle(teamName)
                                 Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
                             end
                         end
-                        task.wait(0)  -- Sürekli tetikleme (task.wait(0) kullanarak her frame'de)
+                        task.wait(0)
                     end
                 end)
             end
