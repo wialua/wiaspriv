@@ -251,83 +251,60 @@ VehicleSpawnEventSection:AddButton({
         Event:FireServer(unpack(args))
     end
 })
--- 🎯 Gelişmiş ve Stabil Hitbox (Seçilebilir Vücut Parçası)
+-- 🎯 Hitbox (Gelişmiş ve Stabil)
 local HitboxSection = HitboxTab:CreateSection({ Name = "Ayarlar" })
 local selectedTeams = {}
 local isHitboxEnabled = false
-local lastSize = 3.8
+local lastSize = 20
 local lastTransparency = 0.5
 local lastColor = Color3.fromRGB(255, 0, 0)
-local selectedBodyPart = "Head" -- Varsayılan olarak baş
-local hitboxConnection -- Bağlantıyı saklayacağımız değişken
-local hitboxToggle -- Hitbox toggle butonunu saklayacağız
+local hitboxConnection
 
--- Seçilebilecek vücut parçaları
-local bodyParts = {"Head", "Torso", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
-
--- Vücut parçalarına hitbox uygulama fonksiyonu
 local function applyHitbox(player)
-    if player and player.Character then
-        local part = player.Character:FindFirstChild(selectedBodyPart)
-        
-        if part then
-            part.Size = Vector3.new(lastSize, lastSize, lastSize)
-            part.Transparency = lastTransparency
-            part.BrickColor = BrickColor.new(lastColor)
-            part.CanCollide = false
-            part.Material = Enum.Material.ForceField
-        end
+    if player and player.Character and player.Character:FindFirstChild("Head") then
+        local head = player.Character.Head
+        head.Size = Vector3.new(lastSize, lastSize, lastSize)
+        head.Transparency = lastTransparency
+        head.BrickColor = BrickColor.new(lastColor)
+        head.CanCollide = false
+        head.Material = Enum.Material.ForceField
     end
 end
 
--- Vücut parçalarına hitbox sıfırlama fonksiyonu
 local function resetHitbox(player)
-    if player and player.Character then
-        local part = player.Character:FindFirstChild(selectedBodyPart)
-        
-        if part then
-            -- Varsayılan değerler
-            part.Size = Vector3.new(2, 2, 2)
-            part.Transparency = 0
-            part.BrickColor = BrickColor.new("Medium stone grey")
-            part.CanCollide = true
-            part.Material = Enum.Material.Plastic
-        end
+    if player and player.Character and player.Character:FindFirstChild("Head") then
+        local head = player.Character.Head
+        head.Size = Vector3.new(2, 1, 1)
+        head.Transparency = 0
+        head.BrickColor = BrickColor.new("Medium stone grey")
+        head.CanCollide = true
+        head.Material = Enum.Material.Plastic
     end
 end
 
--- Tüm oyunculardaki hitbox'ları güncelleme fonksiyonu
 local function updateHitboxes()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Team and table.find(selectedTeams, player.Team.Name) then
-            -- Eski hitbox'ı sıfırlayıp yeni hitbox'ı uyguluyoruz
-            resetHitbox(player)
             applyHitbox(player)
         else
-            resetHitbox(player) -- Takım dışı oyuncularda hitbox'ı sıfırlıyoruz
+            resetHitbox(player)
         end
     end
 end
 
--- Hitbox'ı açma/kapama toggle'ı
-hitboxToggle = HitboxSection:AddToggle({
+HitboxSection:AddToggle({
     Name = "Hitbox Aktif",
     Value = false,
     Callback = function(state)
         isHitboxEnabled = state
         if state then
-            -- Eğer hitbox aktifse, RenderStepped'e bağlanalım
-            if hitboxConnection then
-                hitboxConnection:Disconnect()
-            end
-            hitboxConnection = RunService.RenderStepped:Connect(updateHitboxes)
+            if hitboxConnection then hitboxConnection:Disconnect() end
+            hitboxConnection = RunService.Heartbeat:Connect(updateHitboxes)
         else
-            -- Eğer hitbox kapalıysa, bağlantıyı keselim
             if hitboxConnection then
                 hitboxConnection:Disconnect()
                 hitboxConnection = nil
             end
-            -- Hitbox'ı sıfırlayalım
             for _, player in ipairs(Players:GetPlayers()) do
                 resetHitbox(player)
             end
@@ -335,33 +312,10 @@ hitboxToggle = HitboxSection:AddToggle({
     end
 })
 
--- Boyut, şeffaflık ve renk ayarları
-HitboxSection:AddSlider({ Name = "Boyut", Min = 1, Max = 5, Value = lastSize, Callback = function(v) lastSize = v end })
+HitboxSection:AddSlider({ Name = "Boyut", Min = 1, Max = 20, Value = lastSize, Callback = function(v) lastSize = v end })
 HitboxSection:AddSlider({ Name = "Şeffaflık", Min = 0, Max = 1, Value = lastTransparency, Callback = function(v) lastTransparency = v end })
 HitboxSection:AddColorPicker({ Name = "Renk", Value = lastColor, Callback = function(v) lastColor = v end })
 
--- Vücut parçası seçimi dropdown'u
-HitboxSection:AddDropdown({
-    Name = "Vücut Parçası Seç",
-    List = bodyParts,
-    Callback = function(selectedPart)
-        -- Vücut parçası değiştiğinde önce hitbox'ı kapatıyoruz
-        hitboxToggle:Set(false)  -- Hitbox toggle'ını kapatıyoruz
-        selectedBodyPart = selectedPart
-        if isHitboxEnabled then
-            -- Eğer hitbox aktifse, bağlantıyı kesip yeni bir bağlantı kuruyoruz
-            if hitboxConnection then
-                hitboxConnection:Disconnect()
-            end
-            -- Hitbox'ı yeniden başlatıyoruz
-            hitboxConnection = RunService.RenderStepped:Connect(updateHitboxes)
-            -- Yeni parça seçildikten sonra toggle'ı yeniden aktif ediyoruz
-            hitboxToggle:Set(true)  -- Toggle'ı tekrar açıyoruz
-        end
-    end
-})
-
--- Takım seçimi toggle'ları
 local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
 for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
     TeamSection:AddToggle({
@@ -369,12 +323,10 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
         Value = false,
         Callback = function(value)
             if value then
-                -- Takım seçildiğinde, bu takımı ekliyoruz
                 if not table.find(selectedTeams, team) then
                     table.insert(selectedTeams, team)
                 end
             else
-                -- Takım kaldırıldığında, bu takımı listeden çıkarıyoruz
                 for i, t in ipairs(selectedTeams) do
                     if t == team then
                         table.remove(selectedTeams, i)
@@ -382,13 +334,8 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
                     end
                 end
             end
-
-            -- Takım seçildiğinde hitbox'ları güncelliyoruz
             if isHitboxEnabled then
-                if hitboxConnection then
-                    hitboxConnection:Disconnect()
-                end
-                hitboxConnection = RunService.RenderStepped:Connect(updateHitboxes)
+                updateHitboxes()
             end
         end
     })
