@@ -1,10 +1,1 @@
-for i = 1,50 do
-    for i,v in pairs(game.Players:GetChildren()) do
-local args = {
-    [1] = "Pickpocket",
-    [2] = v
-}
-
-game:GetService("ReplicatedStorage").Event:FireServer(unpack(args))
-end
-end
+print"31"
