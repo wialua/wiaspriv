@@ -77,37 +77,54 @@ TeleportSection:AddButton({ Name = "Train", Callback = function() if game.Worksp
 TeleportSection:AddButton({ Name = "Plane", Callback = function() game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(game.Workspace.CargoPlane.Plane.Tele1.Position) end })
 -- Auto Kill V1: BM Hızlandırılmış
 local AutoKillSectionV1 = AutoKillTab:CreateSection({ Name = "Auto Kill V1 (BM - Hızlandırılmış)" })
+local RunService = game:GetService("RunService")
+local TeamsService = game:GetService("Teams")
+local Event = game.ReplicatedStorage:WaitForChild("Event")
+
 local function createAutoKillToggleV1(teamName)
     local team = TeamsService:WaitForChild(teamName)
-    local connection = nil
+    local isActive = false  -- Toggle durumunu takip etmek için bir değişken
+    local connection = nil  -- Heartbeat bağlantısını tutacak değişken
+
     AutoKillSectionV1:AddToggle({
         Name = teamName,
         Value = false,
         Callback = function(value)
-            if connection then
-                connection:Disconnect()  -- Önceki bağlantıyı kes
-                connection = nil
-            end
+            isActive = value  -- Toggle'ın aktif durumunu güncelle
 
             if value then
-                connection = task.spawn(function()
-                    while true do
-                        if not value then break end
-                        for _, player in pairs(team:GetPlayers()) do
-                            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                                Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
-                            end
+                -- Toggle açıldığında, Heartbeat bağlantısını oluştur
+                if connection then
+                    connection:Disconnect()  -- Önceki bağlantıyı kes
+                end
+
+                connection = RunService.Heartbeat:Connect(function()
+                    if not isActive then
+                        connection:Disconnect()  -- Toggle kapalıysa, bağlantıyı kes
+                        return
+                    end
+
+                    -- Takımdaki her oyuncuya işlem yap
+                    for _, player in pairs(team:GetPlayers()) do
+                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            -- Event tetikle
+                            Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
                         end
-                        task.wait(0)
                     end
                 end)
+            elseif connection then
+                -- Eğer toggle kapalıysa, mevcut bağlantıyı kes
+                connection:Disconnect()
             end
         end
     })
 end
+
+-- Her bir takım için Auto Kill Toggle'ını oluştur
 for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
     createAutoKillToggleV1(team)
 end
+
 -- Auto Kill V2: BM Tetikleme
 local AutoKillSectionV2 = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (BM Tetikle)" })
 local function createAutoKillV2(teamName)
