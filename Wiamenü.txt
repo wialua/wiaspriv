@@ -106,9 +106,14 @@ local function createAutoKillToggleV1(teamName)
 
                     -- Takımdaki her oyuncuya işlem yap
                     for _, player in pairs(team:GetPlayers()) do
-                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                            -- Event tetikle
-                            Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
+                        if player.Character then
+                            -- Karakterdeki tüm BasePart'ları kontrol et
+                            for _, part in pairs(player.Character:GetChildren()) do
+                                if part:IsA("BasePart") then
+                                    -- Event'i her BasePart için tetikle
+                                    Event:FireServer("BM", part.Position)
+                                end
+                            end
                         end
                     end
                 end)
@@ -124,6 +129,7 @@ end
 for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
     createAutoKillToggleV1(team)
 end
+
 
 -- Auto Kill V2: BM Tetikleme
 local AutoKillSectionV2 = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (BM Tetikle)" })
