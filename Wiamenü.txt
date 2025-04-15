@@ -1,7 +1,10 @@
--- Menü Kütüphanesini Yükle
 local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
 
--- Oyuncu ve Servisler
+local PepsisWorld = library:CreateWindow({
+    Name = "Wia Menü Beta",
+    Themeable = { Info = "Beta Version" }
+})
+
 local RunService = game:GetService('RunService')
 local Players = game:GetService('Players')
 local TeamsService = game:GetService("Teams")
@@ -10,14 +13,6 @@ local Event = ReplicatedStorage:WaitForChild("Event")
 local Mouse = Players.LocalPlayer:GetMouse()
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
-
--- Menü Penceresini Oluştur
-local PepsisWorld = library:CreateWindow({
-    Name = "Gelişmiş Menü",
-    Themeable = { Info = "Tüm sistemler tablara ayrıldı | wialua" }
-})
-
--- Sekmeleri Oluştur
 local PvpTab = PepsisWorld:CreateTab({ Name = "⚔️" })
 local VehicleTab = PepsisWorld:CreateTab({ Name = "🚗" })
 local ExtraTab = PepsisWorld:CreateTab({ Name = "💰" })
@@ -27,17 +22,224 @@ local TeleportTab = PepsisWorld:CreateTab({ Name = "🔮" })
 local MusicTab = PepsisWorld:CreateTab({ Name = "🎵" })
 local ChatTab = PepsisWorld:CreateTab({ Name = "💬" })
 local SystemTab = PepsisWorld:CreateTab({ Name = "🛠️" })
--- ⚔️ PVP Sekmesi
+
+
 local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
-CombatSection:AddButton({ Name = "ESP Aç", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdsp"))() end })
-CombatSection:AddButton({ Name = "ESP Kapat", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/mdspclo"))() end })
-CombatSection:AddButton({ Name = "Aim Lock", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/erdemscripterxd/wia/refs/heads/main/aimlck"))() end })
--- 🚗 Araçlar Sekmesi
+
+CombatSection:AddButton({
+    Name = "ESP Aç",
+    Callback = function()
+        -- ESP Aç Scripti
+        local Players = game:GetService("Players")
+
+        local function fixNameTag(player)
+            local function apply()
+                local char = player.Character
+                if not char then return end
+                local nameTag = char:FindFirstChild("NameTag")
+                if nameTag then
+                    nameTag.AlwaysOnTop = true
+                    nameTag.MaxDistance = 10000
+                end
+            end
+
+            if player.Character then apply() end
+
+            player.CharacterAdded:Connect(function(char)
+                char:WaitForChild("NameTag", 10)
+                apply()
+                local nameTag = char:FindFirstChild("NameTag")
+                if nameTag then
+                    nameTag:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
+                        nameTag.AlwaysOnTop = true
+                    end)
+                end
+            end)
+        end
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            fixNameTag(player)
+        end
+
+        Players.PlayerAdded:Connect(fixNameTag)
+    end
+})
+
+local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
+
+CombatSection:AddButton({
+    Name = "ESP Kapat",
+    Callback = function()
+        -- ESP Kapat Scripti
+        for _, player in pairs(game:GetService("Players"):GetChildren()) do
+            local character = player.Character or player.CharacterAdded:Wait()
+            local nameTag = character:FindFirstChild("NameTag")
+            if nameTag then
+                nameTag.AlwaysOnTop = false
+                nameTag.MaxDistance = 10000
+            end
+        end
+
+        game:GetService("Players").PlayerAdded:Connect(function(player)
+            player.CharacterAdded:Connect(function(character)
+                local nameTag = character:WaitForChild("NameTag", 10)
+                if nameTag then
+                    nameTag.AlwaysOnTop = false
+                    nameTag.MaxDistance = 10000
+                end
+            end)
+        end)
+    end
+})
+
+local VehicleSpawnEventSection = VehicleTab:CreateSection({ Name = "Araç Spawn (Sende Olanlar)" })
+local selectedSpawnVehicle = "Fury"
+
+VehicleSpawnEventSection:AddDropdown({
+    Name = "Spawnlanacak Araç",
+    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
+    Callback = function(v) selectedSpawnVehicle = v end
+})
+
+VehicleSpawnEventSection:AddButton({
+    Name = "Araç Spawn (Sende Olanlar)",
+    Callback = function()
+        local args = {
+            [1] = "SpawnVehicle",
+            [2] = selectedSpawnVehicle
+        }
+        Event:FireServer(unpack(args))
+    end
+})
+
+local VehicleSpawnSection = VehicleTab:CreateSection({ Name = "Araç Spawnlama" })
+local selectedVehicle = "Nighthawk"
+VehicleSpawnSection:AddDropdown({
+    Name = "Araç Seç",
+    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
+    Callback = function(v) selectedVehicle = v end
+})
+VehicleSpawnSection:AddButton({
+    Name = "Seçilen Araca Bin",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local HRP = char.HumanoidRootPart
+        local btp = Instance.new("Vector3Value", LocalPlayer)
+        btp.Name = "btp"
+        btp.Value = HRP.Position
+        HRP.CFrame = Workspace.VehicleSpawns[selectedVehicle].Pos.CFrame
+        wait()
+        HRP.CFrame = CFrame.new(btp.Value)
+        wait()
+        local vehicle = Workspace.ObjectSelection[selectedVehicle]
+        if vehicle then
+            vehicle.DriveSeat.Disabled = false
+            vehicle:MoveTo(HRP.Position)
+            wait()
+            HRP.CFrame = vehicle.DriveSeat.CFrame
+            wait()
+            vehicle.DriveSeat.Disabled = true
+        end
+        btp:Destroy()
+    end
+})
+
 local VehicleSection = VehicleTab:CreateSection({ Name = "Araç/Uçak Hileleri" })
-VehicleSection:AddButton({ Name = "Hızlı Night Dönme", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/ilfafl"))() end })
-VehicleSection:AddButton({ Name = "Suda Araç Sürme", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/drve"))() end })
-VehicleSection:AddButton({ Name = "Super Car", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crspdorsm"))() end })
--- 🏠 Teleport Sekmesi
+
+VehicleSection:AddButton({
+    Name = "Super Car",
+    Callback = function()
+        -- Super Car Scripti
+        local a = {Price=150000, Bounce=1, Height=3.5, Sway=13.5, Suspension=20, TurnSpeed=2, Torque=2, MaxSpeed=900, BrakeForce=1, SpeedDecay=0.2, Boost=true, BoostParticles="Middle", Drift=true, VelLerp=0.2, RotLerp=0.2, DriftVelLerp=0.1, DriftRotLerp=0.2, HideCharacter=true, CameraOffset=26}
+
+        -- Araç parametrelerini değiştirme
+        for b, c in pairs(getgc(true)) do
+            if type(c) == "table" then
+                for d, e in pairs(a) do
+                    if rawget(c, d) ~= nil then
+                        c[d] = e
+                    end
+                end
+            end
+        end
+
+        -- Aracın Boost değerini ayarlama
+        local f = workspace.ObjectSelection:FindFirstChild(game.Players.LocalPlayer.Name.."'s Vehicle")
+        if f then
+            pcall(function() 
+                local g = f:FindFirstChild("CarChassis")
+                if g then
+                    local h = g:FindFirstChild("Boost")
+                    if h then
+                        h.Value = 20  -- Boost değerini 20 yapıyoruz
+                    end
+                end
+            end)
+        end
+    end
+})
+
+VehicleSection:AddButton({
+    Name = "Hızlı Dönme",
+    Callback = function()
+        -- Night Hızlı Dönme Scripti
+        local _a = {Price = 4000000, MaxAltitude = 650, MaxSpeed = 240, Acceleration = 1, DampeningAcceleration = 0.8, MaxVerticalTilt = 10, VerticalTiltUpSpeed = 1, VerticalTiltDownSpeed = 1, VerticalTiltDampening = 0.95, VerticalSpeedLimit = 30, HorizontalTiltSpeed = 6, MaxSideTilt = 20, SideTiltSpeed = 0.9, SideTiltDampening = 0.95, TurnSpeed = 3.5, HideCharacter = true, CameraOffset = 50, Missiles = true, Bombs = true, Stealth = true, MissileTargetRange = 540, MissileCooldown = 2, MissileLock = 0}
+
+        for i, v in pairs(getgc(true)) do
+            if type(v) == "table" then
+                for p, val in pairs(_a) do
+                    if rawget(v, p) ~= nil then
+                        v[p] = val
+                    end
+                end
+            end
+        end
+
+        -- Bomba bırakma işlemi
+        local r = game.ReplicatedStorage:WaitForChild("Event")
+        local u = game:GetService("UserInputService")
+
+        u.InputBegan:Connect(function(i, p)
+            if not p then
+                if i.KeyCode == Enum.KeyCode.G then
+                    r:FireServer("DropBomb")
+                end
+            end
+        end)
+    end
+})
+
+VehicleSection:AddButton({
+    Name = "Suda Araç Sürme",
+    Callback = function()
+        -- Suda Araç Sürme Scripti
+        for k,v in pairs(game:GetService("Workspace").Water:GetChildren()) do
+            v.CanCollide = true
+            v.Anchored = true
+            v.Material = "Ice"  -- Suyun buz gibi olmasını sağlıyoruz
+            v:Clone().Parent = v.Parent  -- Su objesinin bir kopyasını oluşturuyoruz
+            v:Destroy()  -- Eski su objesini yok ediyoruz
+        end
+
+        -- Ocean objesinin adını değiştiriyoruz
+        for i, v in pairs(game:GetService("Workspace"):GetDescendants()) do
+            if v.Name == "Ocean" then
+                v.Name = "NotWater"  -- Su yerine başka bir ad veriyoruz
+            end
+        end
+
+        -- Yeni bir Water folder'ı oluşturuyoruz
+        local newfolder = Instance.new("Folder")
+        newfolder.Name = "Water"
+        newfolder.Parent = game:GetService("Workspace")
+
+        -- Su objesinin ismini değiştiriyoruz
+        wait(0.1)
+        game:GetService("Workspace").Water.Name = "NotWaterBruh"  -- Su artık "NotWaterBruh" olacak
+    end
+})
+
 local TeleportSection = TeleportTab:CreateSection({ Name = "Hızlı Teleport" })
 
 -- Teleport Fonksiyonu
@@ -75,7 +277,7 @@ TeleportSection:AddButton({ Name = "Pyramid", Callback = function() tp(-1046, 18
 TeleportSection:AddButton({ Name = "Casino", Callback = function() tp(1697, 38, 739) end })
 TeleportSection:AddButton({ Name = "Train", Callback = function() if game.Workspace.Train ~= nil then tp(game.Workspace.Train.Mid1.Yeet.Position) end end })
 TeleportSection:AddButton({ Name = "Plane", Callback = function() game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(game.Workspace.CargoPlane.Plane.Tele1.Position) end })
--- Auto Kill V1: BM Hızlandırılmış
+
 local AutoKillSectionV1 = AutoKillTab:CreateSection({ Name = "Auto Kill V1 (BM - Hızlandırılmış)" })
 local RunService = game:GetService("RunService")
 local TeamsService = game:GetService("Teams")
@@ -130,8 +332,6 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
     createAutoKillToggleV1(team)
 end
 
-
--- Auto Kill V2: BM Tetikleme
 local AutoKillSectionV2 = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (BM Tetikle)" })
 local function createAutoKillV2(teamName)
     local team = TeamsService:WaitForChild(teamName)
@@ -160,7 +360,7 @@ end
 for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
     createAutoKillV2(team)
 end
--- Auto Kill V3: Seçilen Oyuncuya Göre Auto Kill
+
 local AutoKillPlayerSection = AutoKillTab:CreateSection({ Name = "Oyuncuya Göre Auto Kill" })
 local selectedPlayerName = ""  -- Başlangıçta boş bir oyuncu seçili
 local autoKillConnection = nil
@@ -220,61 +420,94 @@ AutoKillPlayerSection:AddToggle({
         end
     end
 })
--- 🚗 Araç Spawnlama
-local VehicleSpawnSection = VehicleTab:CreateSection({ Name = "Araç Spawnlama" })
-local selectedVehicle = "Nighthawk"
-VehicleSpawnSection:AddDropdown({
-    Name = "Araç Seç",
-    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
-    Callback = function(v) selectedVehicle = v end
-})
-VehicleSpawnSection:AddButton({
-    Name = "Seçilen Araca Bin",
+
+local XPSection = ExtraTab:CreateSection({ Name = "XP & Para" })
+
+-- Auto Farm Para
+XPSection:AddButton({
+    Name = "Auto Farm Para",
     Callback = function()
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local HRP = char.HumanoidRootPart
-        local btp = Instance.new("Vector3Value", LocalPlayer)
-        btp.Name = "btp"
-        btp.Value = HRP.Position
-        HRP.CFrame = Workspace.VehicleSpawns[selectedVehicle].Pos.CFrame
-        wait()
-        HRP.CFrame = CFrame.new(btp.Value)
-        wait()
-        local vehicle = Workspace.ObjectSelection[selectedVehicle]
-        if vehicle then
-            vehicle.DriveSeat.Disabled = false
-            vehicle:MoveTo(HRP.Position)
-            wait()
-            HRP.CFrame = vehicle.DriveSeat.CFrame
-            wait()
-            vehicle.DriveSeat.Disabled = true
+        -- Auto Farm Para Scripti
+        getgenv().fps = false -- Makes The Map Invisable To Increase Fps
+        getgenv().whitescreen = false -- Enables A White-Screen
+        getgenv().Arrest = false -- Arrests Most Players Before AutoRobbing
+        
+        -- Scripti Çalıştırma
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/AdminEvilDRagon/smallAR/refs/heads/main/SmallAR.lua", true))()
+    end
+})
+
+-- Crash
+XPSection:AddButton({
+    Name = "Crash",
+    Callback = function()
+        -- Crash Scripti
+        if game.Players.LocalPlayer.Backpack:FindFirstChild("Shotgun") == nil then 
+            game:GetService("StarterGui"):SetCore("SendNotification",{     
+                Title = "Attention",     
+                Text = "Envanterinde shotgun olması gerek ve eline alma!",
+                Duration = 7, 
+            })
+        else
+            local plr = game.Players.LocalPlayer
+            local char = plr.Character
+
+            for i = 1, 20 do
+                wait()
+                workspace.ObjectSelection.Shotgun.Shotgun.Shotgun.Event:FireServer()
+            end
+            char.Humanoid:EquipTool(plr.Backpack.Shotgun)
+            for i = 1, 8000 do
+                game:GetService("ReplicatedStorage").Event:FireServer("ShootShotgun", workspace[plr.Name], Vector3.new(0, 0, 0), "Shotgun", "inf", "inf", "inf")
+            end
+            game:GetService("StarterGui"):SetCore("SendNotification",{     
+                Title = "Crash Server Script",     
+                Text = "Server Has Been Crashed",
+                Duration = 7, 
+            })
         end
-        btp:Destroy()
     end
 })
 
--- 🚗 Araç Spawnlama (Event Sistemiyle)
-local VehicleSpawnEventSection = VehicleTab:CreateSection({ Name = "Araç Spawn (Sende Olanlar)" })
-local selectedSpawnVehicle = "Fury"
-
-VehicleSpawnEventSection:AddDropdown({
-    Name = "Spawnlanacak Araç",
-    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
-    Callback = function(v) selectedSpawnVehicle = v end
-})
-
-VehicleSpawnEventSection:AddButton({
-    Name = "Araç Spawn (Sende Olanlar)",
+-- Keycard
+XPSection:AddButton({
+    Name = "Keycard",
     Callback = function()
-        local args = {
-            [1] = "SpawnVehicle",
-            [2] = selectedSpawnVehicle
-        }
-        Event:FireServer(unpack(args))
+        -- Keycard Scripti
+        for i = 1, 50 do
+            for i,v in pairs(game.Players:GetChildren()) do
+                local args = {
+                    [1] = "Pickpocket",
+                    [2] = v
+                }
+                game:GetService("ReplicatedStorage").Event:FireServer(unpack(args))
+            end
+        end
     end
 })
--- 🎯 Hitbox (Gelişmiş ve Stabil)
+
+-- XP Scripti
+XPSection:AddButton({
+    Name = "XP Scripti",
+    Callback = function()
+        -- XP scripti entegre ediliyor
+        game:GetService("ReplicatedStorage").RemoteFunction:InvokeServer("SetTeam", "Police")
+        
+        wait(0.5)
+        for _, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetChildren()) do
+            if v.Name == "Handcuffs" then
+                v.Parent = game:GetService("Players").LocalPlayer.Character
+            end
+        end
+
+        for i = 1, 1000 do  
+            game:GetService("RunService").RenderStepped:Connect(function()
+                game:GetService("ReplicatedStorage").Event:FireServer("Eject", game:GetService("Players").LocalPlayer)
+            end)
+        end
+    end
+})
+
 local HitboxSection = HitboxTab:CreateSection({ Name = "Ayarlar" })
 local selectedTeams = {}
 local isHitboxEnabled = false
@@ -363,179 +596,3 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
         end
     })
 end
--- 💰 Ekstra
-local XPSection = ExtraTab:CreateSection({ Name = "XP & Para" })
-XPSection:AddButton({ Name = "XP Scripti", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/exp"))() end })
-XPSection:AddButton({ Name = "Auto Farm", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/auto%20farm%20(%20para%20)"))() end })
-XPSection:AddButton({ Name = "Crash", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crsh"))() end })
-XPSection:AddButton({ Name = "Polis Keycard", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))() end })
--- Sistem Sekmesi: Server Hop
--- Gerekli Servisleri Al
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local PlaceId = game.PlaceId
-local CurrentJobId = game.JobId
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
--- RemoteEvent: Client ile iletişim için
-local serverListEvent = Instance.new("RemoteEvent")
-serverListEvent.Name = "ServerListEvent"
-serverListEvent.Parent = ReplicatedStorage
-
--- Menü Elemanları
-local SystemTab = game:GetService("ReplicatedStorage") -- Menü Tabları burada olacak
-local ServerHopSection = SystemTab:CreateSection({ Name = "🌐 Sunucu Hoplama Sistemi" })
-local statusLabel = ServerHopSection:AddLabel("Durum: Bekleniyor...")
-local serverCountLabel = ServerHopSection:AddLabel("Sunucular: 0")
-local pingLabel = ServerHopSection:AddLabel("Ping: Belirleniyor...")
-
--- Kullanıcı Ayarları
-local pingLimit = 200  -- ms olarak ping limiti
-local minPlayers = 1   -- Minimum oyuncu sayısı
-local maxPlayers = 10  -- Maksimum oyuncu sayısı
-local serverType = "Public" -- Sunucu türü (Public veya Private)
-
-local visitedServers = {}  -- Ziyaret edilen sunucuların IDsini saklayacağız
-
--- Sunucu listesini almak için RemoteEvent tetikle
-local function getServerList()
-    -- Sunucu listesini server-side'dan alıyoruz.
-    serverListEvent:FireServer({
-        pingLimit = pingLimit,
-        minPlayers = minPlayers,
-        maxPlayers = maxPlayers,
-        serverType = serverType,
-    })
-end
-
--- Sunucu seçme ve geçiş yapma
-local function hopToServer()
-    serverListEvent.OnClientEvent:Connect(function(filteredServers)
-        local validServers = {}
-
-        -- Sunucuları filtrele
-        for _, server in ipairs(filteredServers) do
-            if not visitedServers[server.id] then
-                -- Ping filtresi
-                local ping = getPing()
-                if ping <= pingLimit then
-                    table.insert(validServers, server)
-                end
-            end
-        end
-
-        -- En uygun sunucuyu seç
-        if #validServers > 0 then
-            local chosenServer = validServers[math.random(1, #validServers)]
-            visitedServers[chosenServer.id] = true
-            TeleportService:TeleportToPlaceInstance(PlaceId, chosenServer.id)
-            statusLabel:SetText("Durum: Teleport ediliyor...")
-        else
-            statusLabel:SetText("Durum: Uygun sunucu bulunamadı.")
-        end
-    end)
-end
-
--- Sunucuya geçiş
-getServerList()  -- Sunucu listesini al
-hopToServer()   -- Geçiş yap
-
--- Menü Bağlantıları
-ServerHopSection:AddToggle({
-    Name = "Otomatik Sunucu Hoplama",
-    Value = false,
-    Callback = function(v)
-        autoHopEnabled = v
-        statusLabel:SetText("Durum: " .. (v and "Aktif" or "Pasif"))
-    end
-})
-
--- Zaman Aralığı Kontrolü
-ServerHopSection:AddSlider({
-    Name = "Zaman (Saniye)",
-    Min = 30,
-    Max = 600,
-    Value = hopInterval,
-    Callback = function(v)
-        hopInterval = v
-    end
-})
-
--- Ping Limiti Ayarı
-ServerHopSection:AddSlider({
-    Name = "Ping Limiti (ms)",
-    Min = 50,
-    Max = 500,
-    Value = pingLimit,
-    Callback = function(v)
-        pingLimit = v
-    end
-})
-
--- Düşük Oyunculuya Öncelik
-ServerHopSection:AddToggle({
-    Name = "Düşük Oyunculuya Öncelik",
-    Value = preferLowPlayerCount,
-    Callback = function(v)
-        preferLowPlayerCount = v
-    end
-})
-
--- Sunucu Seçimi İçin Player Sayısı
-ServerHopSection:AddSlider({
-    Name = "Minimum Oyuncu Sayısı",
-    Min = 1,
-    Max = 100,
-    Value = minPlayers,
-    Callback = function(v)
-        minPlayers = v
-    end
-})
-
-ServerHopSection:AddSlider({
-    Name = "Maksimum Oyuncu Sayısı",
-    Min = 1,
-    Max = 100,
-    Value = maxPlayers,
-    Callback = function(v)
-        maxPlayers = v
-    end
-})
-
--- Sunucu Türü Seçimi (Public/Private)
-ServerHopSection:AddDropdown({
-    Name = "Sunucu Türü",
-    List = {"Public", "Private"},
-    Callback = function(v)
-        serverType = v
-    end
-})
-
--- Sunucu Geçişini Hemen Yap
-ServerHopSection:AddButton({
-    Name = "Hemen Sunucuya Geç",
-    Callback = function()
-        hopToServer()
-    end
-})
-
--- Sunucu Listesini Yenile
-ServerHopSection:AddButton({
-    Name = "Sunucu Listesini Yenile",
-    Callback = function()
-        statusLabel:SetText("Durum: Sunucular yenileniyor...")
-        visitedServers = {} -- Sunucuları sıfırla
-        hopToServer()
-    end
-})
-
--- Sunucuya Rejoin Yap
-ServerHopSection:AddButton({
-    Name = "🔁 Sunucuya Rejoin",
-    Callback = function()
-        statusLabel:SetText("Durum: Yeniden bağlanılıyor...")
-        TeleportService:TeleportToPlaceInstance(PlaceId, CurrentJobId)
-    end
-})
