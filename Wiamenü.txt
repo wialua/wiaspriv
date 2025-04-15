@@ -682,3 +682,44 @@ end)
 
 -- Başlangıçta oyuncu listesini yükle
 updatePlayerList()
+
+local SuperPunchSection = PvpTab:CreateSection({ Name = "Super Punch" })
+
+local superPunchConnection
+
+local function startSuperPunch()
+    if superPunchConnection then return end
+    superPunchConnection = RunService.Heartbeat:Connect(function()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
+                local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local targetHRP = player.Character:FindFirstChild("HumanoidRootPart")
+                if myHRP and targetHRP then
+                    local distance = (myHRP.Position - targetHRP.Position).Magnitude
+                    if distance <= 15 then
+                        Event:FireServer("Punch", player.Character.Humanoid)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function stopSuperPunch()
+    if superPunchConnection then
+        superPunchConnection:Disconnect()
+        superPunchConnection = nil
+    end
+end
+
+SuperPunchSection:AddToggle({
+    Name = "SuperPunch Aktif",
+    Value = false,
+    Callback = function(state)
+        if state then
+            startSuperPunch()
+        else
+            stopSuperPunch()
+        end
+    end
+})
