@@ -683,20 +683,40 @@ end)
 -- Başlangıçta oyuncu listesini yükle
 updatePlayerList()
 
-local SuperPunchSection = PvpTab:CreateSection({ Name = "Super Punch" })
+-- ⚔️ Super Punch
+local SuperPunchSection = PvpTab:CreateSection({ Name = "Super Punch Gelişmiş" })
 
 local superPunchConnection
+local superPunchDistance = 15
+local selectedTargetPlayer = ""
+local everyoneEnabled = false
 
+-- Oyuncu listesi fonksiyonu
+local function updatePlayerList()
+    local names = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(names, player.Name)
+        end
+    end
+    return names
+end
+
+-- SuperPunch başlatma
 local function startSuperPunch()
     if superPunchConnection then return end
     superPunchConnection = RunService.Heartbeat:Connect(function()
+        if not LocalPlayer.Character then return end
+        local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return end
+
         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
-                local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                local targetHRP = player.Character:FindFirstChild("HumanoidRootPart")
-                if myHRP and targetHRP then
-                    local distance = (myHRP.Position - targetHRP.Position).Magnitude
-                    if distance <= 15 then
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+                local targetHRP = player.Character.HumanoidRootPart
+                local distance = (myHRP.Position - targetHRP.Position).Magnitude
+
+                if distance <= superPunchDistance then
+                    if everyoneEnabled or player.Name == selectedTargetPlayer then
                         Event:FireServer("Punch", player.Character.Humanoid)
                     end
                 end
@@ -712,11 +732,38 @@ local function stopSuperPunch()
     end
 end
 
+-- Ayarlar
+SuperPunchSection:AddDropdown({
+    Name = "Hedef Oyuncu",
+    List = updatePlayerList(),
+    Callback = function(v)
+        selectedTargetPlayer = v
+    end
+})
+
+SuperPunchSection:AddToggle({
+    Name = "Yakındaki Herkese Uygula",
+    Value = false,
+    Callback = function(v)
+        everyoneEnabled = v
+    end
+})
+
+SuperPunchSection:AddSlider({
+    Name = "Mesafe (Stud)",
+    Min = 5,
+    Max = 50,
+    Value = 15,
+    Callback = function(v)
+        superPunchDistance = v
+    end
+})
+
 SuperPunchSection:AddToggle({
     Name = "SuperPunch Aktif",
     Value = false,
-    Callback = function(state)
-        if state then
+    Callback = function(v)
+        if v then
             startSuperPunch()
         else
             stopSuperPunch()
