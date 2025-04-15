@@ -596,3 +596,89 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
         end
     })
 end
+
+-- Combat sekmesi ve player dropdown için gerekli objeleri oluşturuyoruz
+local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
+local playerDropdown = nil  -- Player dropdown objesi
+local refreshButton = nil  -- Yenileme butonu objesi
+local selectedPlayerName = nil  -- Seçilen oyuncunun adı
+local isVRActive = false  -- Toggle durumunu tutacak değişken
+
+-- Toggle ekliyoruz
+CombatSection:AddToggle({
+    Name = "VR Aktif",  -- Toggle'ın ismi
+    Value = false,  -- Başlangıçta kapalı
+    Callback = function(value)
+        isVRActive = value  -- Toggle durumunu kaydediyoruz
+    end,
+})
+
+-- Oyuncu listesini güncelleme fonksiyonu
+local function updatePlayerList()
+    local playerNames = {}  -- Oyuncu isimlerini tutacak bir tablo
+
+    -- Oyuncu listesini oluşturuyoruz
+    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+        if player.Name ~= game.Players.LocalPlayer.Name then
+            table.insert(playerNames, player.Name)  -- Listeye oyuncuyu ekliyoruz
+        end
+    end
+
+    -- Eğer dropdown var ise, listeyi güncelliyoruz
+    if playerDropdown then
+        playerDropdown:UpdateList(playerNames)  -- Player dropdown'u güncelliyoruz
+    end
+end
+
+-- Player dropdown oluşturuluyor
+playerDropdown = CombatSection:AddDropdown({
+    Name = "Oyuncu Seç",
+    List = {},  -- Başlangıçta boş olacak
+    Callback = function(selectedPlayer)
+        selectedPlayerName = selectedPlayer  -- Seçilen oyuncuyu kaydediyoruz
+    end,
+    BlankValue = "Hiçbir oyuncu seçilmedi",  -- Eğer seçim yapılmazsa bu mesaj görünsün
+    Sort = true,  -- Liste sıralı olsun
+    Multi = false  -- Birden fazla oyuncu seçilemesin
+})
+
+-- Player listesi yenileme butonu
+refreshButton = CombatSection:AddButton({
+    Name = "Oyuncu Listesini Yenile",
+    Callback = function()
+        updatePlayerList()  -- Listeyi yenileme fonksiyonunu çağırıyoruz
+    end
+})
+
+-- MouseButton1'e basıldığında çalışacak işlev
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end  -- Eğer oyun bu girdiyi işlediyse, geçelim
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and isVRActive then
+        -- Eğer toggle aktifse ve MouseButton1'e basıldıysa çalışacak
+        if selectedPlayerName then
+            local selectedPlayer = game:GetService("Players"):FindFirstChild(selectedPlayerName)
+            if selectedPlayer and selectedPlayer.Character then
+                local args = {
+                    [1] = "VR",
+                    [2] = selectedPlayer.Character.HumanoidRootPart  -- Seçilen oyuncunun HumanoidRootPart'ı
+                }
+
+                -- ReplicatedStorage'daki event'i tetikleyerek sunucuya mesaj gönderiyoruz
+                game:GetService("ReplicatedStorage"):WaitForChild("Event"):FireServer(unpack(args))
+            end
+        end
+    end
+end)
+
+-- Oyuncular sunucuya katıldığında veya çıktığında listeyi yenile
+game:GetService("Players").PlayerAdded:Connect(function()
+    updatePlayerList()  -- Yeni oyuncu eklenince listeyi yenile
+end)
+
+game:GetService("Players").PlayerRemoving:Connect(function()
+    updatePlayerList()  -- Oyuncu çıktığında listeyi yenile
+end)
+
+-- Başlangıçta oyuncu listesini yükle
+updatePlayerList()
