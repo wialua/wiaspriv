@@ -370,87 +370,81 @@ XPSection:AddButton({ Name = "Auto Farm", Callback = function() loadstring(game:
 XPSection:AddButton({ Name = "Crash", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/crsh"))() end })
 XPSection:AddButton({ Name = "Polis Keycard", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/key"))() end })
 -- Sistem Sekmesi: Server Hop
-local ServerHopSection = SystemTab:CreateSection({ Name = "🌐 Server Hop Sistemi" })
-
+-- Gerekli Servisleri Al
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlaceId = game.PlaceId
 local CurrentJobId = game.JobId
-local apiURL = "https://games.roblox.com/v1/games/"
-local visitedServers = {}
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Ayarlar
-local autoHopEnabled = false
-local hopInterval = 120
-local preferLowPlayerCount = true
-local pingLimit = 200 -- ms
+-- RemoteEvent: Client ile iletişim için
+local serverListEvent = Instance.new("RemoteEvent")
+serverListEvent.Name = "ServerListEvent"
+serverListEvent.Parent = ReplicatedStorage
 
--- UI Göstergeleri
+-- Menü Elemanları
+local SystemTab = game:GetService("ReplicatedStorage") -- Menü Tabları burada olacak
+local ServerHopSection = SystemTab:CreateSection({ Name = "🌐 Sunucu Hoplama Sistemi" })
 local statusLabel = ServerHopSection:AddLabel("Durum: Bekleniyor...")
 local serverCountLabel = ServerHopSection:AddLabel("Sunucular: 0")
 local pingLabel = ServerHopSection:AddLabel("Ping: Belirleniyor...")
 
--- Sunucu listesi çekme fonksiyonu
-local function getServerList(cursor)
-    local url = apiURL .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-    if cursor then url = url .. "&cursor=" .. cursor end
-    local response = game:HttpGet(url)
-    return HttpService:JSONDecode(response)
+-- Kullanıcı Ayarları
+local pingLimit = 200  -- ms olarak ping limiti
+local minPlayers = 1   -- Minimum oyuncu sayısı
+local maxPlayers = 10  -- Maksimum oyuncu sayısı
+local serverType = "Public" -- Sunucu türü (Public veya Private)
+
+local visitedServers = {}  -- Ziyaret edilen sunucuların IDsini saklayacağız
+
+-- Sunucu listesini almak için RemoteEvent tetikle
+local function getServerList()
+    -- Sunucu listesini server-side'dan alıyoruz.
+    serverListEvent:FireServer({
+        pingLimit = pingLimit,
+        minPlayers = minPlayers,
+        maxPlayers = maxPlayers,
+        serverType = serverType,
+    })
 end
 
--- Ping kontrol fonksiyonu
-local function getPing()
-    return math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
-end
-
--- Sunucu seçme ve teleport fonksiyonu
+-- Sunucu seçme ve geçiş yapma
 local function hopToServer()
-    local servers, cursor = {}, nil
-    repeat
-        local data = getServerList(cursor)
-        for _, server in ipairs(data.data) do
-            if server.id ~= CurrentJobId and not visitedServers[server.id] and server.playing < server.maxPlayers then
-                if not preferLowPlayerCount or server.playing <= 10 then
-                    table.insert(servers, server)
+    serverListEvent.OnClientEvent:Connect(function(filteredServers)
+        local validServers = {}
+
+        -- Sunucuları filtrele
+        for _, server in ipairs(filteredServers) do
+            if not visitedServers[server.id] then
+                -- Ping filtresi
+                local ping = getPing()
+                if ping <= pingLimit then
+                    table.insert(validServers, server)
                 end
             end
         end
-        cursor = data.nextPageCursor
-    until not cursor or #servers >= 5
 
-    serverCountLabel:SetText("Sunucular: " .. tostring(#servers))
-
-    if #servers > 0 then
-        local chosen = servers[math.random(1, #servers)]
-        visitedServers[chosen.id] = true
-        statusLabel:SetText("Durum: Teleport ediliyor...")
-        TeleportService:TeleportToPlaceInstance(PlaceId, chosen.id, LocalPlayer)
-    else
-        statusLabel:SetText("Durum: Uygun sunucu bulunamadı.")
-    end
+        -- En uygun sunucuyu seç
+        if #validServers > 0 then
+            local chosenServer = validServers[math.random(1, #validServers)]
+            visitedServers[chosenServer.id] = true
+            TeleportService:TeleportToPlaceInstance(PlaceId, chosenServer.id)
+            statusLabel:SetText("Durum: Teleport ediliyor...")
+        else
+            statusLabel:SetText("Durum: Uygun sunucu bulunamadı.")
+        end
+    end)
 end
 
--- Otomatik geçiş döngüsü
-task.spawn(function()
-    while true do
-        if autoHopEnabled then
-            pingLabel:SetText("Ping: " .. getPing() .. " ms")
-            if getPing() <= pingLimit then
-                statusLabel:SetText("Durum: Otomatik geçiş aktif...")
-                hopToServer()
-            else
-                statusLabel:SetText("Durum: Ping yüksek (" .. getPing() .. " ms)")
-            end
-        end
-        task.wait(hopInterval)
-    end
-end)
+-- Sunucuya geçiş
+getServerList()  -- Sunucu listesini al
+hopToServer()   -- Geçiş yap
 
--- UI Kontrolleri
+-- Menü Bağlantıları
 ServerHopSection:AddToggle({
-    Name = "Otomatik Server Hop",
+    Name = "Otomatik Sunucu Hoplama",
     Value = false,
     Callback = function(v)
         autoHopEnabled = v
@@ -458,6 +452,7 @@ ServerHopSection:AddToggle({
     end
 })
 
+-- Zaman Aralığı Kontrolü
 ServerHopSection:AddSlider({
     Name = "Zaman (Saniye)",
     Min = 30,
@@ -468,14 +463,7 @@ ServerHopSection:AddSlider({
     end
 })
 
-ServerHopSection:AddToggle({
-    Name = "Düşük Oyunculuya Öncelik",
-    Value = preferLowPlayerCount,
-    Callback = function(v)
-        preferLowPlayerCount = v
-    end
-})
-
+-- Ping Limiti Ayarı
 ServerHopSection:AddSlider({
     Name = "Ping Limiti (ms)",
     Min = 50,
@@ -486,26 +474,68 @@ ServerHopSection:AddSlider({
     end
 })
 
+-- Düşük Oyunculuya Öncelik
+ServerHopSection:AddToggle({
+    Name = "Düşük Oyunculuya Öncelik",
+    Value = preferLowPlayerCount,
+    Callback = function(v)
+        preferLowPlayerCount = v
+    end
+})
+
+-- Sunucu Seçimi İçin Player Sayısı
+ServerHopSection:AddSlider({
+    Name = "Minimum Oyuncu Sayısı",
+    Min = 1,
+    Max = 100,
+    Value = minPlayers,
+    Callback = function(v)
+        minPlayers = v
+    end
+})
+
+ServerHopSection:AddSlider({
+    Name = "Maksimum Oyuncu Sayısı",
+    Min = 1,
+    Max = 100,
+    Value = maxPlayers,
+    Callback = function(v)
+        maxPlayers = v
+    end
+})
+
+-- Sunucu Türü Seçimi (Public/Private)
+ServerHopSection:AddDropdown({
+    Name = "Sunucu Türü",
+    List = {"Public", "Private"},
+    Callback = function(v)
+        serverType = v
+    end
+})
+
+-- Sunucu Geçişini Hemen Yap
 ServerHopSection:AddButton({
-    Name = "Hemen Server Hop",
+    Name = "Hemen Sunucuya Geç",
     Callback = function()
         hopToServer()
     end
 })
 
+-- Sunucu Listesini Yenile
 ServerHopSection:AddButton({
     Name = "Sunucu Listesini Yenile",
     Callback = function()
         statusLabel:SetText("Durum: Sunucular yenileniyor...")
-        visitedServers = {} -- temizle
+        visitedServers = {} -- Sunucuları sıfırla
         hopToServer()
     end
 })
 
+-- Sunucuya Rejoin Yap
 ServerHopSection:AddButton({
     Name = "🔁 Sunucuya Rejoin",
     Callback = function()
         statusLabel:SetText("Durum: Yeniden bağlanılıyor...")
-        TeleportService:TeleportToPlaceInstance(PlaceId, CurrentJobId, LocalPlayer)
+        TeleportService:TeleportToPlaceInstance(PlaceId, CurrentJobId)
     end
 })
