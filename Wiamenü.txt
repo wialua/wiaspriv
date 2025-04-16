@@ -809,3 +809,230 @@ end)
 
 -- Başlangıçta listeyi yükle
 updatePlayerList()
+
+-- 🌐 Otomatik Koruma Takip Sistemi
+local korumaDurum, logList = {}, {}
+
+local function registerKoruma(name)
+    korumaDurum[name] = true
+    local saat = os.date("%H:%M:%S")
+    table.insert(logList, "[" .. saat .. "] ✅ " .. name .. " aktif edildi.")
+end
+
+-- 🛡️ Full Koruma Bölümü (Tek Section)
+local FullProtection = SystemTab:CreateSection({ Name = "Wia Ultimate Koruma 🚫👑" })
+
+-- Tüm koruma sistemlerini ekliyoruz
+local korumaButonlari = {
+    { "Anti TP Detection", function()
+        task.spawn(function()
+            local lastPos = nil
+            while true do
+                wait(1)
+                local char = game.Players.LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local pos = char.HumanoidRootPart.Position
+                    if lastPos and (pos - lastPos).Magnitude > 150 then
+                        char.HumanoidRootPart.CFrame = CFrame.new(lastPos)
+                    end
+                    lastPos = pos
+                end
+            end
+        end)
+    end },
+
+    { "Anti Death Detection", function()
+        local lp = game.Players.LocalPlayer
+        lp.CharacterAdded:Connect(function(char)
+            local hum = char:WaitForChild("Humanoid", 5)
+            if hum then
+                hum.Died:Connect(function()
+                    task.wait(1)
+                    lp:LoadCharacter()
+                end)
+            end
+        end)
+    end },
+
+    { "Anti CheatCore Remover", function()
+        for _, v in pairs(game:GetDescendants()) do
+            if v:IsA("LocalScript") or v:IsA("ModuleScript") then
+                if v.Name:lower():find("detect") or v.Name:lower():find("cheat") then
+                    v:Destroy()
+                end
+            end
+        end
+    end },
+
+    { "Anti Chat Logger", function()
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        local old = mt.__namecall
+        mt.__namecall = newcclosure(function(self, ...)
+            if tostring(self):lower():find("chat") and getnamecallmethod() == "FireServer" then return end
+            return old(self, ...)
+        end)
+        setreadonly(mt, true)
+    end },
+
+    { "Anti Stat Logger", function()
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                if obj.Name:lower():find("stat") then obj:Destroy() end
+            end
+        end
+    end },
+
+    { "Anti RemoteSpy", function()
+        for _, c in pairs(getconnections(game:GetService("LogService").MessageOut)) do c:Disable() end
+    end },
+
+    { "Anti Mod Teleport Trap", function()
+        task.spawn(function()
+            local lastPos = nil
+            while true do
+                wait(1)
+                local char = game.Players.LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local pos = char.HumanoidRootPart.Position
+                    if lastPos and (pos - lastPos).Magnitude > 200 then
+                        char.HumanoidRootPart.CFrame = CFrame.new(lastPos)
+                    end
+                    lastPos = pos
+                end
+            end
+        end)
+    end },
+
+    { "Log Eraser", function()
+        for _, log in pairs(game:GetService("CoreGui"):GetDescendants()) do
+            if log:IsA("TextLabel") and log.Text:lower():find("log") then
+                log:Destroy()
+            end
+        end
+    end },
+
+    { "Server Script Destroyer", function()
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("Script") and not obj:IsDescendantOf(game.Players) then
+                if obj.Name:lower():find("detect") or obj.Name:lower():find("log") then
+                    obj:Destroy()
+                end
+            end
+        end
+    end },
+
+    { "Anti Heartbeat / Render Tespiti", function()
+        local RS = game:GetService("RunService")
+        local lastPos = nil
+        RS.Heartbeat:Connect(function()
+            local char = game.Players.LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                if lastPos and (hrp.Position - lastPos).magnitude > 100 then
+                    hrp.CFrame = hrp.CFrame - Vector3.new(0, 3, 0)
+                end
+                lastPos = hrp.Position
+            end
+        end)
+        RS.RenderStepped:Connect(function()
+            workspace.CurrentCamera.FieldOfView = 70
+        end)
+    end },
+
+    { "Zaman / Delay Tespiti Bypass", function()
+        local spoof = math.random(100000, 200000)
+        hookfunction(tick, function() return spoof end)
+        hookfunction(os.clock, function() return spoof end)
+        hookfunction(time, function() return spoof end)
+    end },
+
+    { "Hareket / Kill Pattern Gizle", function()
+        task.spawn(function()
+            while true do
+                wait(math.random(1, 4))
+                mousemoverel(math.random(-2, 2), math.random(-2, 2))
+            end
+        end)
+    end },
+
+    { "RemoteSpy Koruması", function()
+        for _, v in pairs(getconnections(game:GetService("LogService").MessageOut)) do v:Disable() end
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        local old = mt.__namecall
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if typeof(self) == "Instance" and (method == "FireServer" or method == "InvokeServer") then
+                if tostring(self):lower():find("log") or tostring(self):lower():find("spy") then
+                    return
+                end
+            end
+            return old(self, ...)
+        end)
+        setreadonly(mt, true)
+    end },
+
+    { "Obfuscated Module Temizle", function()
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("ModuleScript") or obj:IsA("LocalScript") then
+                if obj.Name:match("%d%d%d%d%d%d%d") or obj.Name:lower():find("require") or obj.Source:find("base64") then
+                    obj:Destroy()
+                end
+            end
+        end
+    end },
+
+    { "Sahte Kimlik Spoofu (IP/HWID)", function()
+        hookfunction(identifyexecutor, function() return "RobloxMobile" end)
+        shared = {}; getrenv().shared = {}
+    end },
+
+    { "Webhook Logger Engelle", function()
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        local old = mt.__namecall
+        mt.__namecall = newcclosure(function(self, ...)
+            local args = { ... }
+            if getnamecallmethod() == "FireServer" or getnamecallmethod() == "InvokeServer" then
+                for _, v in pairs(args) do
+                    if typeof(v) == "string" and (v:lower():find("webhook") or v:lower():find("discord") or v:lower():find("report")) then
+                        return
+                    end
+                end
+            end
+            return old(self, unpack(args))
+        end)
+        setreadonly(mt, true)
+    end },
+}
+
+-- 🔘 Korumaları ekliyoruz
+for _, data in pairs(korumaButonlari) do
+    local name, callback = unpack(data)
+    FullProtection:AddButton({
+        Name = name,
+        Callback = function()
+            callback()
+            registerKoruma(name)
+            PepsisWorld:Notify({ Title = name, Content = "Koruma aktif edildi ✅", Duration = 4 })
+        end
+    })
+end
+
+-- 🔘 GODMODE (Hepsini Aç)
+FullProtection:AddButton({
+    Name = "💣 Tüm Koruma Sistemlerini Aç (GODMODE)",
+    Callback = function()
+        for _, data in pairs(korumaButonlari) do
+            local name, callback = unpack(data)
+            callback()
+            registerKoruma(name)
+        end
+        PepsisWorld:Notify({
+            Title = "TAM KORUMA",
+            Content = "Tüm gelişmiş sistemler aktif edildi 🔥",
+            Duration = 6
+        })
+    end
+})
