@@ -596,163 +596,216 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
         end
     })
 end
+-- ⚔️ Super Punch
+local SuperPunchSection = PvpTab:CreateSection({ Name = "Super Punch Gelişmiş" })
 
--- Combat sekmesi ve player dropdown için gerekli objeleri oluşturuyoruz
+local superPunchConnection
+local superPunchDistance = 15
+local selectedTargetPlayer = ""
+local everyoneEnabled = false
+
+-- Oyuncu listesi fonksiyonu
+local function updatePlayerList()
+    local names = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(names, player.Name)
+        end
+    end
+    return names
+end
+
+-- SuperPunch başlatma
+local function startSuperPunch()
+    if superPunchConnection then return end
+    superPunchConnection = RunService.Heartbeat:Connect(function()
+        if not LocalPlayer.Character then return end
+        local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return end
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+                local targetHRP = player.Character.HumanoidRootPart
+                local distance = (myHRP.Position - targetHRP.Position).Magnitude
+
+                if distance <= superPunchDistance then
+                    if everyoneEnabled or player.Name == selectedTargetPlayer then
+                        Event:FireServer("Punch", player.Character.Humanoid)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function stopSuperPunch()
+    if superPunchConnection then
+        superPunchConnection:Disconnect()
+        superPunchConnection = nil
+    end
+end
+
+-- Ayarlar
+SuperPunchSection:AddDropdown({
+    Name = "Hedef Oyuncu",
+    List = updatePlayerList(),
+    Callback = function(v)
+        selectedTargetPlayer = v
+    end
+})
+
+SuperPunchSection:AddToggle({
+    Name = "Yakındaki Herkese Uygula",
+    Value = false,
+    Callback = function(v)
+        everyoneEnabled = v
+    end
+})
+
+SuperPunchSection:AddSlider({
+    Name = "Mesafe (Stud)",
+    Min = 5,
+    Max = 50,
+    Value = 15,
+    Callback = function(v)
+        superPunchDistance = v
+    end
+})
+
+SuperPunchSection:AddToggle({
+    Name = "SuperPunch Aktif",
+    Value = false,
+    Callback = function(v)
+        if v then
+            startSuperPunch()
+        else
+            stopSuperPunch()
+        end
+    end
+})
+
+-- VR sistemi için blacklist ve ekran uyarısı entegre edilmiş versiyon
+
 local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
-local playerDropdown = nil  -- Player dropdown objesi
-local refreshButton = nil  -- Yenileme butonu objesi
-local selectedPlayerName = nil  -- Seçilen oyuncunun adı
-local isVRActive = false  -- Toggle durumunu tutacak değişken
+local playerDropdown = nil
+local refreshButton = nil
+local selectedPlayerName = nil
+local isVRActive = false
 
--- Toggle ekliyoruz
+-- Yasaklı oyuncular listesi
+local blacklist = {
+    ["MAD_CITYAIMBOTLOL"] = true
+}
+
+-- ⚠️ Aktif uyarı yazısını saklayacağımız referans
+local currentWarningGui = nil
+
+-- Ekranda ortada yazı çıkaran ve kalıcı olan fonksiyon
+local function showPersistentScreenWarning(text)
+    if currentWarningGui then currentWarningGui:Destroy() end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "PersistentWarning"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    gui.DisplayOrder = 9999
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.8, 0, 0.1, 0)
+    label.Position = UDim2.new(0.5, 0, 0.45, 0)
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.BackgroundTransparency = 0.2
+    label.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    label.TextColor3 = Color3.fromRGB(255, 85, 85)
+    label.TextStrokeTransparency = 0.2
+    label.Font = Enum.Font.FredokaOne
+    label.TextScaled = true
+    label.Text = text
+    label.ZIndex = 9999
+    label.Parent = gui
+
+    currentWarningGui = gui
+end
+
 CombatSection:AddToggle({
-    Name = "VR Aktif",  -- Toggle'ın ismi
-    Value = false,  -- Başlangıçta kapalı
+    Name = "VR Aktif",
+    Value = false,
     Callback = function(value)
-        isVRActive = value  -- Toggle durumunu kaydediyoruz
+        isVRActive = value
     end,
 })
 
 -- Oyuncu listesini güncelleme fonksiyonu
 local function updatePlayerList()
-    local playerNames = {}  -- Oyuncu isimlerini tutacak bir tablo
-
-    -- Oyuncu listesini oluşturuyoruz
+    local playerNames = {}
     for _, player in pairs(game:GetService("Players"):GetPlayers()) do
         if player.Name ~= game.Players.LocalPlayer.Name then
-            table.insert(playerNames, player.Name)  -- Listeye oyuncuyu ekliyoruz
+            table.insert(playerNames, player.Name)
         end
     end
-
-    -- Eğer dropdown var ise, listeyi güncelliyoruz
     if playerDropdown then
-        playerDropdown:UpdateList(playerNames)  -- Player dropdown'u güncelliyoruz
+        playerDropdown:UpdateList(playerNames)
     end
 end
 
--- Player dropdown oluşturuluyor
+-- Dropdown oluşturuluyor (Blacklist kontrolü entegre)
 playerDropdown = CombatSection:AddDropdown({
     Name = "Oyuncu Seç",
-    List = {},  -- Başlangıçta boş olacak
+    List = {},
     Callback = function(selectedPlayer)
-        selectedPlayerName = selectedPlayer  -- Seçilen oyuncuyu kaydediyoruz
+        if blacklist[selectedPlayer] then
+            showPersistentScreenWarning("BU OYUNCUYA KARŞI KULLANAMAZSIN LİSTEDEN BAŞKA OYUNCU SEÇ ⚠️")
+            selectedPlayerName = nil
+            return
+        end
+
+        -- Eğer önceden uyarı varsa, kaldır
+        if currentWarningGui then
+            currentWarningGui:Destroy()
+            currentWarningGui = nil
+        end
+
+        selectedPlayerName = selectedPlayer
     end,
-    BlankValue = "Hiçbir oyuncu seçilmedi",  -- Eğer seçim yapılmazsa bu mesaj görünsün
-    Sort = true,  -- Liste sıralı olsun
-    Multi = false  -- Birden fazla oyuncu seçilemesin
+    BlankValue = "Hiçbir oyuncu seçilmedi",
+    Sort = true,
+    Multi = false
 })
 
--- Player listesi yenileme butonu
+-- Yenileme butonu
 refreshButton = CombatSection:AddButton({
     Name = "Oyuncu Listesini Yenile",
     Callback = function()
-        updatePlayerList()  -- Listeyi yenileme fonksiyonunu çağırıyoruz
+        updatePlayerList()
     end
 })
 
--- MouseButton1'e basıldığında çalışacak işlev
+-- Mouse tıklama işlevi (VR saldırı)
 game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end  -- Eğer oyun bu girdiyi işlediyse, geçelim
-
+    if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 and isVRActive then
-        -- Eğer toggle aktifse ve MouseButton1'e basıldıysa çalışacak
         if selectedPlayerName then
             local selectedPlayer = game:GetService("Players"):FindFirstChild(selectedPlayerName)
             if selectedPlayer and selectedPlayer.Character then
                 local args = {
                     [1] = "VR",
-                    [2] = selectedPlayer.Character.HumanoidRootPart  -- Seçilen oyuncunun HumanoidRootPart'ı
+                    [2] = selectedPlayer.Character.HumanoidRootPart
                 }
-
-                -- ReplicatedStorage'daki event'i tetikleyerek sunucuya mesaj gönderiyoruz
                 game:GetService("ReplicatedStorage"):WaitForChild("Event"):FireServer(unpack(args))
             end
         end
     end
 end)
 
--- Oyuncular sunucuya katıldığında veya çıktığında listeyi yenile
+-- Oyuncular değiştiğinde listeyi güncelle
 game:GetService("Players").PlayerAdded:Connect(function()
-    updatePlayerList()  -- Yeni oyuncu eklenince listeyi yenile
+    updatePlayerList()
 end)
 
 game:GetService("Players").PlayerRemoving:Connect(function()
-    updatePlayerList()  -- Oyuncu çıktığında listeyi yenile
+    updatePlayerList()
 end)
 
--- Başlangıçta oyuncu listesini yükle
+-- Başlangıçta listeyi yükle
 updatePlayerList()
-
-local SuperPunchSection = PvpTab:CreateSection({ Name = "Super Punch" })
-
-local selectedTarget = ""
-local useEveryone = false
-local punchConnection = nil
-
--- Oyuncu listesi güncelleme fonksiyonu
-local function updatePlayerList()
-    local names = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(names, p.Name)
-        end
-    end
-    return names
-end
-
--- Dropdown: Oyuncu seçimi
-SuperPunchSection:AddDropdown({
-    Name = "Hedef Oyuncu",
-    List = updatePlayerList(),
-    Callback = function(v)
-        selectedTarget = v
-    end
-})
-
--- Toggle: Yakındaki herkese uygula
-SuperPunchSection:AddToggle({
-    Name = "Herkese Uygula",
-    Value = false,
-    Callback = function(state)
-        useEveryone = state
-    end
-})
-
--- Buton: Oyuncu listesini yenile
-SuperPunchSection:AddButton({
-    Name = "Oyuncu Listesini Yenile",
-    Callback = function()
-        SuperPunchSection:GetDropdown("Hedef Oyuncu"):UpdateList(updatePlayerList())
-    end
-})
-
--- Toggle: SuperPunch Aktif
-SuperPunchSection:AddToggle({
-    Name = "SuperPunch Aktif",
-    Value = false,
-    Callback = function(state)
-        if punchConnection then
-            punchConnection:Disconnect()
-            punchConnection = nil
-        end
-
-        if state then
-            punchConnection = RunService.Heartbeat:Connect(function()
-                local myChar = LocalPlayer.Character
-                if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
-
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
-                        if useEveryone or player.Name == selectedTarget then
-                            local args = {
-                                [1] = "Punch",
-                                [2] = player.Character.Humanoid
-                            }
-                            Event:FireServer(unpack(args))
-                        end
-                    end
-                end
-            end)
-        end
-    end
-})
