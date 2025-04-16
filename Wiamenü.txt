@@ -683,90 +683,76 @@ end)
 -- Başlangıçta oyuncu listesini yükle
 updatePlayerList()
 
--- ⚔️ Super Punch
-local SuperPunchSection = PvpTab:CreateSection({ Name = "Super Punch Gelişmiş" })
+local SuperPunchSection = PvpTab:CreateSection({ Name = "Super Punch" })
 
-local superPunchConnection
-local superPunchDistance = 15
-local selectedTargetPlayer = ""
-local everyoneEnabled = false
+local selectedTarget = ""
+local useEveryone = false
+local punchConnection = nil
 
--- Oyuncu listesi fonksiyonu
+-- Oyuncu listesi güncelleme fonksiyonu
 local function updatePlayerList()
     local names = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            table.insert(names, player.Name)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(names, p.Name)
         end
     end
     return names
 end
 
--- SuperPunch başlatma
-local function startSuperPunch()
-    if superPunchConnection then return end
-    superPunchConnection = RunService.Heartbeat:Connect(function()
-        if not LocalPlayer.Character then return end
-        local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not myHRP then return end
-
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-                local targetHRP = player.Character.HumanoidRootPart
-                local distance = (myHRP.Position - targetHRP.Position).Magnitude
-
-                if distance <= superPunchDistance then
-                    if everyoneEnabled or player.Name == selectedTargetPlayer then
-                        Event:FireServer("Punch", player.Character.Humanoid)
-                    end
-                end
-            end
-        end
-    end)
-end
-
-local function stopSuperPunch()
-    if superPunchConnection then
-        superPunchConnection:Disconnect()
-        superPunchConnection = nil
-    end
-end
-
--- Ayarlar
+-- Dropdown: Oyuncu seçimi
 SuperPunchSection:AddDropdown({
     Name = "Hedef Oyuncu",
     List = updatePlayerList(),
     Callback = function(v)
-        selectedTargetPlayer = v
+        selectedTarget = v
     end
 })
 
+-- Toggle: Yakındaki herkese uygula
 SuperPunchSection:AddToggle({
-    Name = "Yakındaki Herkese Uygula",
+    Name = "Herkese Uygula",
     Value = false,
-    Callback = function(v)
-        everyoneEnabled = v
+    Callback = function(state)
+        useEveryone = state
     end
 })
 
-SuperPunchSection:AddSlider({
-    Name = "Mesafe (Stud)",
-    Min = 5,
-    Max = 50,
-    Value = 15,
-    Callback = function(v)
-        superPunchDistance = v
+-- Buton: Oyuncu listesini yenile
+SuperPunchSection:AddButton({
+    Name = "Oyuncu Listesini Yenile",
+    Callback = function()
+        SuperPunchSection:GetDropdown("Hedef Oyuncu"):UpdateList(updatePlayerList())
     end
 })
 
+-- Toggle: SuperPunch Aktif
 SuperPunchSection:AddToggle({
     Name = "SuperPunch Aktif",
     Value = false,
-    Callback = function(v)
-        if v then
-            startSuperPunch()
-        else
-            stopSuperPunch()
+    Callback = function(state)
+        if punchConnection then
+            punchConnection:Disconnect()
+            punchConnection = nil
+        end
+
+        if state then
+            punchConnection = RunService.Heartbeat:Connect(function()
+                local myChar = LocalPlayer.Character
+                if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
+                        if useEveryone or player.Name == selectedTarget then
+                            local args = {
+                                [1] = "Punch",
+                                [2] = player.Character.Humanoid
+                            }
+                            Event:FireServer(unpack(args))
+                        end
+                    end
+                end
+            end)
         end
     end
 })
