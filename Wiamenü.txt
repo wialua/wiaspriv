@@ -932,3 +932,108 @@ local successGameKick, _ = pcall(function()
     end))
 end)
 
+local UltraSection = SystemTab:CreateSection("Ultra Lag Cleaner (Optimize)")
+
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
+local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local UserSettings = UserSettings()
+local RenderSettings = UserSettings.GameSettings
+
+local cleanerRunning = false
+local soundMuted = false
+local lightingOptimized = false
+
+UltraSection:AddToggle({
+	Name = "🧠 Optimize Lag Cleaner + CPU Saver",
+	Value = false,
+	Callback = function(state)
+		cleanerRunning = state
+		if state then
+			warn("⚙️ Ultra Lag Cleaner (Optimize) aktif edildi.")
+
+			-- 🎮 Grafik kalitesini sürekli olarak 1'e sabitle
+			task.spawn(function()
+				while cleanerRunning do
+					pcall(function()
+						RenderSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+					end)
+					task.wait(10)
+				end
+			end)
+
+			-- 💡 Lag temizleyici loop
+			task.spawn(function()
+				while cleanerRunning do
+					-- 1. Lag Objelerini Sil (sadece belirli tipler)
+					for _, obj in ipairs(workspace:GetDescendants()) do
+						local class = obj.ClassName
+						if class == "ParticleEmitter" or class == "Trail" or class == "Smoke" or class == "Fire"
+							or class == "Explosion" or class == "ForceField" or class == "SelectionBox"
+							or class == "SelectionPartLasso" or class == "Weld" or class == "Attachment" then
+							pcall(function() obj:Destroy() end)
+						elseif class == "Decal" then
+							obj.Transparency = 1
+						elseif obj:IsA("BasePart") then
+							obj.Material = Enum.Material.Plastic
+							obj.Reflectance = 0
+						end
+					end
+
+					-- 2. Lighting ayarları (sadece ilk çalışmada)
+					if not lightingOptimized then
+						for _, effect in ipairs(Lighting:GetChildren()) do
+							if effect:IsA("BlurEffect") or effect:IsA("SunRaysEffect") or effect:IsA("ColorCorrectionEffect") or effect:IsA("BloomEffect") then
+								effect.Enabled = false
+							end
+						end
+						Lighting.GlobalShadows = false
+						Lighting.FogEnd = 1e10
+						lightingOptimized = true
+					end
+
+					-- 3. Sesleri sadece bir kez mute et
+					if not soundMuted then
+						for _, s in ipairs(workspace:GetDescendants()) do
+							if s:IsA("Sound") then
+								s.Volume = 0
+							end
+						end
+						SoundService.AmbientReverb = Enum.ReverbType.NoReverb
+						soundMuted = true
+					end
+
+					-- 4. GUI temizliği (sadece pasif GUI'ler)
+					for _, gui in ipairs(CoreGui:GetChildren()) do
+						if gui:IsA("ScreenGui") and not gui.Enabled then
+							pcall(function() gui:Destroy() end)
+						end
+					end
+
+					-- 5. FPS panelini kapat
+					pcall(function()
+						local perfStats = CoreGui:FindFirstChild("PerformanceStats")
+						if perfStats then perfStats:Destroy() end
+						StarterGui:SetCore("PerformanceStatsVisible", false)
+					end)
+
+					-- 6. CPU saver: FPS'i sınırlamak isteyenler için
+					if setfpscap then
+						setfpscap(60)
+					end
+
+					task.wait(15)
+				end
+			end)
+		else
+			warn("⏹️ Optimize Lag Cleaner durduruldu.")
+			lightingOptimized = false
+			soundMuted = false
+		end
+	end
+})
