@@ -932,7 +932,7 @@ local successGameKick, _ = pcall(function()
     end))
 end)
 
-local UltraSection = SystemTab:CreateSection("Ultra Lag Cleaner (Optimize)")
+local UltraSection = SystemTab:CreateSection("Performance Shield MAX")
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -941,51 +941,55 @@ local CoreGui = game:GetService("CoreGui")
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local UserSettings = UserSettings()
 local RenderSettings = UserSettings.GameSettings
 
+local cleaned = {}
 local cleanerRunning = false
-local soundMuted = false
+local graphicsLocked = false
 local lightingOptimized = false
+local soundMuted = false
 
+-- 🔰 FPS Güvenli Temizlik Fonksiyonu (Sıralı ve sınırlı)
+local function safeClean(limit)
+	local count = 0
+	for _, obj in ipairs(workspace:GetChildren()) do
+		if count >= limit then break end
+		for _, child in ipairs(obj:GetDescendants()) do
+			if cleaned[child] then continue end
+
+			local class = child.ClassName
+			if class == "ParticleEmitter" or class == "Trail" or class == "Smoke" or class == "Fire"
+				or class == "Explosion" or class == "ForceField" or class == "SelectionBox"
+				or class == "SelectionPartLasso" or class == "Weld" or class == "Attachment" then
+				pcall(function() child:Destroy() end)
+			elseif class == "Decal" then
+				child.Transparency = 1
+			elseif child:IsA("BasePart") and child.Material ~= Enum.Material.Plastic then
+				child.Material = Enum.Material.Plastic
+				child.Reflectance = 0
+			end
+
+			cleaned[child] = true
+			count += 1
+			if count >= limit then break end
+		end
+	end
+end
+
+-- 🔁 FPS Stabil Toggle
 UltraSection:AddToggle({
-	Name = "🧠 Optimize Lag Cleaner + CPU Saver",
+	Name = "🧠 Performance Shield MAX (Sıfır Drop)",
 	Value = false,
 	Callback = function(state)
 		cleanerRunning = state
+
 		if state then
-			warn("⚙️ Ultra Lag Cleaner (Optimize) aktif edildi.")
-
-			-- 🎮 Grafik kalitesini sürekli olarak 1'e sabitle
+			warn("🟢 Performance Shield MAX aktif.")
 			task.spawn(function()
 				while cleanerRunning do
-					pcall(function()
-						RenderSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
-					end)
-					task.wait(10)
-				end
-			end)
+					safeClean(1000) -- Her döngüde 1000 obje işle
 
-			-- 💡 Lag temizleyici loop
-			task.spawn(function()
-				while cleanerRunning do
-					-- 1. Lag Objelerini Sil (sadece belirli tipler)
-					for _, obj in ipairs(workspace:GetDescendants()) do
-						local class = obj.ClassName
-						if class == "ParticleEmitter" or class == "Trail" or class == "Smoke" or class == "Fire"
-							or class == "Explosion" or class == "ForceField" or class == "SelectionBox"
-							or class == "SelectionPartLasso" or class == "Weld" or class == "Attachment" then
-							pcall(function() obj:Destroy() end)
-						elseif class == "Decal" then
-							obj.Transparency = 1
-						elseif obj:IsA("BasePart") then
-							obj.Material = Enum.Material.Plastic
-							obj.Reflectance = 0
-						end
-					end
-
-					-- 2. Lighting ayarları (sadece ilk çalışmada)
 					if not lightingOptimized then
 						for _, effect in ipairs(Lighting:GetChildren()) do
 							if effect:IsA("BlurEffect") or effect:IsA("SunRaysEffect") or effect:IsA("ColorCorrectionEffect") or effect:IsA("BloomEffect") then
@@ -997,7 +1001,6 @@ UltraSection:AddToggle({
 						lightingOptimized = true
 					end
 
-					-- 3. Sesleri sadece bir kez mute et
 					if not soundMuted then
 						for _, s in ipairs(workspace:GetDescendants()) do
 							if s:IsA("Sound") then
@@ -1008,32 +1011,38 @@ UltraSection:AddToggle({
 						soundMuted = true
 					end
 
-					-- 4. GUI temizliği (sadece pasif GUI'ler)
 					for _, gui in ipairs(CoreGui:GetChildren()) do
 						if gui:IsA("ScreenGui") and not gui.Enabled then
 							pcall(function() gui:Destroy() end)
 						end
 					end
 
-					-- 5. FPS panelini kapat
+					if not graphicsLocked then
+						pcall(function()
+							RenderSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+						end)
+						graphicsLocked = true
+					end
+
 					pcall(function()
 						local perfStats = CoreGui:FindFirstChild("PerformanceStats")
 						if perfStats then perfStats:Destroy() end
 						StarterGui:SetCore("PerformanceStatsVisible", false)
 					end)
 
-					-- 6. CPU saver: FPS'i sınırlamak isteyenler için
 					if setfpscap then
 						setfpscap(60)
 					end
 
-					task.wait(15)
+					task.wait(20)
 				end
 			end)
 		else
-			warn("⏹️ Optimize Lag Cleaner durduruldu.")
+			warn("🔴 Performance Shield MAX durduruldu.")
 			lightingOptimized = false
 			soundMuted = false
+			graphicsLocked = false
+			cleaned = {}
 		end
 	end
 })
