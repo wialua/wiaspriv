@@ -6,6 +6,8 @@ local PepsisWorld = library:CreateWindow({
 })
 
 local RunService = game:GetService('RunService')
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService('Players')
 local TeamsService = game:GetService("Teams")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1050,5 +1052,55 @@ UltraSection:AddToggle({
 			soundMuted = false
 			graphicsLocked = false
 		end
+	end
+})
+
+local ServerhopSection = SystemTab:CreateSection("Server Hop")
+
+local function serverHop()
+	local PlaceId = game.PlaceId
+	local JobId = game.JobId
+	local servers = {}
+
+	local function fetchServers(cursor)
+		local url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?limit=100"
+		if cursor then url = url .. "&cursor=" .. cursor end
+
+		local response = game:HttpGet(url)
+		local data = HttpService:JSONDecode(response)
+
+		for _, server in pairs(data.data) do
+			if server.playing < server.maxPlayers and server.id ~= JobId then
+				table.insert(servers, server.id)
+			end
+		end
+
+		if data.nextPageCursor then
+			fetchServers(data.nextPageCursor)
+		end
+	end
+
+	pcall(function() fetchServers() end)
+
+	if #servers > 0 then
+		local randomServer = servers[math.random(1, #servers)]
+		local success, err = pcall(function()
+			TeleportService:TeleportToPlaceInstance(PlaceId, randomServer, Players.LocalPlayer)
+		end)
+
+		if not success then
+			warn("⚠️ Teleport başarısız oldu. Tekrar deneniyor...")
+			task.wait(2)
+			serverHop()
+		end
+	else
+		warn("🌐 Uygun başka sunucu bulunamadı.")
+	end
+end
+
+ServerhopSection:AddButton({
+	Name = "🌐 Server Hop (Gelişmiş)",
+	Callback = function()
+		serverHop()
 	end
 })
