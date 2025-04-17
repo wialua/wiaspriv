@@ -1121,3 +1121,36 @@ ServerhopSection:AddButton({
 		rejoinServer()
 	end
 })
+
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Event = ReplicatedStorage:WaitForChild("Event")
+
+local stealthConn -- renderstepped bağlantısı
+
+VehicleSection:AddToggle({
+	Name = "🕶️ Night Sonsuz Görünmezlik",
+	Value = false,
+	Callback = function(state)
+		if state then
+			-- Toggle açıldı → sürekli true gönder
+			stealthConn = RunService.RenderStepped:Connect(function()
+				pcall(function()
+					Event:FireServer("StealthMode", true)
+				end)
+			end)
+		else
+			-- Toggle kapandı → 2 kez false gönder + bağlantıyı kes
+			pcall(function()
+				Event:FireServer("StealthMode", false)
+				task.wait(0.2)
+				Event:FireServer("StealthMode", false)
+			end)
+
+			if stealthConn then
+				stealthConn:Disconnect()
+				stealthConn = nil
+			end
+		end
+	end
+})
