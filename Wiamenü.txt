@@ -932,7 +932,7 @@ local successGameKick, _ = pcall(function()
     end))
 end)
 
-local UltraSection = SystemTab:CreateSection("Performance Shield MAX")
+local UltraSection = SystemTab:CreateSection("Ultra Lag Cleaner (FPS Dostu)")
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -941,54 +941,61 @@ local CoreGui = game:GetService("CoreGui")
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local UserSettings = UserSettings()
 local RenderSettings = UserSettings.GameSettings
 
-local cleaned = {}
 local cleanerRunning = false
-local graphicsLocked = false
+local cleanedObjects = {}
 local lightingOptimized = false
 local soundMuted = false
+local graphicsLocked = false
 
--- 🔰 FPS Güvenli Temizlik Fonksiyonu (Sıralı ve sınırlı)
-local function safeClean(limit)
-	local count = 0
-	for _, obj in ipairs(workspace:GetChildren()) do
-		if count >= limit then break end
-		for _, child in ipairs(obj:GetDescendants()) do
-			if cleaned[child] then continue end
-
-			local class = child.ClassName
-			if class == "ParticleEmitter" or class == "Trail" or class == "Smoke" or class == "Fire"
-				or class == "Explosion" or class == "ForceField" or class == "SelectionBox"
-				or class == "SelectionPartLasso" or class == "Weld" or class == "Attachment" then
-				pcall(function() child:Destroy() end)
-			elseif class == "Decal" then
-				child.Transparency = 1
-			elseif child:IsA("BasePart") and child.Material ~= Enum.Material.Plastic then
-				child.Material = Enum.Material.Plastic
-				child.Reflectance = 0
-			end
-
-			cleaned[child] = true
-			count += 1
-			if count >= limit then break end
-		end
-	end
-end
-
--- 🔁 FPS Stabil Toggle
 UltraSection:AddToggle({
-	Name = "🧠 Performance Shield MAX (Sıfır Drop)",
+	Name = "🧠 FPS Dostu Ultra Lag Cleaner + Ping Stabilizer",
 	Value = false,
 	Callback = function(state)
 		cleanerRunning = state
-
 		if state then
-			warn("🟢 Performance Shield MAX aktif.")
+			warn("⚙️ FPS Dostu Lag Cleaner + Ping Stabilizer aktif edildi.")
+
+			-- 🛰️ PING Stabilizer
+			task.spawn(function()
+				local ns = settings():GetService("NetworkSettings")
+				pcall(function()
+					ns.IncomingReplicationLag = 0
+				end)
+			end)
+
+			-- 🎮 Grafik Zorlayıcı: Her 5 saniyede kaliteyi sabit tut
 			task.spawn(function()
 				while cleanerRunning do
-					safeClean(1000) -- Her döngüde 1000 obje işle
+					pcall(function()
+						RenderSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+					end)
+					task.wait(5)
+				end
+			end)
+
+			task.spawn(function()
+				while cleanerRunning do
+					for _, obj in ipairs(workspace:GetDescendants()) do
+						if obj:GetAttribute("Wia_Cleaned") then continue end
+
+						local class = obj.ClassName
+						if class == "ParticleEmitter" or class == "Trail" or class == "Smoke" or class == "Fire"
+							or class == "Explosion" or class == "ForceField" or class == "SelectionBox"
+							or class == "SelectionPartLasso" or class == "Weld" or class == "Attachment" then
+							pcall(function() obj:Destroy() end)
+						elseif class == "Decal" then
+							obj.Transparency = 1
+						elseif obj:IsA("BasePart") then
+							obj.Material = Enum.Material.Plastic
+							obj.Reflectance = 0
+						end
+
+						obj:SetAttribute("Wia_Cleaned", true)
+					end
 
 					if not lightingOptimized then
 						for _, effect in ipairs(Lighting:GetChildren()) do
@@ -1034,15 +1041,14 @@ UltraSection:AddToggle({
 						setfpscap(60)
 					end
 
-					task.wait(20)
+					task.wait(30)
 				end
 			end)
 		else
-			warn("🔴 Performance Shield MAX durduruldu.")
+			warn("⏹️ FPS Cleaner durduruldu.")
 			lightingOptimized = false
 			soundMuted = false
 			graphicsLocked = false
-			cleaned = {}
 		end
 	end
 })
