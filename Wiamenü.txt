@@ -18,9 +18,9 @@ local VehicleTab = PepsisWorld:CreateTab({ Name = "🚗" })
 local ExtraTab = PepsisWorld:CreateTab({ Name = "💰" })
 local AutoKillTab = PepsisWorld:CreateTab({ Name = "☠️" })
 local HitboxTab = PepsisWorld:CreateTab({ Name = "🎯" })
+local SystemTab = PepsisWorld:CreateTab({ Name = "🛠️" })
 local MusicTab = PepsisWorld:CreateTab({ Name = "🎵" })
 local ChatTab = PepsisWorld:CreateTab({ Name = "💬" })
-local SystemTab = PepsisWorld:CreateTab({ Name = "🛠️" })
 
 local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
 
@@ -1132,3 +1132,82 @@ CharacterSection:AddSlider({
 	end
 })
 
+-- ✅ SystemTab Oluşturuluyor
+local SystemTab = PepsisWorld:CreateTab({ Name = "🛠️" })
+
+-- 🔒 Anti Kick Sistemi
+local AntiKickSection = SystemTab:CreateSection("Anti Kick Sistemi")
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+-- 1. LocalPlayer:Kick() __namecall engelle
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local oldNamecall = mt.__namecall
+
+mt.__namecall = newcclosure(function(self, ...)
+	local method = getnamecallmethod()
+	if tostring(self) == tostring(LocalPlayer) and method == "Kick" then
+		warn("🚫 AntiKick: Kick() engellendi (__namecall)")
+		return
+	end
+	return oldNamecall(self, ...)
+end)
+
+-- 2. LocalPlayer.Kick() hookfunction engelle
+local oldKick = hookfunction(LocalPlayer.Kick, newcclosure(function(...)
+	warn("🚫 AntiKick: hookfunction ile Kick() engellendi.")
+	return
+end))
+
+-- 3. GUI Kick tespiti ve yok etme
+CoreGui.ChildAdded:Connect(function(child)
+	if child:IsA("ScreenGui") and child:FindFirstChildWhichIsA("TextLabel") then
+		warn("🚫 AntiKick: GUI Kick ekranı yok edildi.")
+		task.wait()
+		child:Destroy()
+	end
+end)
+
+-- 4. StarterGui mesaj engelle
+pcall(function()
+	game:GetService("StarterGui"):SetCore("ResetButtonCallback", false)
+	game:GetService("StarterGui"):SetCore("KickMessage", "")
+end)
+
+-- 5. Opsiyonel Roblox abuse engelleme
+if setfflag then
+	setfflag("AbuseReportScreenshot", "false")
+end
+
+-- 📦 Koruma Sistemleri: Auto Rejoin
+local AutoSection = SystemTab:CreateSection("Koruma Sistemleri")
+
+local autoRejoinEnabled = true -- ✅ Başlangıçta otomatik açık
+local TeleportService = game:GetService("TeleportService")
+
+local function handleAutoRejoin()
+	CoreGui.ChildAdded:Connect(function(child)
+		if autoRejoinEnabled and child:IsA("ScreenGui") and child:FindFirstChildWhichIsA("TextLabel") then
+			warn("⛔ Auto Rejoin: Kick algılandı, tekrar bağlanılıyor...")
+			task.wait(1)
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+		end
+	end)
+end
+
+-- 🔁 Başlangıçta başlat
+handleAutoRejoin()
+warn("🔁 Auto Rejoin otomatik başlatıldı.")
+
+-- ✅ Toggle menüde hâlâ görünsün
+AutoSection:AddToggle({
+	Name = "Auto Rejoin (Her Kicked'e Karşı)",
+	Value = true,
+	Callback = function(state)
+		autoRejoinEnabled = state
+		warn("🔁 Auto Rejoin durumu:", state and "Aktif" or "Pasif")
+	end
+})
