@@ -18,11 +18,9 @@ local VehicleTab = PepsisWorld:CreateTab({ Name = "🚗" })
 local ExtraTab = PepsisWorld:CreateTab({ Name = "💰" })
 local AutoKillTab = PepsisWorld:CreateTab({ Name = "☠️" })
 local HitboxTab = PepsisWorld:CreateTab({ Name = "🎯" })
-local TeleportTab = PepsisWorld:CreateTab({ Name = "🔮" })
 local MusicTab = PepsisWorld:CreateTab({ Name = "🎵" })
 local ChatTab = PepsisWorld:CreateTab({ Name = "💬" })
 local SystemTab = PepsisWorld:CreateTab({ Name = "🛠️" })
-
 
 local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
 
@@ -239,44 +237,6 @@ VehicleSection:AddButton({
         game:GetService("Workspace").Water.Name = "NotWaterBruh"  -- Su artık "NotWaterBruh" olacak
     end
 })
-
-local TeleportSection = TeleportTab:CreateSection({ Name = "Hızlı Teleport" })
-
--- Teleport Fonksiyonu
-local function tp(...)
-    local plr = game.Players.LocalPlayer
-    local args = {...}
-    if typeof(args[1]) == "number" and args[2] and args[3] then
-        args = Vector3.new(args[1], args[2], args[3])
-    elseif typeof(args[1]) == "Vector3" then
-        args = args[1]
-    elseif typeof(args[1]) == "CFrame" then
-        args = args[1].Position
-    end
-    local dist = (plr.Character.HumanoidRootPart.Position - args).Magnitude
-    game:GetService("TweenService"):Create(
-        plr.Character.HumanoidRootPart,
-        TweenInfo.new(dist / 1000, Enum.EasingStyle.Linear),
-        { CFrame = CFrame.new(args) }
-    ):Play()
-end
-
--- Teleport Butonları
-TeleportSection:AddButton({ Name = "Prison", Callback = function() tp(-945, 119, -2979) end })
-TeleportSection:AddButton({ Name = "Gun Shop", Callback = function() tp(-1658, 43, 707) end })
-TeleportSection:AddButton({ Name = "Criminal Base", Callback = function() tp(2101, 27, 426) end })
-
-TeleportSection:AddLabel("Robbery Areas", Color3.fromRGB(127, 143, 166))
-
-TeleportSection:AddButton({ Name = "Ship", Callback = function() tp(2517, 81, 335) end })
-TeleportSection:AddButton({ Name = "Airport", Callback = function() tp(-2146, 28, -1421) end })
-TeleportSection:AddButton({ Name = "Jewelry Store", Callback = function() tp(-109, 96, 746) end })
-TeleportSection:AddButton({ Name = "Club", Callback = function() tp(1093, 54, 169) end })
-TeleportSection:AddButton({ Name = "Bank", Callback = function() tp(637, 51, 465) end })
-TeleportSection:AddButton({ Name = "Pyramid", Callback = function() tp(-1046, 18, -499) end })
-TeleportSection:AddButton({ Name = "Casino", Callback = function() tp(1697, 38, 739) end })
-TeleportSection:AddButton({ Name = "Train", Callback = function() if game.Workspace.Train ~= nil then tp(game.Workspace.Train.Mid1.Yeet.Position) end end })
-TeleportSection:AddButton({ Name = "Plane", Callback = function() game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(game.Workspace.CargoPlane.Plane.Tele1.Position) end })
 
 local AutoKillSectionV1 = AutoKillTab:CreateSection({ Name = "Auto Kill V1 (BM - Hızlandırılmış)" })
 local RunService = game:GetService("RunService")
@@ -1036,3 +996,139 @@ FullProtection:AddButton({
         })
     end
 })
+
+-- 🛡️ RemoteEvent Hook (FlyStop + Glider engellenir)
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local old = mt.__namecall
+
+mt.__namecall = newcclosure(function(self, ...)
+	local args = {...}
+	if tostring(self) == "Event" and getnamecallmethod() == "FireServer" then
+		if args[1] == "FlyStop" or args[1] == "Glider" then
+			warn("🚫 RemoteEvent engellendi: " .. tostring(args[1]))
+			return nil
+		end
+	end
+	return old(self, unpack(args))
+end)
+
+-- 🧍 Admin Fly (geliştirilmiş)
+local CharacterTab = PepsisWorld:CreateTab({ Name = "🧍" })
+local CharacterSection = CharacterTab:CreateSection({ Name = "Uçuş Sistemi" })
+
+local FlySpeed = 50
+local flying = false
+local flyConn = nil
+
+CharacterSection:AddSlider({
+	Name = "Uçuş Hızı",
+	Min = 10,
+	Max = 150,
+	Value = 50,
+	Callback = function(v)
+		FlySpeed = v
+	end
+})
+
+CharacterSection:AddToggle({
+	Name = "Uçmayı Aç / Kapat",
+	Value = false,
+	Callback = function(state)
+		local player = game.Players.LocalPlayer
+		local char = player.Character or player.CharacterAdded:Wait()
+		local hrp = char:WaitForChild("HumanoidRootPart")
+		local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+		if state and not flying then
+			flying = true
+			if humanoid then humanoid.PlatformStand = true end
+
+			local bg = Instance.new("BodyGyro", hrp)
+			local bv = Instance.new("BodyVelocity", hrp)
+
+			bg.P = 9e4
+			bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+			bg.CFrame = hrp.CFrame
+
+			bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+			bv.Velocity = Vector3.zero
+
+			local uis = game:GetService("UserInputService")
+
+			flyConn = game:GetService("RunService").Heartbeat:Connect(function()
+				local cam = workspace.CurrentCamera
+				local move = Vector3.zero
+
+				if uis:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+				if uis:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+				if uis:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+				if uis:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+				if uis:IsKeyDown(Enum.KeyCode.Space) then move += cam.CFrame.UpVector end
+				if uis:IsKeyDown(Enum.KeyCode.LeftControl) then move -= cam.CFrame.UpVector end
+
+				bg.CFrame = cam.CFrame
+				if move.Magnitude > 0 then
+					bv.Velocity = move.Unit * FlySpeed
+				else
+					bv.Velocity = Vector3.zero
+				end
+			end)
+		else
+			flying = false
+			if flyConn then flyConn:Disconnect() flyConn = nil end
+			for _,v in pairs(hrp:GetChildren()) do
+				if v:IsA("BodyGyro") or v:IsA("BodyVelocity") then
+					v:Destroy()
+				end
+			end
+			if humanoid then humanoid.PlatformStand = false end
+		end
+	end
+})
+
+local NoclipEnabled = false
+local NoclipConnection = nil
+
+CharacterSection:AddToggle({
+	Name = "Noclip Aç / Kapat",
+	Value = false,
+	Callback = function(state)
+		NoclipEnabled = state
+
+		if state then
+			NoclipConnection = game:GetService("RunService").Stepped:Connect(function()
+				local char = game.Players.LocalPlayer.Character
+				if char then
+					for _,v in pairs(char:GetDescendants()) do
+						if v:IsA("BasePart") and v.CanCollide then
+							v.CanCollide = false
+						end
+					end
+				end
+			end)
+		else
+			if NoclipConnection then
+				NoclipConnection:Disconnect()
+				NoclipConnection = nil
+			end
+		end
+	end
+})
+
+local JumpPower = 50
+
+CharacterSection:AddSlider({
+	Name = "Zıplama Gücü",
+	Min = 50,
+	Max = 300,
+	Value = 50,
+	Callback = function(val)
+		JumpPower = val
+		local char = game.Players.LocalPlayer.Character
+		if char and char:FindFirstChildOfClass("Humanoid") then
+			char:FindFirstChildOfClass("Humanoid").JumpPower = JumpPower
+		end
+	end
+})
+
