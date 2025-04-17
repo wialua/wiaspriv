@@ -86,7 +86,7 @@ Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
 
 -- Şifre kutusu
 local passwordBox = Instance.new("TextBox", mainFrame)
-passwordBox.PlaceholderText = "Şifrenizi giriniz"
+passwordBox.PlaceholderText = "Şifreyi Giriniz"
 passwordBox.Size = UDim2.new(0.8, 0, 0, 38)
 passwordBox.Position = UDim2.new(0.1, 0, 0, 95)
 passwordBox.Text = savedPassword or ""
