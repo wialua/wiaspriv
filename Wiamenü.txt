@@ -1055,8 +1055,9 @@ UltraSection:AddToggle({
 	end
 })
 
-local ServerhopSection = SystemTab:CreateSection("Server Hop")
+local ServerhopSection = SystemTab:CreateSection("Server Hop & Rejoin")
 
+-- 🌐 Server Hop Fonksiyonu
 local function serverHop()
 	local PlaceId = game.PlaceId
 	local JobId = game.JobId
@@ -1098,9 +1099,25 @@ local function serverHop()
 	end
 end
 
+-- 🔁 Rejoin Fonksiyonu
+local function rejoinServer()
+	local placeId = game.PlaceId
+	local jobId = game.JobId
+	TeleportService:TeleportToPlaceInstance(placeId, jobId, Players.LocalPlayer)
+end
+
+-- 🌐 Server Hop Butonu
 ServerhopSection:AddButton({
 	Name = "🌐 Server Hop (Gelişmiş)",
 	Callback = function()
 		serverHop()
+	end
+})
+
+-- 🔁 Rejoin Butonu
+ServerhopSection:AddButton({
+	Name = "🔁 Aynı Sunucuya Rejoin",
+	Callback = function()
+		rejoinServer()
 	end
 })
