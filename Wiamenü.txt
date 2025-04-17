@@ -93,11 +93,11 @@ CombatSection:AddButton({
 })
 
 local VehicleSpawnEventSection = VehicleTab:CreateSection({ Name = "Araç Spawn (Sende Olanlar)" })
-local selectedSpawnVehicle = "Fury"
+local selectedSpawnVehicle = "Nighthawk"
 
 VehicleSpawnEventSection:AddDropdown({
     Name = "Spawnlanacak Araç",
-    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
+    List = {"Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury"},
     Callback = function(v) selectedSpawnVehicle = v end
 })
 
@@ -113,10 +113,10 @@ VehicleSpawnEventSection:AddButton({
 })
 
 local VehicleSpawnSection = VehicleTab:CreateSection({ Name = "Araç Spawnlama" })
-local selectedVehicle = "Nighthawk"
+local selectedVehicle = "Nero"
 VehicleSpawnSection:AddDropdown({
     Name = "Araç Seç",
-    List = {"Fury", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard"},
+    List = {"Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury"},
     Callback = function(v) selectedVehicle = v end
 })
 VehicleSpawnSection:AddButton({
