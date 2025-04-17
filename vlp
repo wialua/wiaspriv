@@ -18,135 +18,170 @@ lighting.FogStart = 100000
 lighting.FogEnd = 100000
 lighting.FogColor = Color3.fromRGB(255, 255, 255)
 
-local userInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
--- GUI oluştur
-local gui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-gui.Name = "WiaLoginUI"
-gui.IgnoreGuiInset = true
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+-- Kaydedilen şifre
+local savedPassword
+pcall(function()
+    if isfile and readfile and isfile("wia_login_cache.txt") then
+        savedPassword = readfile("wia_login_cache.txt")
+    end
+end)
 
--- Arka plan
-local background = Instance.new("ImageLabel", gui)
-background.Size = UDim2.new(1, 0, 1, 0)
-background.Image = "rbxassetid://11622626925"
-background.BackgroundTransparency = 1
-background.ImageTransparency = 1
-TweenService:Create(background, TweenInfo.new(0.6), {ImageTransparency = 0}):Play()
+-- GUI
+local screenGui = Instance.new("ScreenGui", game.CoreGui)
+screenGui.Name = "Wia_LoginUI"
+screenGui.IgnoreGuiInset = true
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
 -- Ana Frame
-local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0, 400, 0, 280)
-main.Position = UDim2.new(0.5, -200, 0.5, -140)
-main.AnchorPoint = Vector2.new(0.5, 0.5)
-main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-main.BackgroundTransparency = 1
-main.BorderSizePixel = 0
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
-TweenService:Create(main, TweenInfo.new(0.6), {BackgroundTransparency = 0.1}):Play()
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.Size = UDim2.new(0, 380, 0, 260)
+mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+mainFrame.BackgroundTransparency = 0.05
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
 
-local stroke = Instance.new("UIStroke", main)
-stroke.Thickness = 2
-stroke.Color = Color3.fromRGB(80, 170, 255)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
-local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1, 0, 0, 60)
+local stroke = Instance.new("UIStroke", mainFrame)
+stroke.Thickness = 1.5
+stroke.Color = Color3.fromRGB(0, 170, 255)
+
+-- Gölge efekti
+local shadow = Instance.new("ImageLabel", mainFrame)
+shadow.Size = UDim2.new(1, 60, 1, 60)
+shadow.Position = UDim2.new(0, -30, 0, -30)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxassetid://1316045217"
+shadow.ImageTransparency = 0.75
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+shadow.ZIndex = 0
+
+-- Başlık
+local title = Instance.new("TextLabel", mainFrame)
 title.Text = "Wia Menü Giriş"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.TextTransparency = 1
-title.Font = Enum.Font.GothamBold
-title.TextSize = 30
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Position = UDim2.new(0, 0, 0, 5)
 title.BackgroundTransparency = 1
-TweenService:Create(title, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.ZIndex = 6
 
-local input = Instance.new("TextBox", main)
-input.Size = UDim2.new(0.8, 0, 0, 45)
-input.Position = UDim2.new(0.1, 0, 0.4, 0)
-input.PlaceholderText = "Şifrenizi giriniz"
-input.Text = ""
-input.TextColor3 = Color3.new(1, 1, 1)
-input.TextScaled = true
-input.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-input.Font = Enum.Font.Gotham
-Instance.new("UICorner", input).CornerRadius = UDim.new(0, 8)
+-- Avatar
+local avatar = Instance.new("ImageLabel", mainFrame)
+avatar.Size = UDim2.new(0, 60, 0, 60)
+avatar.Position = UDim2.new(1, -70, 0, 10)
+avatar.BackgroundTransparency = 1
+avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId="..player.UserId.."&width=420&height=420&format=png"
+Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
 
-local button = Instance.new("TextButton", main)
-button.Size = UDim2.new(0.8, 0, 0, 40)
-button.Position = UDim2.new(0.1, 0, 0.65, 0)
-button.Text = "Giriş Yap"
-button.TextColor3 = Color3.new(1, 1, 1)
-button.TextScaled = true
-button.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-button.Font = Enum.Font.GothamBold
-Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
+-- Şifre kutusu
+local passwordBox = Instance.new("TextBox", mainFrame)
+passwordBox.PlaceholderText = "Şifrenizi giriniz"
+passwordBox.Size = UDim2.new(0.8, 0, 0, 38)
+passwordBox.Position = UDim2.new(0.1, 0, 0, 95)
+passwordBox.Text = savedPassword or ""
+passwordBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+passwordBox.Font = Enum.Font.Gotham
+passwordBox.TextScaled = true
+passwordBox.ClearTextOnFocus = false
+passwordBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+passwordBox.BorderSizePixel = 0
 
--- Spinner
-local spinner = Instance.new("ImageLabel", main)
-spinner.Size = UDim2.new(0, 32, 0, 32)
-spinner.Position = UDim2.new(0.5, -16, 0.88, 0)
-spinner.Image = "rbxassetid://3926305904"
-spinner.ImageRectSize = Vector2.new(36, 36)
-spinner.ImageTransparency = 1
-spinner.BackgroundTransparency = 1
-local spinAnim = TweenService:Create(spinner, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
-	Rotation = 360
-})
-spinAnim:Play()
-TweenService:Create(spinner, TweenInfo.new(0.4), {ImageTransparency = 0}):Play()
+Instance.new("UICorner", passwordBox).CornerRadius = UDim.new(0, 8)
 
--- Uyarı kutusu
-local warning = Instance.new("TextLabel", gui)
-warning.Size = UDim2.new(0, 350, 0, 45)
-warning.Position = UDim2.new(0.5, -175, 0, -60)
-warning.AnchorPoint = Vector2.new(0.5, 0)
-warning.Text = "❌ Hatalı şifre, tekrar dene."
-warning.TextColor3 = Color3.fromRGB(255, 100, 100)
-warning.Font = Enum.Font.GothamBold
-warning.TextScaled = true
-warning.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
-warning.BackgroundTransparency = 1
-warning.TextTransparency = 1
-warning.Visible = false
-Instance.new("UICorner", warning).CornerRadius = UDim.new(0, 10)
-Instance.new("UIStroke", warning).Color = Color3.fromRGB(255, 60, 60)
+-- Beni Hatırla kutusu
+local remember = Instance.new("TextButton", mainFrame)
+remember.Size = UDim2.new(0.5, 0, 0, 25)
+remember.Position = UDim2.new(0.1, 0, 0, 140)
+remember.Text = "☐ Beni Hatırla"
+remember.BackgroundTransparency = 1
+remember.Font = Enum.Font.Gotham
+remember.TextColor3 = Color3.fromRGB(200, 200, 200)
+remember.TextScaled = true
 
--- Uyarı fonksiyonu
-local function showWarning()
-	warning.Visible = true
-	warning.Position = UDim2.new(0.5, -175, 0, -60)
-	local tweenIn = TweenService:Create(warning, TweenInfo.new(0.3), {
-		BackgroundTransparency = 0.1,
-		TextTransparency = 0,
-		Position = UDim2.new(0.5, -175, 0, 20)
-	})
-	tweenIn:Play()
-	tweenIn.Completed:Wait()
-
-	wait(3.5)
-
-	local tweenOut = TweenService:Create(warning, TweenInfo.new(0.4), {
-		BackgroundTransparency = 1,
-		TextTransparency = 1,
-		Position = UDim2.new(0.5, -175, 0, -60)
-	})
-	tweenOut:Play()
-	tweenOut.Completed:Wait()
-	warning.Visible = false
+local isRemembered = savedPassword and true or false
+if isRemembered then
+    remember.Text = "☑ Beni Hatırla"
 end
 
--- Giriş kontrol
-button.MouseButton1Click:Connect(function()
-	local entered = input.Text
-	if entered == "wiabest31" then
-		title.Text = "Şifre doğru, yükleniyor..."
-		TweenService:Create(main, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
-		TweenService:Create(background, TweenInfo.new(0.6), {ImageTransparency = 1}):Play()
-		wait(0.8)
-		gui:Destroy()
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt"))()
-	else
-		showWarning()
-	end
+remember.MouseButton1Click:Connect(function()
+    isRemembered = not isRemembered
+    remember.Text = isRemembered and "☑ Beni Hatırla" or "☐ Beni Hatırla"
+end)
+
+-- Giriş butonu
+local loginBtn = Instance.new("TextButton", mainFrame)
+loginBtn.Size = UDim2.new(0.8, 0, 0, 40)
+loginBtn.Position = UDim2.new(0.1, 0, 0, 180)
+loginBtn.Text = "Giriş Yap"
+loginBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+loginBtn.Font = Enum.Font.GothamBold
+loginBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+loginBtn.TextScaled = true
+loginBtn.BorderSizePixel = 0
+
+Instance.new("UICorner", loginBtn).CornerRadius = UDim.new(0, 8)
+
+-- Giriş Animasyonu
+mainFrame.Size = UDim2.new(0, 0, 0, 0)
+TweenService:Create(mainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {
+    Size = UDim2.new(0, 380, 0, 260)
+}):Play()
+
+-- Hatalı giriş bildirimi
+local warning = Instance.new("TextLabel", mainFrame)
+warning.Size = UDim2.new(1, 0, 0, 25)
+warning.Position = UDim2.new(0, 0, 1, -25)
+warning.Text = ""
+warning.TextColor3 = Color3.fromRGB(255, 80, 80)
+warning.TextScaled = true
+warning.Font = Enum.Font.Gotham
+warning.BackgroundTransparency = 1
+warning.ZIndex = 10
+
+-- Giriş işlemi
+local function handleLogin()
+    local pwd = passwordBox.Text
+    if pwd == "wia123" then
+        if isRemembered and writefile then
+            pcall(function()
+                writefile("wia_login_cache.txt", pwd)
+            end)
+        elseif isfile and delfile and isfile("wia_login_cache.txt") then
+            delfile("wia_login_cache.txt")
+        end
+
+        loginBtn.Text = "✔ Giriş Başarılı"
+        TweenService:Create(mainFrame, TweenInfo.new(0.6), {
+            Position = UDim2.new(0.5, 0, 1.5, 0)
+        }):Play()
+        wait(0.7)
+        screenGui:Destroy()
+
+        -- Menü yükle
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt"))()
+    else
+        warning.Text = "❌ Hatalı şifre"
+        wait(2)
+        warning.Text = ""
+        loginBtn.Text = "Giriş Yap"
+    end
+end
+
+-- Buton ve Enter ile giriş
+loginBtn.MouseButton1Click:Connect(handleLogin)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.Return then
+        handleLogin()
+    end
 end)
