@@ -18,4 +18,135 @@ lighting.FogStart = 100000
 lighting.FogEnd = 100000
 lighting.FogColor = Color3.fromRGB(255, 255, 255)
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt"))()
+local userInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+-- GUI oluştur
+local gui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+gui.Name = "WiaLoginUI"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+-- Arka plan
+local background = Instance.new("ImageLabel", gui)
+background.Size = UDim2.new(1, 0, 1, 0)
+background.Image = "rbxassetid://11622626925"
+background.BackgroundTransparency = 1
+background.ImageTransparency = 1
+TweenService:Create(background, TweenInfo.new(0.6), {ImageTransparency = 0}):Play()
+
+-- Ana Frame
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 400, 0, 280)
+main.Position = UDim2.new(0.5, -200, 0.5, -140)
+main.AnchorPoint = Vector2.new(0.5, 0.5)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+main.BackgroundTransparency = 1
+main.BorderSizePixel = 0
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
+TweenService:Create(main, TweenInfo.new(0.6), {BackgroundTransparency = 0.1}):Play()
+
+local stroke = Instance.new("UIStroke", main)
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(80, 170, 255)
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 60)
+title.Text = "Wia Menü Giriş"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 30
+title.BackgroundTransparency = 1
+TweenService:Create(title, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
+
+local input = Instance.new("TextBox", main)
+input.Size = UDim2.new(0.8, 0, 0, 45)
+input.Position = UDim2.new(0.1, 0, 0.4, 0)
+input.PlaceholderText = "Şifrenizi giriniz"
+input.Text = ""
+input.TextColor3 = Color3.new(1, 1, 1)
+input.TextScaled = true
+input.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+input.Font = Enum.Font.Gotham
+Instance.new("UICorner", input).CornerRadius = UDim.new(0, 8)
+
+local button = Instance.new("TextButton", main)
+button.Size = UDim2.new(0.8, 0, 0, 40)
+button.Position = UDim2.new(0.1, 0, 0.65, 0)
+button.Text = "Giriş Yap"
+button.TextColor3 = Color3.new(1, 1, 1)
+button.TextScaled = true
+button.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+button.Font = Enum.Font.GothamBold
+Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
+
+-- Spinner
+local spinner = Instance.new("ImageLabel", main)
+spinner.Size = UDim2.new(0, 32, 0, 32)
+spinner.Position = UDim2.new(0.5, -16, 0.88, 0)
+spinner.Image = "rbxassetid://3926305904"
+spinner.ImageRectSize = Vector2.new(36, 36)
+spinner.ImageTransparency = 1
+spinner.BackgroundTransparency = 1
+local spinAnim = TweenService:Create(spinner, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
+	Rotation = 360
+})
+spinAnim:Play()
+TweenService:Create(spinner, TweenInfo.new(0.4), {ImageTransparency = 0}):Play()
+
+-- Uyarı kutusu
+local warning = Instance.new("TextLabel", gui)
+warning.Size = UDim2.new(0, 350, 0, 45)
+warning.Position = UDim2.new(0.5, -175, 0, -60)
+warning.AnchorPoint = Vector2.new(0.5, 0)
+warning.Text = "❌ Hatalı şifre, tekrar dene."
+warning.TextColor3 = Color3.fromRGB(255, 100, 100)
+warning.Font = Enum.Font.GothamBold
+warning.TextScaled = true
+warning.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
+warning.BackgroundTransparency = 1
+warning.TextTransparency = 1
+warning.Visible = false
+Instance.new("UICorner", warning).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", warning).Color = Color3.fromRGB(255, 60, 60)
+
+-- Uyarı fonksiyonu
+local function showWarning()
+	warning.Visible = true
+	warning.Position = UDim2.new(0.5, -175, 0, -60)
+	local tweenIn = TweenService:Create(warning, TweenInfo.new(0.3), {
+		BackgroundTransparency = 0.1,
+		TextTransparency = 0,
+		Position = UDim2.new(0.5, -175, 0, 20)
+	})
+	tweenIn:Play()
+	tweenIn.Completed:Wait()
+
+	wait(3.5)
+
+	local tweenOut = TweenService:Create(warning, TweenInfo.new(0.4), {
+		BackgroundTransparency = 1,
+		TextTransparency = 1,
+		Position = UDim2.new(0.5, -175, 0, -60)
+	})
+	tweenOut:Play()
+	tweenOut.Completed:Wait()
+	warning.Visible = false
+end
+
+-- Giriş kontrol
+button.MouseButton1Click:Connect(function()
+	local entered = input.Text
+	if entered == "wiabest31" then
+		title.Text = "Şifre doğru, yükleniyor..."
+		TweenService:Create(main, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
+		TweenService:Create(background, TweenInfo.new(0.6), {ImageTransparency = 1}):Play()
+		wait(0.8)
+		gui:Destroy()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt"))()
+	else
+		showWarning()
+	end
+end)
