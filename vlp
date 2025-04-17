@@ -152,7 +152,7 @@ warning.ZIndex = 10
 -- Giriş işlemi
 local function handleLogin()
     local pwd = passwordBox.Text
-    if pwd == "wia123" then
+    if pwd == "wiabest31" then
         if isRemembered and writefile then
             pcall(function()
                 writefile("wia_login_cache.txt", pwd)
