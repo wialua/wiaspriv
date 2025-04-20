@@ -336,6 +336,11 @@ local TeamsService = game:GetService("Teams")
 local Players = game:GetService("Players")
 local Event = game:GetService("ReplicatedStorage"):WaitForChild("Event")
 
+-- 🛡️ Kara liste (blacklist)
+local blacklist = {
+	["MAD_CITYAIMBOTLOL"] = true
+}
+
 -- Takım başına toggle oluştur
 local function createAutoKillToggleV1(teamName)
 	local team = TeamsService:WaitForChild(teamName)
@@ -348,13 +353,12 @@ local function createAutoKillToggleV1(teamName)
 		Callback = function(state)
 			isActive = state
 
-			-- Başlat
 			if state then
 				if killThread then return end
 				killThread = task.spawn(function()
 					while isActive do
 						for _, player in pairs(team:GetPlayers()) do
-							if player ~= Players.LocalPlayer and player.Character then
+							if player ~= Players.LocalPlayer and player.Character and not blacklist[player.Name] then
 								for _, part in ipairs(player.Character:GetDescendants()) do
 									if part:IsA("BasePart") then
 										Event:FireServer("BM", part.Position)
@@ -362,11 +366,10 @@ local function createAutoKillToggleV1(teamName)
 								end
 							end
 						end
-						task.wait() -- Sunucu hızına göre çalışır
+						task.wait()
 					end
 				end)
 
-			-- Durdur
 			else
 				if killThread then
 					pcall(function() task.cancel(killThread) end)
@@ -382,6 +385,7 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
 	createAutoKillToggleV1(team)
 end
 
+
 local AutoKillSectionV4 = AutoKillTab:CreateSection({ Name = "Auto Kill FPS SİKEN V4 🚨" })
 
 local selectedTargetV4 = ""
@@ -389,8 +393,18 @@ local selectedTeamV4 = ""
 local missileLoopV4 = nil
 local teamMissileLoopV4 = nil
 
--- ⚔️ Hardcore Füze Spam (10x her parçaya)
+local Players = game:GetService("Players")
+local Teams = game:GetService("Teams")
+local LocalPlayer = Players.LocalPlayer
+
+-- 🛡️ Kara liste (dokunulmaz oyuncular)
+local blacklist = {
+	["MAD_CITYAIMBOTLOL"] = true
+}
+
+-- ⚔️ Füze Spam (Blacklist Dahil)
 local function explodePlayerParts(player)
+	if blacklist[player.Name] then return end
 	if player and player.Character then
 		for _, part in ipairs(player.Character:GetDescendants()) do
 			if part:IsA("BasePart") then
@@ -402,7 +416,7 @@ local function explodePlayerParts(player)
 	end
 end
 
--- 🔁 Oyuncu listesi altyapısı
+-- 🔁 Oyuncu listesi güncelleme
 local playerDropdowns = {}
 
 function registerLiveDropdown(dropdown)
@@ -441,7 +455,7 @@ local function getTeamList()
 	return list
 end
 
--- 🎯 FPS'i Sikeceğin Oyuncu
+-- 🎯 Oyuncuya füze spam
 local playerDropdownV4 = AutoKillSectionV4:AddDropdown({
 	Name = "FPS'i Sikeceğin Oyuncu",
 	List = getPlayerList(),
@@ -451,7 +465,7 @@ local playerDropdownV4 = AutoKillSectionV4:AddDropdown({
 })
 registerLiveDropdown(playerDropdownV4)
 
--- 👥 FPS'i Sikeceğin Takım
+-- 👥 Takıma füze spam
 local teamDropdownV4 = AutoKillSectionV4:AddDropdown({
 	Name = "FPS'i Sikeceğin Takım",
 	List = getTeamList(),
@@ -460,7 +474,7 @@ local teamDropdownV4 = AutoKillSectionV4:AddDropdown({
 	end
 })
 
--- 🎯 Oyuncuya Füze Spam
+-- 🎯 FPS SİK (Oyuncu)
 AutoKillSectionV4:AddToggle({
 	Name = "🎯 FPS'i SİK (Oyuncu)",
 	Value = false,
@@ -485,7 +499,7 @@ AutoKillSectionV4:AddToggle({
 	end
 })
 
--- 👥 Takıma Füze Spam
+-- 👥 FPS SİK (Takım)
 AutoKillSectionV4:AddToggle({
 	Name = "👥 FPS'i SİK (Takım)",
 	Value = false,
@@ -510,7 +524,6 @@ AutoKillSectionV4:AddToggle({
 		end
 	end
 })
-
 -- ===================== 🧠 HITBOX =====================
 local HitboxSection = HitboxTab:CreateSection({ Name = "Wia Head Hitbox MASTER v1.7" })
 
