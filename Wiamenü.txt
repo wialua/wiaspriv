@@ -1,779 +1,515 @@
+-- Wia Menü | Full Revize | Premium UI
 local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
 
 local PepsisWorld = library:CreateWindow({
-    Name = "Wia Menü Beta",
-    Themeable = { Info = "Beta Version" }
+	Name = "Wia Menü | Revize",
+	Themeable = { Info = "Tam Sürüm" }
 })
 
+-- Gerekli Servisler
 local RunService = game:GetService('RunService')
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService('Players')
-local TeamsService = game:GetService("Teams")
+local Teams = game:GetService("Teams")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Event = ReplicatedStorage:WaitForChild("Event")
-local Mouse = Players.LocalPlayer:GetMouse()
-local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
-local PvpTab = PepsisWorld:CreateTab({ Name = "⚔️" })
-local VehicleTab = PepsisWorld:CreateTab({ Name = "🚗" })
-local ExtraTab = PepsisWorld:CreateTab({ Name = "💰" })
-local AutoKillTab = PepsisWorld:CreateTab({ Name = "☠️" })
+local Event = ReplicatedStorage:WaitForChild("Event")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+-- Sekmeler
+local CombatTab = PepsisWorld:CreateTab({ Name = "🥊" })
+local VehicleTab = PepsisWorld:CreateTab({ Name = "🚘" })
+local AutoKillTab = PepsisWorld:CreateTab({ Name = "🚀" })
 local HitboxTab = PepsisWorld:CreateTab({ Name = "🎯" })
-local SystemTab = PepsisWorld:CreateTab({ Name = "🛠️" })
-local MusicTab = PepsisWorld:CreateTab({ Name = "🎵" })
-local ChatTab = PepsisWorld:CreateTab({ Name = "💬" })
+local ExtraTab = PepsisWorld:CreateTab({ Name = "💼" })
+local CharacterTab = PepsisWorld:CreateTab({ Name = "🧍" })
+local SystemTab = PepsisWorld:CreateTab({ Name = "📳" })
 
-local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
-
-CombatSection:AddButton({
-    Name = "ESP Aç",
-    Callback = function()
-        -- ESP Aç Scripti
-        local Players = game:GetService("Players")
-
-        local function fixNameTag(player)
-            local function apply()
-                local char = player.Character
-                if not char then return end
-                local nameTag = char:FindFirstChild("NameTag")
-                if nameTag then
-                    nameTag.AlwaysOnTop = true
-                    nameTag.MaxDistance = 10000
-                end
-            end
-
-            if player.Character then apply() end
-
-            player.CharacterAdded:Connect(function(char)
-                char:WaitForChild("NameTag", 10)
-                apply()
-                local nameTag = char:FindFirstChild("NameTag")
-                if nameTag then
-                    nameTag:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
-                        nameTag.AlwaysOnTop = true
-                    end)
-                end
-            end)
-        end
-
-        for _, player in ipairs(Players:GetPlayers()) do
-            fixNameTag(player)
-        end
-
-        Players.PlayerAdded:Connect(fixNameTag)
-    end
-})
-
-local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
+-- ===================== 🥊 SAVAŞ =====================
+local CombatSection = CombatTab:CreateSection({ Name = "ESP Kontrol" })
 
 CombatSection:AddButton({
-    Name = "ESP Kapat",
-    Callback = function()
-        -- ESP Kapat Scripti
-        for _, player in pairs(game:GetService("Players"):GetChildren()) do
-            local character = player.Character or player.CharacterAdded:Wait()
-            local nameTag = character:FindFirstChild("NameTag")
-            if nameTag then
-                nameTag.AlwaysOnTop = false
-                nameTag.MaxDistance = 10000
-            end
-        end
-
-        game:GetService("Players").PlayerAdded:Connect(function(player)
-            player.CharacterAdded:Connect(function(character)
-                local nameTag = character:WaitForChild("NameTag", 10)
-                if nameTag then
-                    nameTag.AlwaysOnTop = false
-                    nameTag.MaxDistance = 10000
-                end
-            end)
-        end)
-    end
+	Name = "ESP Aç",
+	Callback = function()
+		local function fixNameTag(player)
+			local function apply()
+				local char = player.Character
+				if not char then return end
+				local nameTag = char:FindFirstChild("NameTag")
+				if nameTag then
+					nameTag.AlwaysOnTop = true
+					nameTag.MaxDistance = 10000
+				end
+			end
+			if player.Character then apply() end
+			player.CharacterAdded:Connect(function(char)
+				char:WaitForChild("NameTag", 10)
+				apply()
+			end)
+		end
+		for _, player in ipairs(Players:GetPlayers()) do
+			fixNameTag(player)
+		end
+		Players.PlayerAdded:Connect(fixNameTag)
+	end
 })
 
-local VehicleSpawnEventSection = VehicleTab:CreateSection({ Name = "Araç Spawn (Sende Olanlar)" })
-local selectedSpawnVehicle = "Nighthawk"
-
-VehicleSpawnEventSection:AddDropdown({
-    Name = "Spawnlanacak Araç",
-    List = {"Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury"},
-    Callback = function(v) selectedSpawnVehicle = v end
+CombatSection:AddButton({
+	Name = "ESP Kapat",
+	Callback = function()
+		for _, player in pairs(Players:GetChildren()) do
+			local character = player.Character or player.CharacterAdded:Wait()
+			local nameTag = character:FindFirstChild("NameTag")
+			if nameTag then
+				nameTag.AlwaysOnTop = false
+				nameTag.MaxDistance = 10000
+			end
+		end
+	end
 })
-
-VehicleSpawnEventSection:AddButton({
-    Name = "Araç Spawn (Sende Olanlar)",
-    Callback = function()
-        local args = {
-            [1] = "SpawnVehicle",
-            [2] = selectedSpawnVehicle
-        }
-        Event:FireServer(unpack(args))
-    end
-})
-
-local VehicleSpawnSection = VehicleTab:CreateSection({ Name = "Araç Spawnlama" })
+-- ===================== 🚘 ARAÇLAR =====================
+local VehicleSpawnSection = VehicleTab:CreateSection({ Name = "Araç Spawnlama (Tüm Araçlar)" })
 local selectedVehicle = "Nero"
+
 VehicleSpawnSection:AddDropdown({
-    Name = "Araç Seç",
-    List = {"Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury"},
-    Callback = function(v) selectedVehicle = v end
+	Name = "Araç Seç",
+	List = {"Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury"},
+	Callback = function(v) selectedVehicle = v end
 })
+
 VehicleSpawnSection:AddButton({
-    Name = "Seçilen Araca Bin",
-    Callback = function()
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local HRP = char.HumanoidRootPart
-        local btp = Instance.new("Vector3Value", LocalPlayer)
-        btp.Name = "btp"
-        btp.Value = HRP.Position
-        HRP.CFrame = Workspace.VehicleSpawns[selectedVehicle].Pos.CFrame
-        wait()
-        HRP.CFrame = CFrame.new(btp.Value)
-        wait()
-        local vehicle = Workspace.ObjectSelection[selectedVehicle]
-        if vehicle then
-            vehicle.DriveSeat.Disabled = false
-            vehicle:MoveTo(HRP.Position)
-            wait()
-            HRP.CFrame = vehicle.DriveSeat.CFrame
-            wait()
-            vehicle.DriveSeat.Disabled = true
-        end
-        btp:Destroy()
-    end
+	Name = "Araç Spawnla",
+	Callback = function()
+		local args = {
+			[1] = "SpawnVehicle",
+			[2] = selectedVehicle
+		}
+		Event:FireServer(unpack(args))
+	end
 })
 
-local VehicleSection = VehicleTab:CreateSection({ Name = "Araç/Uçak Hileleri" })
-
-VehicleSection:AddButton({
-    Name = "Super Car",
-    Callback = function()
-        -- Super Car Scripti
-        local a = {Price=150000, Bounce=1, Height=3.5, Sway=13.5, Suspension=20, TurnSpeed=2, Torque=2, MaxSpeed=900, BrakeForce=1, SpeedDecay=0.2, Boost=true, BoostParticles="Middle", Drift=true, VelLerp=0.2, RotLerp=0.2, DriftVelLerp=0.1, DriftRotLerp=0.2, HideCharacter=true, CameraOffset=26}
-
-        -- Araç parametrelerini değiştirme
-        for b, c in pairs(getgc(true)) do
-            if type(c) == "table" then
-                for d, e in pairs(a) do
-                    if rawget(c, d) ~= nil then
-                        c[d] = e
-                    end
-                end
-            end
-        end
-
-        -- Aracın Boost değerini ayarlama
-        local f = workspace.ObjectSelection:FindFirstChild(game.Players.LocalPlayer.Name.."'s Vehicle")
-        if f then
-            pcall(function() 
-                local g = f:FindFirstChild("CarChassis")
-                if g then
-                    local h = g:FindFirstChild("Boost")
-                    if h then
-                        h.Value = 20  -- Boost değerini 20 yapıyoruz
-                    end
-                end
-            end)
-        end
-    end
+VehicleSpawnSection:AddButton({
+	Name = "Spawnlanana Bin",
+	Callback = function()
+		local char = LocalPlayer.Character
+		if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+		local HRP = char.HumanoidRootPart
+		local btp = Instance.new("Vector3Value", LocalPlayer)
+		btp.Name = "btp"
+		btp.Value = HRP.Position
+		HRP.CFrame = Workspace.VehicleSpawns[selectedVehicle].Pos.CFrame
+		wait()
+		HRP.CFrame = CFrame.new(btp.Value)
+		wait()
+		local vehicle = Workspace.ObjectSelection[selectedVehicle]
+		if vehicle then
+			vehicle.DriveSeat.Disabled = false
+			vehicle:MoveTo(HRP.Position)
+			wait()
+			HRP.CFrame = vehicle.DriveSeat.CFrame
+			wait()
+			vehicle.DriveSeat.Disabled = true
+		end
+		btp:Destroy()
+	end
 })
 
-VehicleSection:AddButton({
-    Name = "Hızlı Dönme",
-    Callback = function()
-        -- Night Hızlı Dönme Scripti
-        local _a = {Price = 4000000, MaxAltitude = 650, MaxSpeed = 240, Acceleration = 1, DampeningAcceleration = 0.8, MaxVerticalTilt = 10, VerticalTiltUpSpeed = 1, VerticalTiltDownSpeed = 1, VerticalTiltDampening = 0.95, VerticalSpeedLimit = 30, HorizontalTiltSpeed = 6, MaxSideTilt = 20, SideTiltSpeed = 0.9, SideTiltDampening = 0.95, TurnSpeed = 3.5, HideCharacter = true, CameraOffset = 50, Missiles = true, Bombs = true, Stealth = true, MissileTargetRange = 540, MissileCooldown = 2, MissileLock = 0}
+local BoostSection = VehicleTab:CreateSection({ Name = "Performans & Boost" })
 
-        for i, v in pairs(getgc(true)) do
-            if type(v) == "table" then
-                for p, val in pairs(_a) do
-                    if rawget(v, p) ~= nil then
-                        v[p] = val
-                    end
-                end
-            end
-        end
+BoostSection:AddButton({
+	Name = "Super Car",
+	Callback = function()
+		-- Araç parametrelerini güncelle
+		local propertyValues = {
+			Sway = 20,
+			Torque = 7,
+			MaxSpeed = 900,
+			TurnSpeed = 1.7,
+			DriftVelLerp = 0.45,
+			DriftRotLerp = 0.12,
+		}
 
-        -- Bomba bırakma işlemi
-        local r = game.ReplicatedStorage:WaitForChild("Event")
-        local u = game:GetService("UserInputService")
+		for _, v in pairs(getgc(true)) do
+			if type(v) == "table" then
+				for property, value in pairs(propertyValues) do
+					if rawget(v, property) ~= nil then
+						v[property] = value
+					end
+				end
+			end
+		end
 
-        u.InputBegan:Connect(function(i, p)
-            if not p then
-                if i.KeyCode == Enum.KeyCode.G then
-                    r:FireServer("DropBomb")
-                end
-            end
-        end)
-    end
+		-- Boost değeri ayarı
+		local playerVehicle = workspace.ObjectSelection:FindFirstChild(game.Players.LocalPlayer.Name.."'s Vehicle")
+		if playerVehicle then
+			pcall(function()
+				local carChassis = playerVehicle:FindFirstChild("CarChassis")
+				if carChassis then
+					local boost = carChassis:FindFirstChild("Boost")
+					if boost then
+						boost.Value = 20
+					end
+				end
+			end)
+		end
+	end
 })
 
-VehicleSection:AddButton({
-    Name = "Suda Araç Sürme",
-    Callback = function()
-        -- Suda Araç Sürme Scripti
-        for k,v in pairs(game:GetService("Workspace").Water:GetChildren()) do
-            v.CanCollide = true
-            v.Anchored = true
-            v.Material = "Ice"  -- Suyun buz gibi olmasını sağlıyoruz
-            v:Clone().Parent = v.Parent  -- Su objesinin bir kopyasını oluşturuyoruz
-            v:Destroy()  -- Eski su objesini yok ediyoruz
-        end
+BoostSection:AddButton({
+	Name = "Hızlı Dönüş (Uçak)",
+	Callback = function()
+		local propertyValues = {
+			Acceleration = 1,
+			HorizontalTiltSpeed = 7.3,
+			MissileCooldown = 2,
+			MissileLock = 0,
+			SideTiltSpeed = 1.5,
+			MaxSideTilt = 25,
+		}
 
-        -- Ocean objesinin adını değiştiriyoruz
-        for i, v in pairs(game:GetService("Workspace"):GetDescendants()) do
-            if v.Name == "Ocean" then
-                v.Name = "NotWater"  -- Su yerine başka bir ad veriyoruz
-            end
-        end
+		for i, v in pairs(getgc(true)) do
+			if type(v) == "table" then
+				for property, value in pairs(propertyValues) do
+					if rawget(v, property) ~= nil then
+						v[property] = value
+					end
+				end
+			end
+		end
 
-        -- Yeni bir Water folder'ı oluşturuyoruz
-        local newfolder = Instance.new("Folder")
-        newfolder.Name = "Water"
-        newfolder.Parent = game:GetService("Workspace")
+		-- Bombayı anında bırak (G tuşuna basıldığında)
+		local Remote = game.ReplicatedStorage:WaitForChild("Event")
+		local UserInputService = game:GetService("UserInputService")
 
-        -- Su objesinin ismini değiştiriyoruz
-        wait(0.1)
-        game:GetService("Workspace").Water.Name = "NotWaterBruh"  -- Su artık "NotWaterBruh" olacak
-    end
+		UserInputService.InputBegan:Connect(function(input, gameProcessed)
+			if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+				Remote:FireServer("DropBomb")
+			end
+		end)
+	end
 })
 
-local AutoKillSectionV1 = AutoKillTab:CreateSection({ Name = "Auto Kill V1 (BM - Hızlandırılmış)" })
-local RunService = game:GetService("RunService")
-local TeamsService = game:GetService("Teams")
-local Event = game.ReplicatedStorage:WaitForChild("Event")
+local OtherSection = VehicleTab:CreateSection({ Name = "Özel Araç Hileleri" })
 
-local function createAutoKillToggleV1(teamName)
-    local team = TeamsService:WaitForChild(teamName)
-    local isActive = false  -- Toggle durumunu takip etmek için bir değişken
-    local connection = nil  -- Heartbeat bağlantısını tutacak değişken
-
-    AutoKillSectionV1:AddToggle({
-        Name = teamName,
-        Value = false,
-        Callback = function(value)
-            isActive = value  -- Toggle'ın aktif durumunu güncelle
-
-            if value then
-                -- Toggle açıldığında, Heartbeat bağlantısını oluştur
-                if connection then
-                    connection:Disconnect()  -- Önceki bağlantıyı kes
-                end
-
-                connection = RunService.Heartbeat:Connect(function()
-                    if not isActive then
-                        connection:Disconnect()  -- Toggle kapalıysa, bağlantıyı kes
-                        return
-                    end
-
-                    -- Takımdaki her oyuncuya işlem yap
-                    for _, player in pairs(team:GetPlayers()) do
-                        if player.Character then
-                            -- Karakterdeki tüm BasePart'ları kontrol et
-                            for _, part in pairs(player.Character:GetChildren()) do
-                                if part:IsA("BasePart") then
-                                    -- Event'i her BasePart için tetikle
-                                    Event:FireServer("BM", part.Position)
-                                end
-                            end
-                        end
-                    end
-                end)
-            elseif connection then
-                -- Eğer toggle kapalıysa, mevcut bağlantıyı kes
-                connection:Disconnect()
-            end
-        end
-    })
-end
-
--- Her bir takım için Auto Kill Toggle'ını oluştur
-for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
-    createAutoKillToggleV1(team)
-end
-
-local AutoKillSectionV2 = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (BM Tetikle)" })
-local function createAutoKillV2(teamName)
-    local team = TeamsService:WaitForChild(teamName)
-    local connection = nil
-    AutoKillSectionV2:AddToggle({
-        Name = "V2: " .. teamName,
-        Value = false,
-        Callback = function(enabled)
-            if connection then
-                connection:Disconnect()  -- Önceki bağlantıyı kes
-                connection = nil
-            end
-
-            if enabled then
-                connection = RunService.Heartbeat:Connect(function()
-                    for _, player in ipairs(team:GetPlayers()) do
-                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                            Event:FireServer("BM", player.Character.HumanoidRootPart.Position)
-                        end
-                    end
-                end)
-            end
-        end
-    })
-end
-for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
-    createAutoKillV2(team)
-end
-
-local AutoKillPlayerSection = AutoKillTab:CreateSection({ Name = "Oyuncuya Göre Auto Kill" })
-local selectedPlayerName = ""  -- Başlangıçta boş bir oyuncu seçili
-local autoKillConnection = nil
-
-local function triggerBM(targetHRP)
-    local targetPos = targetHRP.Position
-    Event:FireServer("BM", targetPos)
-    Event:FireServer("BM", targetPos)
-end
-
-local function triggerAttack(targetPlayerName)
-    local targetPlayer = Players:FindFirstChild(targetPlayerName)
-    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local targetHRP = targetPlayer.Character.HumanoidRootPart
-        task.spawn(function()
-            triggerBM(targetHRP)
-        end)
-    end
-end
-
-local function updatePlayerList()
-    local playerNames = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Name ~= LocalPlayer.Name then
-            table.insert(playerNames, player.Name)
-        end
-    end
-    return playerNames
-end
-
-AutoKillPlayerSection:AddDropdown({
-    Name = "Oyuncu Seç",
-    List = updatePlayerList(),
-    Callback = function(selectedPlayer)
-        selectedPlayerName = selectedPlayer
-    end
+OtherSection:AddButton({
+	Name = "Suda Araç Sürme",
+	Callback = function()
+		for k,v in pairs(Workspace.Water:GetChildren()) do
+			v.CanCollide = true
+			v.Anchored = true
+			v.Material = "Ice"
+			v:Clone().Parent = v.Parent
+			v:Destroy()
+		end
+		for i, v in pairs(Workspace:GetDescendants()) do
+			if v.Name == "Ocean" then v.Name = "NotWater" end
+		end
+		local newfolder = Instance.new("Folder")
+		newfolder.Name = "Water"
+		newfolder.Parent = Workspace
+		wait(0.1)
+		Workspace.Water.Name = "NotWaterBruh"
+	end
 })
+
+OtherSection:AddToggle({
+	Name = "🕶️ Sonsuz Stealth (Night)",
+	Value = false,
+	Callback = function(state)
+		if state then
+			_G.StealthLoop = RunService.RenderStepped:Connect(function()
+				pcall(function()
+					Event:FireServer("StealthMode", true)
+				end)
+			end)
+		else
+			pcall(function()
+				Event:FireServer("StealthMode", false)
+				task.wait(0.2)
+				Event:FireServer("StealthMode", false)
+			end)
+			if _G.StealthLoop then
+				_G.StealthLoop:Disconnect()
+				_G.StealthLoop = nil
+			end
+		end
+	end
+})
+
+-- ===================== 🎯 AUTO KILL =====================
+local AutoKillPlayerSection = AutoKillTab:CreateSection({ Name = "Oyuncuya Özel Auto Kill V1 (10x BM)" })
+
+local selectedPlayerName = ""
+local autoKillLoop = nil
+local playerDropdown = nil
+
+-- 🔒 Kara liste (dokunulmaz oyuncular)
+local blacklist = {
+	["MAD_CITYAIMBOTLOL"] = true
+}
+
+-- Güncel oyuncu listesi
+local function getUpdatedPlayerList()
+	local list = {}
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			table.insert(list, player.Name)
+		end
+	end
+	return list
+end
+
+local function refreshDropdown()
+	if playerDropdown then
+		playerDropdown:UpdateList(getUpdatedPlayerList())
+	end
+end
+
+Players.PlayerAdded:Connect(refreshDropdown)
+Players.PlayerRemoving:Connect(refreshDropdown)
+
+playerDropdown = AutoKillPlayerSection:AddDropdown({
+	Name = "Hedef Oyuncu",
+	List = getUpdatedPlayerList(),
+	Callback = function(playerName)
+		selectedPlayerName = playerName
+
+		if blacklist[playerName] then
+			game.StarterGui:SetCore("SendNotification", {
+				Title = "❌ Korumalı Oyuncu",
+				Text = playerName .. " Auto Kill'den muaf!",
+				Duration = 5
+			})
+			selectedPlayerName = "" -- Hedef boşaltılır, hiçbir işlem yapılmaz
+		end
+	end
+})
+
+local function fireBM10xAtParts(player)
+	if player and player.Character then
+		for _, part in pairs(player.Character:GetChildren()) do
+			if part:IsA("BasePart") then
+				for i = 1, 10 do
+					Event:FireServer("BM", part.Position)
+				end
+			end
+		end
+	end
+end
 
 AutoKillPlayerSection:AddToggle({
-    Name = "Auto Kill Aktif",
-    Value = false,
-    Callback = function(enabled)
-        if enabled then
-            if selectedPlayerName ~= "" then
-                if autoKillConnection then
-                    autoKillConnection:Disconnect()
-                end
-                autoKillConnection = RunService.Heartbeat:Connect(function()
-                    triggerAttack(selectedPlayerName)
-                end)
-            end
-        else
-            if autoKillConnection then
-                autoKillConnection:Disconnect()
-                autoKillConnection = nil
-            end
-        end
-    end
+	Name = "Auto Kill Aktif",
+	Value = false,
+	Callback = function(enabled)
+		if enabled and selectedPlayerName ~= "" and not blacklist[selectedPlayerName] then
+			if autoKillLoop then autoKillLoop:Disconnect() end
+			autoKillLoop = task.spawn(function()
+				while true do
+					local target = Players:FindFirstChild(selectedPlayerName)
+					if target then fireBM10xAtParts(target) end
+					task.wait()
+				end
+			end)
+		else
+			if autoKillLoop then
+				pcall(function() task.cancel(autoKillLoop) end)
+				autoKillLoop = nil
+			end
+		end
+	end
 })
+-- ===================== 🧠 HITBOX =====================
+local HitboxSection = HitboxTab:CreateSection({ Name = "Hitbox Ayarları" })
+local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
 
-local XPSection = ExtraTab:CreateSection({ Name = "XP & Para" })
-
--- Auto Farm Para
-XPSection:AddButton({
-    Name = "Auto Farm Para",
-    Callback = function()
-        -- Auto Farm Para Scripti
-        getgenv().fps = false -- Makes The Map Invisable To Increase Fps
-        getgenv().whitescreen = false -- Enables A White-Screen
-        getgenv().Arrest = false -- Arrests Most Players Before AutoRobbing
-        
-        -- Scripti Çalıştırma
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/AdminEvilDRagon/smallAR/refs/heads/main/SmallAR.lua", true))()
-    end
-})
-
--- Crash
-XPSection:AddButton({
-    Name = "Crash",
-    Callback = function()
-        -- Crash Scripti
-        if game.Players.LocalPlayer.Backpack:FindFirstChild("Shotgun") == nil then 
-            game:GetService("StarterGui"):SetCore("SendNotification",{     
-                Title = "Attention",     
-                Text = "Envanterinde shotgun olması gerek ve eline alma!",
-                Duration = 7, 
-            })
-        else
-            local plr = game.Players.LocalPlayer
-            local char = plr.Character
-
-            for i = 1, 20 do
-                wait()
-                workspace.ObjectSelection.Shotgun.Shotgun.Shotgun.Event:FireServer()
-            end
-            char.Humanoid:EquipTool(plr.Backpack.Shotgun)
-            for i = 1, 8000 do
-                game:GetService("ReplicatedStorage").Event:FireServer("ShootShotgun", workspace[plr.Name], Vector3.new(0, 0, 0), "Shotgun", "inf", "inf", "inf")
-            end
-            game:GetService("StarterGui"):SetCore("SendNotification",{     
-                Title = "Crash Server Script",     
-                Text = "Server Has Been Crashed",
-                Duration = 7, 
-            })
-        end
-    end
-})
-
--- Keycard
-XPSection:AddButton({
-    Name = "Keycard",
-    Callback = function()
-        -- Keycard Scripti
-        for i = 1, 50 do
-            for i,v in pairs(game.Players:GetChildren()) do
-                local args = {
-                    [1] = "Pickpocket",
-                    [2] = v
-                }
-                game:GetService("ReplicatedStorage").Event:FireServer(unpack(args))
-            end
-        end
-    end
-})
-
--- XP Scripti
-XPSection:AddButton({
-    Name = "XP Scripti",
-    Callback = function()
-        -- XP scripti entegre ediliyor
-        game:GetService("ReplicatedStorage").RemoteFunction:InvokeServer("SetTeam", "Police")
-        
-        wait(0.5)
-        for _, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetChildren()) do
-            if v.Name == "Handcuffs" then
-                v.Parent = game:GetService("Players").LocalPlayer.Character
-            end
-        end
-
-        for i = 1, 1000 do  
-            game:GetService("RunService").RenderStepped:Connect(function()
-                game:GetService("ReplicatedStorage").Event:FireServer("Eject", game:GetService("Players").LocalPlayer)
-            end)
-        end
-    end
-})
-
-local HitboxSection = HitboxTab:CreateSection({ Name = "Ayarlar" })
 local selectedTeams = {}
 local isHitboxEnabled = false
 local lastSize = 20
 local lastTransparency = 0.5
 local lastColor = Color3.fromRGB(255, 0, 0)
-local hitboxConnection
+local hitboxConnection = nil
 
 local function applyHitbox(player)
-    if player and player.Character and player.Character:FindFirstChild("Head") then
-        local head = player.Character.Head
-        head.Size = Vector3.new(lastSize, lastSize, lastSize)
-        head.Transparency = lastTransparency
-        head.BrickColor = BrickColor.new(lastColor)
-        head.CanCollide = false
-        head.Material = Enum.Material.ForceField
-    end
+	if player and player.Character and player.Character:FindFirstChild("Head") then
+		local head = player.Character.Head
+		head.Size = Vector3.new(lastSize, lastSize, lastSize)
+		head.Transparency = lastTransparency
+		head.BrickColor = BrickColor.new(lastColor)
+		head.CanCollide = false
+		head.Material = Enum.Material.ForceField
+	end
 end
 
 local function resetHitbox(player)
-    if player and player.Character and player.Character:FindFirstChild("Head") then
-        local head = player.Character.Head
-        head.Size = Vector3.new(2, 1, 1)
-        head.Transparency = 0
-        head.BrickColor = BrickColor.new("Medium stone grey")
-        head.CanCollide = true
-        head.Material = Enum.Material.Plastic
-    end
+	if player and player.Character and player.Character:FindFirstChild("Head") then
+		local head = player.Character.Head
+		head.Size = Vector3.new(2, 1, 1)
+		head.Transparency = 0
+		head.BrickColor = BrickColor.new("Medium stone grey")
+		head.CanCollide = true
+		head.Material = Enum.Material.Plastic
+	end
 end
 
 local function updateHitboxes()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Team and table.find(selectedTeams, player.Team.Name) then
-            applyHitbox(player)
-        else
-            resetHitbox(player)
-        end
-    end
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Team and table.find(selectedTeams, player.Team.Name) then
+			applyHitbox(player)
+		else
+			resetHitbox(player)
+		end
+	end
 end
 
 HitboxSection:AddToggle({
-    Name = "Hitbox Aktif",
-    Value = false,
-    Callback = function(state)
-        isHitboxEnabled = state
-        if state then
-            if hitboxConnection then hitboxConnection:Disconnect() end
-            hitboxConnection = RunService.Heartbeat:Connect(updateHitboxes)
-        else
-            if hitboxConnection then
-                hitboxConnection:Disconnect()
-                hitboxConnection = nil
-            end
-            for _, player in ipairs(Players:GetPlayers()) do
-                resetHitbox(player)
-            end
-        end
-    end
+	Name = "Hitbox Aktif",
+	Value = false,
+	Callback = function(state)
+		isHitboxEnabled = state
+		if state then
+			if hitboxConnection then hitboxConnection:Disconnect() end
+			hitboxConnection = RunService.Heartbeat:Connect(updateHitboxes)
+		else
+			if hitboxConnection then
+				hitboxConnection:Disconnect()
+				hitboxConnection = nil
+			end
+			for _, player in ipairs(Players:GetPlayers()) do
+				resetHitbox(player)
+			end
+		end
+	end
 })
 
-HitboxSection:AddSlider({ Name = "Boyut", Min = 1, Max = 20, Value = lastSize, Callback = function(v) lastSize = v end })
-HitboxSection:AddSlider({ Name = "Şeffaflık", Min = 0, Max = 1, Value = lastTransparency, Callback = function(v) lastTransparency = v end })
-HitboxSection:AddColorPicker({ Name = "Renk", Value = lastColor, Callback = function(v) lastColor = v end })
+HitboxSection:AddSlider({
+	Name = "Boyut",
+	Min = 1,
+	Max = 20,
+	Value = lastSize,
+	Callback = function(v)
+		lastSize = v
+	end
+})
 
-local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
+HitboxSection:AddSlider({
+	Name = "Şeffaflık",
+	Min = 0,
+	Max = 1,
+	Value = lastTransparency,
+	Callback = function(v)
+		lastTransparency = v
+	end
+})
+
+HitboxSection:AddColorPicker({
+	Name = "Renk",
+	Value = lastColor,
+	Callback = function(v)
+		lastColor = v
+	end
+})
+
 for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
-    TeamSection:AddToggle({
-        Name = team,
-        Value = false,
-        Callback = function(value)
-            if value then
-                if not table.find(selectedTeams, team) then
-                    table.insert(selectedTeams, team)
-                end
-            else
-                for i, t in ipairs(selectedTeams) do
-                    if t == team then
-                        table.remove(selectedTeams, i)
-                        break
-                    end
-                end
-            end
-            if isHitboxEnabled then
-                updateHitboxes()
-            end
-        end
-    })
-end
--- ⚔️ Super Punch
-local SuperPunchSection = PvpTab:CreateSection({ Name = "Super Punch Gelişmiş" })
-
-local superPunchConnection
-local superPunchDistance = 15
-local selectedTargetPlayer = ""
-local everyoneEnabled = false
-
--- Oyuncu listesi fonksiyonu
-local function updatePlayerList()
-    local names = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            table.insert(names, player.Name)
-        end
-    end
-    return names
+	TeamSection:AddToggle({
+		Name = team,
+		Value = false,
+		Callback = function(value)
+			if value then
+				if not table.find(selectedTeams, team) then
+					table.insert(selectedTeams, team)
+				end
+			else
+				for i, t in ipairs(selectedTeams) do
+					if t == team then
+						table.remove(selectedTeams, i)
+						break
+					end
+				end
+			end
+			if isHitboxEnabled then updateHitboxes() end
+		end
+	})
 end
 
--- SuperPunch başlatma
-local function startSuperPunch()
-    if superPunchConnection then return end
-    superPunchConnection = RunService.Heartbeat:Connect(function()
-        if not LocalPlayer.Character then return end
-        local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not myHRP then return end
+-- ===================== 💼 EKSTRA =====================
+local XPSection = ExtraTab:CreateSection({ Name = "Para / XP / Araçlar" })
 
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-                local targetHRP = player.Character.HumanoidRootPart
-                local distance = (myHRP.Position - targetHRP.Position).Magnitude
-
-                if distance <= superPunchDistance then
-                    if everyoneEnabled or player.Name == selectedTargetPlayer then
-                        Event:FireServer("Punch", player.Character.Humanoid)
-                    end
-                end
-            end
-        end
-    end)
-end
-
-local function stopSuperPunch()
-    if superPunchConnection then
-        superPunchConnection:Disconnect()
-        superPunchConnection = nil
-    end
-end
-
--- Ayarlar
-SuperPunchSection:AddDropdown({
-    Name = "Hedef Oyuncu",
-    List = updatePlayerList(),
-    Callback = function(v)
-        selectedTargetPlayer = v
-    end
+XPSection:AddButton({
+	Name = "Auto Farm Para",
+	Callback = function()
+		getgenv().fps = false
+		getgenv().whitescreen = false
+		getgenv().Arrest = false
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/AdminEvilDRagon/smallAR/refs/heads/main/SmallAR.lua", true))()
+	end
 })
 
-SuperPunchSection:AddToggle({
-    Name = "Yakındaki Herkese Uygula",
-    Value = false,
-    Callback = function(v)
-        everyoneEnabled = v
-    end
+XPSection:AddButton({
+	Name = "Keycard Çek",
+	Callback = function()
+		for i = 1, 50 do
+			for i, v in pairs(Players:GetChildren()) do
+				local args = {
+					[1] = "Pickpocket",
+					[2] = v
+				}
+				Event:FireServer(unpack(args))
+			end
+		end
+	end
 })
 
-SuperPunchSection:AddSlider({
-    Name = "Mesafe (Stud)",
-    Min = 5,
-    Max = 50,
-    Value = 15,
-    Callback = function(v)
-        superPunchDistance = v
-    end
+XPSection:AddButton({
+	Name = "XP Scripti",
+	Callback = function()
+		ReplicatedStorage.RemoteFunction:InvokeServer("SetTeam", "Police")
+		wait(0.5)
+		for _, v in pairs(LocalPlayer.Backpack:GetChildren()) do
+			if v.Name == "Handcuffs" then
+				v.Parent = LocalPlayer.Character
+			end
+		end
+		for i = 1, 1000 do  
+			RunService.RenderStepped:Connect(function()
+				Event:FireServer("Eject", LocalPlayer)
+			end)
+		end
+	end
 })
 
-SuperPunchSection:AddToggle({
-    Name = "SuperPunch Aktif",
-    Value = false,
-    Callback = function(v)
-        if v then
-            startSuperPunch()
-        else
-            stopSuperPunch()
-        end
-    end
+XPSection:AddButton({
+	Name = "💥 Server Crash",
+	Callback = function()
+		local plr = LocalPlayer
+		if plr.Backpack:FindFirstChild("Shotgun") == nil then
+			game.StarterGui:SetCore("SendNotification",{     
+				Title = "Uyarı",     
+				Text = "Shotgun envanterinde ve elinde olmalı!",
+				Duration = 5
+			})
+		else
+			local char = plr.Character
+			for i = 1, 20 do wait()
+				workspace.ObjectSelection.Shotgun.Shotgun.Shotgun.Event:FireServer()
+			end
+			char.Humanoid:EquipTool(plr.Backpack.Shotgun)
+			for i = 1, 8000 do
+				ReplicatedStorage.Event:FireServer("ShootShotgun", workspace[plr.Name], Vector3.new(0, 0, 0), "Shotgun", "inf", "inf", "inf")
+			end
+			game.StarterGui:SetCore("SendNotification",{     
+				Title = "C R A S H",     
+				Text = "Sunucu çöktü!",
+				Duration = 7 
+			})
+		end
+	end
 })
 
--- VR sistemi için blacklist ve ekran uyarısı entegre edilmiş versiyon
 
-local CombatSection = PvpTab:CreateSection({ Name = "Savaş" })
-local playerDropdown = nil
-local refreshButton = nil
-local selectedPlayerName = nil
-local isVRActive = false
-
--- Yasaklı oyuncular listesi
-local blacklist = {
-    ["MAD_CITYAIMBOTLOL"] = true
-}
-
--- ⚠️ Aktif uyarı yazısını saklayacağımız referans
-local currentWarningGui = nil
-
--- Ekranda ortada yazı çıkaran ve kalıcı olan fonksiyon
-local function showPersistentScreenWarning(text)
-    if currentWarningGui then currentWarningGui:Destroy() end
-
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "PersistentWarning"
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-    gui.DisplayOrder = 9999
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.8, 0, 0.1, 0)
-    label.Position = UDim2.new(0.5, 0, 0.45, 0)
-    label.AnchorPoint = Vector2.new(0.5, 0.5)
-    label.BackgroundTransparency = 0.2
-    label.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    label.TextColor3 = Color3.fromRGB(255, 85, 85)
-    label.TextStrokeTransparency = 0.2
-    label.Font = Enum.Font.FredokaOne
-    label.TextScaled = true
-    label.Text = text
-    label.ZIndex = 9999
-    label.Parent = gui
-
-    currentWarningGui = gui
-end
-
-CombatSection:AddToggle({
-    Name = "VR Aktif",
-    Value = false,
-    Callback = function(value)
-        isVRActive = value
-    end,
-})
-
--- Oyuncu listesini güncelleme fonksiyonu
-local function updatePlayerList()
-    local playerNames = {}
-    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
-        if player.Name ~= game.Players.LocalPlayer.Name then
-            table.insert(playerNames, player.Name)
-        end
-    end
-    if playerDropdown then
-        playerDropdown:UpdateList(playerNames)
-    end
-end
-
--- Dropdown oluşturuluyor (Blacklist kontrolü entegre)
-playerDropdown = CombatSection:AddDropdown({
-    Name = "Oyuncu Seç",
-    List = {},
-    Callback = function(selectedPlayer)
-        if blacklist[selectedPlayer] then
-            showPersistentScreenWarning("BU OYUNCUYA KARŞI KULLANAMAZSIN LİSTEDEN BAŞKA OYUNCU SEÇ ⚠️")
-            selectedPlayerName = nil
-            return
-        end
-
-        -- Eğer önceden uyarı varsa, kaldır
-        if currentWarningGui then
-            currentWarningGui:Destroy()
-            currentWarningGui = nil
-        end
-
-        selectedPlayerName = selectedPlayer
-    end,
-    BlankValue = "Hiçbir oyuncu seçilmedi",
-    Sort = true,
-    Multi = false
-})
-
--- Yenileme butonu
-refreshButton = CombatSection:AddButton({
-    Name = "Oyuncu Listesini Yenile",
-    Callback = function()
-        updatePlayerList()
-    end
-})
-
--- Mouse tıklama işlevi (VR saldırı)
-game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 and isVRActive then
-        if selectedPlayerName then
-            local selectedPlayer = game:GetService("Players"):FindFirstChild(selectedPlayerName)
-            if selectedPlayer and selectedPlayer.Character then
-                local args = {
-                    [1] = "VR",
-                    [2] = selectedPlayer.Character.HumanoidRootPart
-                }
-                game:GetService("ReplicatedStorage"):WaitForChild("Event"):FireServer(unpack(args))
-            end
-        end
-    end
-end)
-
--- Oyuncular değiştiğinde listeyi güncelle
-game:GetService("Players").PlayerAdded:Connect(function()
-    updatePlayerList()
-end)
-
-game:GetService("Players").PlayerRemoving:Connect(function()
-    updatePlayerList()
-end)
-
--- Başlangıçta listeyi yükle
-updatePlayerList()
--- 🧍 Admin Fly (geliştirilmiş)
-local CharacterTab = PepsisWorld:CreateTab({ Name = "🧍" })
-local CharacterSection = CharacterTab:CreateSection({ Name = "Uçuş Sistemi" })
+-- ===================== 🧍 KARAKTER =====================
+local CharacterSection = CharacterTab:CreateSection({ Name = "Uçuş / Geçiş / Zıplama" })
 
 local FlySpeed = 50
 local flying = false
@@ -793,8 +529,7 @@ CharacterSection:AddToggle({
 	Name = "Uçmayı Aç / Kapat",
 	Value = false,
 	Callback = function(state)
-		local player = game.Players.LocalPlayer
-		local char = player.Character or player.CharacterAdded:Wait()
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 		local hrp = char:WaitForChild("HumanoidRootPart")
 		local humanoid = char:FindFirstChildOfClass("Humanoid")
 
@@ -814,7 +549,7 @@ CharacterSection:AddToggle({
 
 			local uis = game:GetService("UserInputService")
 
-			flyConn = game:GetService("RunService").Heartbeat:Connect(function()
+			flyConn = RunService.Heartbeat:Connect(function()
 				local cam = workspace.CurrentCamera
 				local move = Vector3.zero
 
@@ -826,11 +561,7 @@ CharacterSection:AddToggle({
 				if uis:IsKeyDown(Enum.KeyCode.LeftControl) then move -= cam.CFrame.UpVector end
 
 				bg.CFrame = cam.CFrame
-				if move.Magnitude > 0 then
-					bv.Velocity = move.Unit * FlySpeed
-				else
-					bv.Velocity = Vector3.zero
-				end
+				bv.Velocity = move.Magnitude > 0 and move.Unit * FlySpeed or Vector3.zero
 			end)
 		else
 			flying = false
@@ -845,18 +576,15 @@ CharacterSection:AddToggle({
 	end
 })
 
-local NoclipEnabled = false
 local NoclipConnection = nil
 
 CharacterSection:AddToggle({
 	Name = "Noclip Aç / Kapat",
 	Value = false,
 	Callback = function(state)
-		NoclipEnabled = state
-
 		if state then
-			NoclipConnection = game:GetService("RunService").Stepped:Connect(function()
-				local char = game.Players.LocalPlayer.Character
+			NoclipConnection = RunService.Stepped:Connect(function()
+				local char = LocalPlayer.Character
 				if char then
 					for _,v in pairs(char:GetDescendants()) do
 						if v:IsA("BasePart") and v.CanCollide then
@@ -883,16 +611,17 @@ CharacterSection:AddSlider({
 	Value = 50,
 	Callback = function(val)
 		JumpPower = val
-		local char = game.Players.LocalPlayer.Character
+		local char = LocalPlayer.Character
 		if char and char:FindFirstChildOfClass("Humanoid") then
 			char:FindFirstChildOfClass("Humanoid").JumpPower = JumpPower
 		end
 	end
 })
 
-local ServerhopSection = SystemTab:CreateSection("Server Hop & Rejoin")
+-- ===================== ⚙️ SİSTEM =====================
+local ServerhopSection = SystemTab:CreateSection({ Name = "Sunucu İşlemleri" })
 
--- 🌐 Server Hop Fonksiyonu
+-- 🌐 Server Hop
 local function serverHop()
 	local PlaceId = game.PlaceId
 	local JobId = game.JobId
@@ -925,7 +654,7 @@ local function serverHop()
 		end)
 
 		if not success then
-			warn("⚠️ Teleport başarısız oldu. Tekrar deneniyor...")
+			warn("⚠️ Teleport başarısız. Tekrar deneniyor...")
 			task.wait(2)
 			serverHop()
 		end
@@ -934,58 +663,23 @@ local function serverHop()
 	end
 end
 
--- 🔁 Rejoin Fonksiyonu
+-- 🔁 Rejoin
 local function rejoinServer()
 	local placeId = game.PlaceId
 	local jobId = game.JobId
 	TeleportService:TeleportToPlaceInstance(placeId, jobId, Players.LocalPlayer)
 end
 
--- 🌐 Server Hop Butonu
 ServerhopSection:AddButton({
-	Name = "🌐 Server Hop (Gelişmiş)",
+	Name = "🌐 Server Hop (Rastgele)",
 	Callback = function()
 		serverHop()
 	end
 })
 
--- 🔁 Rejoin Butonu
 ServerhopSection:AddButton({
 	Name = "🔁 Aynı Sunucuya Rejoin",
 	Callback = function()
 		rejoinServer()
-	end
-})
-
-local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Event = ReplicatedStorage:WaitForChild("Event")
-
-local stealthConn -- renderstepped bağlantısı
-
-VehicleSection:AddToggle({
-	Name = "🕶️ Night Sonsuz Görünmezlik",
-	Value = false,
-	Callback = function(state)
-		if state then
-			-- Toggle açıldı → sürekli true gönder
-			stealthConn = RunService.RenderStepped:Connect(function()
-				pcall(function()
-					Event:FireServer("StealthMode", true)
-				end)
-			end)
-		else
-			-- Toggle kapandı → 2 kez false gönder + bağlantıyı kes
-			pcall(function()
-				Event:FireServer("StealthMode", false)
-				task.wait(0.2)
-				Event:FireServer("StealthMode", false)
-			end)
-
-			if stealthConn then
-				stealthConn:Disconnect()
-				stealthConn = nil
-			end
-		end
 	end
 })
