@@ -512,175 +512,155 @@ AutoKillSectionV4:AddToggle({
 })
 
 -- ===================== 🧠 HITBOX =====================
-local HitboxSection = HitboxTab:CreateSection({ Name = "Gelişmiş Hitbox Ayarları" })
-local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
+local HitboxSection = HitboxTab:CreateSection({ Name = "Wia Head Hitbox MASTER v1.7" })
 
-local selectedTeams = {}
-local selectedBodyPart = "Head"
-local hitboxSize = 15
-local hitboxTransparency = 0.5
-local hitboxColor = Color3.fromRGB(255, 0, 0)
-local isHitboxEnabled = false
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local hitboxEnabled = false
 local hitboxLoop
-local previousParts = {} -- Önceki parça referanslarını tut
+local appliedPlayers = {}
+local hitboxSize = 8
 
-local bodyPartOptions = { "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftLeg", "RightLeg" }
+local defaultSize = Vector3.new(2, 1, 1)
+local hitboxColor = BrickColor.Red()
+local hitboxTransparency = 0.6
 
--- 🛠️ Hitbox Uygulama
-local function applyHitbox(player)
-	if not player or not player.Team or not table.find(selectedTeams, player.Team.Name) then return end
-	if not player.Character then return end
+-- 🎯 Takım Filtresi (Düşman kontrolü)
+local function isEnemyTeam(targetTeam)
+	local myTeam = Players.LocalPlayer.Team
+	if not myTeam or not targetTeam then return false end
 
-	local part = player.Character:FindFirstChild(selectedBodyPart)
-	if part and part:IsA("BasePart") then
-		-- Eski part'ı resetle
-		local oldPart = previousParts[player]
-		if oldPart and oldPart ~= part and oldPart:IsA("BasePart") then
-			oldPart.Size = Vector3.new(2, 1, 1)
-			oldPart.Transparency = 0
-			oldPart.BrickColor = BrickColor.new("Medium stone grey")
-			oldPart.CanCollide = true
-			oldPart.Material = Enum.Material.Plastic
-		end
+	local allyMap = {
+		Police = { "Police", "Heroes" },
+		Heroes = { "Police", "Heroes" },
+		Prisoners = { "Prisoners", "Criminals", "Villains" },
+		Criminals = { "Prisoners", "Criminals", "Villains" },
+		Villains = { "Prisoners", "Criminals", "Villains" }
+	}
 
-		-- Yeni part'a hitbox uygula
-		part.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-		part.Transparency = hitboxTransparency
-		part.BrickColor = BrickColor.new(hitboxColor)
-		part.CanCollide = false
-		part.Material = Enum.Material.ForceField
-		previousParts[player] = part
-	end
+	local allies = allyMap[myTeam.Name] or {}
+	return not table.find(allies, targetTeam.Name)
 end
 
--- 🔁 Hitbox Sıfırlama
-local function resetHitbox(player)
-	if player and player.Character then
-		local part = player.Character:FindFirstChild(selectedBodyPart)
-		if part and part:IsA("BasePart") then
-			part.Size = Vector3.new(2, 1, 1)
-			part.Transparency = 0
-			part.BrickColor = BrickColor.new("Medium stone grey")
-			part.CanCollide = true
-			part.Material = Enum.Material.Plastic
-		end
-	end
-	previousParts[player] = nil
+-- 🔁 HEADBOX UYGULAYICI
+local function applyHeadHitbox(player)
+	if not player or not player.Character or not isEnemyTeam(player.Team) then return end
+
+	local head = player.Character:FindFirstChild("Head")
+	if not head or not head:IsA("BasePart") then return end
+
+	if appliedPlayers[player] == hitboxSize then return end
+
+	-- Resetle
+	head.Size = defaultSize
+	head.Transparency = 0
+	head.BrickColor = BrickColor.new("Medium stone grey")
+	head.CanCollide = true
+	head.Material = Enum.Material.Plastic
+
+	-- Hitbox uygula
+	head.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+	head.Transparency = hitboxTransparency
+	head.BrickColor = hitboxColor
+	head.CanCollide = false
+	head.Material = Enum.Material.Plastic
+	head.Massless = true
+	head.Anchored = false
+
+	appliedPlayers[player] = hitboxSize
 end
 
--- ♻️ Güncelleme Döngüsü (sabit & optimize tick)
-local function updateHitboxes()
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer and player.Character then
-			if player.Team and table.find(selectedTeams, player.Team.Name) then
-				applyHitbox(player)
-			else
-				resetHitbox(player)
+-- 🧼 RESET
+local function resetHead(player)
+	local head = player.Character and player.Character:FindFirstChild("Head")
+	if head and head:IsA("BasePart") then
+		head.Size = defaultSize
+		head.Transparency = 0
+		head.BrickColor = BrickColor.new("Medium stone grey")
+		head.CanCollide = true
+		head.Material = Enum.Material.Plastic
+	end
+	appliedPlayers[player] = nil
+end
+
+-- 🔁 Ana Döngü
+local function startLoop()
+	if hitboxLoop then hitboxLoop:Disconnect() end
+	hitboxLoop = RunService.Heartbeat:Connect(function()
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= Players.LocalPlayer then
+				applyHeadHitbox(player)
 			end
-		end
-	end
-end
-
--- Auto respawn detection
-Players.PlayerAdded:Connect(function(player)
-	player.CharacterAdded:Connect(function()
-		if isHitboxEnabled then
-			task.wait(1)
-			applyHitbox(player)
 		end
 	end)
-end)
-
--- ✅ Hitbox Toggle
-HitboxSection:AddToggle({
-	Name = "Hitbox Aktif",
-	Value = false,
-	Callback = function(state)
-		isHitboxEnabled = state
-
-		if state then
-			if hitboxLoop then return end
-			hitboxLoop = task.spawn(function()
-				while isHitboxEnabled do
-					updateHitboxes()
-					task.wait(0.1) -- FPS'e bağlı değil, sabit güncelleme
-				end
-			end)
-		else
-			if hitboxLoop then
-				pcall(function() task.cancel(hitboxLoop) end)
-				hitboxLoop = nil
-			end
-			for _, player in ipairs(Players:GetPlayers()) do
-				resetHitbox(player)
-			end
-		end
-	end
-})
-
--- 🔧 Boyut Ayarı
-HitboxSection:AddSlider({
-	Name = "Boyut",
-	Min = 2, Max = 25, Value = hitboxSize,
-	Callback = function(v)
-		hitboxSize = v
-		if isHitboxEnabled then updateHitboxes() end
-	end
-})
-
--- 🌫️ Şeffaflık Ayarı
-HitboxSection:AddSlider({
-	Name = "Şeffaflık",
-	Min = 0, Max = 1, Value = hitboxTransparency,
-	Callback = function(v)
-		hitboxTransparency = v
-		if isHitboxEnabled then updateHitboxes() end
-	end
-})
-
--- 🎨 Renk Ayarı
-HitboxSection:AddColorPicker({
-	Name = "Renk",
-	Value = hitboxColor,
-	Callback = function(v)
-		hitboxColor = v
-		if isHitboxEnabled then updateHitboxes() end
-	end
-})
-
--- 🧠 Vücut Parçası Seçimi
-HitboxSection:AddDropdown({
-	Name = "Vücut Parçası",
-	List = bodyPartOptions,
-	Callback = function(v)
-		selectedBodyPart = v
-		if isHitboxEnabled then updateHitboxes() end
-	end
-})
-
--- 👥 Takım Seçimi
-for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
-	TeamSection:AddToggle({
-		Name = team,
-		Value = false,
-		Callback = function(state)
-			if state then
-				if not table.find(selectedTeams, team) then
-					table.insert(selectedTeams, team)
-				end
-			else
-				for i, t in ipairs(selectedTeams) do
-					if t == team then
-						table.remove(selectedTeams, i)
-						break
-					end
-				end
-			end
-			if isHitboxEnabled then updateHitboxes() end
-		end
-	})
 end
 
+-- 🔒 Stop
+local function stopLoop()
+	if hitboxLoop then
+		hitboxLoop:Disconnect()
+		hitboxLoop = nil
+	end
+	for _, player in ipairs(Players:GetPlayers()) do
+		resetHead(player)
+	end
+end
+
+-- ♻️ Character Spawn Garantisi
+local function bindPlayer(player)
+	player.CharacterAdded:Connect(function(char)
+		if not hitboxEnabled then return end
+
+		local head
+		for i = 1, 30 do
+			task.wait(0.1)
+			head = char:FindFirstChild("Head")
+			if head and head:IsA("BasePart") then break end
+		end
+
+		if not head then return end
+		task.wait(0.25)
+
+		applyHeadHitbox(player)
+	end)
+end
+
+-- 👥 Var olanları bağla
+for _, player in ipairs(Players:GetPlayers()) do
+	bindPlayer(player)
+end
+Players.PlayerAdded:Connect(bindPlayer)
+
+-- 🔘 Toggle
+HitboxSection:AddToggle({
+	Name = "🎯 Head Hitbox Aktif",
+	Value = false,
+	Callback = function(state)
+		hitboxEnabled = state
+		if state then
+			startLoop()
+		else
+			stopLoop()
+		end
+	end
+})
+
+-- 📏 Slider
+HitboxSection:AddSlider({
+	Name = "Head Boyutu",
+	Min = 2,
+	Max = 25,
+	Value = hitboxSize,
+	Callback = function(v)
+		hitboxSize = v
+		if hitboxEnabled then
+			for _, player in ipairs(Players:GetPlayers()) do
+				appliedPlayers[player] = nil
+			end
+		end
+	end
+})
 -- ===================== 💼 EKSTRA =====================
 local XPSection = ExtraTab:CreateSection({ Name = "Para / XP / Araçlar" })
 
