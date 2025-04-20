@@ -331,6 +331,57 @@ AutoKillPlayerSection:AddToggle({
 	end
 })
 
+local AutoKillSectionV1 = AutoKillTab:CreateSection({ Name = "Auto Kill V1 (BM - Hızlandırılmış)" })
+local TeamsService = game:GetService("Teams")
+local Players = game:GetService("Players")
+local Event = game:GetService("ReplicatedStorage"):WaitForChild("Event")
+
+-- Takım başına toggle oluştur
+local function createAutoKillToggleV1(teamName)
+	local team = TeamsService:WaitForChild(teamName)
+	local isActive = false
+	local killThread = nil
+
+	AutoKillSectionV1:AddToggle({
+		Name = teamName,
+		Value = false,
+		Callback = function(state)
+			isActive = state
+
+			-- Başlat
+			if state then
+				if killThread then return end
+				killThread = task.spawn(function()
+					while isActive do
+						for _, player in pairs(team:GetPlayers()) do
+							if player ~= Players.LocalPlayer and player.Character then
+								for _, part in ipairs(player.Character:GetDescendants()) do
+									if part:IsA("BasePart") then
+										Event:FireServer("BM", part.Position)
+									end
+								end
+							end
+						end
+						task.wait() -- Sunucu hızına göre çalışır
+					end
+				end)
+
+			-- Durdur
+			else
+				if killThread then
+					pcall(function() task.cancel(killThread) end)
+					killThread = nil
+				end
+			end
+		end
+	})
+end
+
+-- Bu takımlar için toggle ekle
+for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
+	createAutoKillToggleV1(team)
+end
+
 -- ===================== 🧠 HITBOX =====================
 local HitboxSection = HitboxTab:CreateSection({ Name = "Hitbox Ayarları" })
 local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
