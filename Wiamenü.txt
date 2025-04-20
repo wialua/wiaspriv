@@ -382,6 +382,217 @@ for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}
 	createAutoKillToggleV1(team)
 end
 
+local AutoKillSectionV2 = AutoKillTab:CreateSection({ Name = "Auto Kill V2 (Füze - Ölümcül)" })
+
+local selectedTargetName = ""
+local selectedTeamName = ""
+local missileLoop = nil
+local teamMissileLoop = nil
+local playerDropdown = nil
+local teamDropdown = nil
+
+-- Füze komutu (tek part için)
+local function fireMissileAtPart(part)
+	local char = part:FindFirstAncestorWhichIsA("Model")
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if hrp and part and hrp:IsA("BasePart") then
+		game.ReplicatedStorage.Event:FireServer("ShootBuzzardMissiles", char, part, hrp, part, 3)
+	end
+end
+
+-- Tek oyuncunun karakterindeki tüm parçaları hedef al
+local function fireMissileAtPlayer(player)
+	if not player or not player.Character then return end
+	for _, part in ipairs(player.Character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			fireMissileAtPart(part)
+		end
+	end
+end
+
+-- Oyuncu listesi
+local function getPlayerList()
+	local list = {}
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer then
+			table.insert(list, p.Name)
+		end
+	end
+	return list
+end
+
+-- Takım listesi
+local function getTeamList()
+	local list = {}
+	for _, t in ipairs(Teams:GetChildren()) do
+		table.insert(list, t.Name)
+	end
+	return list
+end
+
+-- Dropdown listeleri güncelle
+local function refreshLists()
+	if playerDropdown then playerDropdown:UpdateList(getPlayerList()) end
+	if teamDropdown then teamDropdown:UpdateList(getTeamList()) end
+end
+
+Players.PlayerAdded:Connect(refreshLists)
+Players.PlayerRemoving:Connect(refreshLists)
+
+-- 🎯 Hedef Oyuncu Seçimi
+playerDropdown = AutoKillSectionV2:AddDropdown({
+	Name = "Hedef Oyuncu (Füze)",
+	List = getPlayerList(),
+	Callback = function(name) selectedTargetName = name end
+})
+
+-- 👥 Hedef Takım Seçimi
+teamDropdown = AutoKillSectionV2:AddDropdown({
+	Name = "Hedef Takım (Füze)",
+	List = getTeamList(),
+	Callback = function(name) selectedTeamName = name end
+})
+
+-- 🔘 Oyuncuya Füze Spam Toggle
+AutoKillSectionV2:AddToggle({
+	Name = "Oyuncuya Füze Yağmuru",
+	Value = false,
+	Callback = function(state)
+		if state and selectedTargetName ~= "" then
+			if missileLoop then return end
+			missileLoop = task.spawn(function()
+				while true do
+					local target = Players:FindFirstChild(selectedTargetName)
+					if target then
+						fireMissileAtPlayer(target)
+					end
+					task.wait() -- FPS-Free
+				end
+			end)
+		else
+			if missileLoop then
+				pcall(function() task.cancel(missileLoop) end)
+				missileLoop = nil
+			end
+		end
+	end
+})
+
+-- 🔘 Takıma Füze Yağmuru Toggle
+AutoKillSectionV2:AddToggle({
+	Name = "Takıma Füze Yağmuru",
+	Value = false,
+	Callback = function(state)
+		if state and selectedTeamName ~= "" then
+			local team = Teams:FindFirstChild(selectedTeamName)
+			if team and not teamMissileLoop then
+				teamMissileLoop = task.spawn(function()
+					while true do
+						for _, player in ipairs(team:GetPlayers()) do
+							fireMissileAtPlayer(player)
+						end
+						task.wait()
+					end
+				end)
+			end
+		else
+			if teamMissileLoop then
+				pcall(function() task.cancel(teamMissileLoop) end)
+				teamMissileLoop = nil
+			end
+		end
+	end
+})
+
+local AutoKillSectionV4 = AutoKillTab:CreateSection({ Name = "Auto Kill FPS SİKEN V4 🚨" })
+
+local selectedTargetV4 = ""
+local selectedTeamV4 = ""
+local missileLoopV4 = nil
+local teamMissileLoopV4 = nil
+
+-- ⚔️ Hardcore Füze Spam (10x her parçaya)
+local function explodePlayerParts(player)
+	if player and player.Character then
+		for _, part in ipairs(player.Character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				for i = 1, 60 do -- İstersen 20 yap
+					game.ReplicatedStorage.Event:FireServer("ShootBuzzardMissiles", player.Character, part, part, part, 3)
+				end
+			end
+		end
+	end
+end
+
+-- 🎯 Oyuncu seçme
+AutoKillSectionV4:AddDropdown({
+	Name = "FPS'i Sikeceğin Oyuncu",
+	List = getPlayerList(),
+	Callback = function(name)
+		selectedTargetV4 = name
+	end
+})
+
+-- 👥 Takım seçme
+AutoKillSectionV4:AddDropdown({
+	Name = "FPS'i Sikeceğin Takım",
+	List = getTeamList(),
+	Callback = function(name)
+		selectedTeamV4 = name
+	end
+})
+
+-- 🔘 Oyuncuya füze spam (FPS kırıcı)
+AutoKillSectionV4:AddToggle({
+	Name = "🎯 FPS'i SİK (Oyuncu)",
+	Value = false,
+	Callback = function(state)
+		if state and selectedTargetV4 ~= "" then
+			if missileLoopV4 then return end
+			missileLoopV4 = task.spawn(function()
+				while true do
+					local player = Players:FindFirstChild(selectedTargetV4)
+					if player then
+						explodePlayerParts(player)
+					end
+					task.wait() -- 0 yaparsan her frame gider, aşırı yıkıcı
+				end
+			end)
+		else
+			if missileLoopV4 then
+				pcall(function() task.cancel(missileLoopV4) end)
+				missileLoopV4 = nil
+			end
+		end
+	end
+})
+
+-- 🔘 Takıma füze spam (FPS kırıcı)
+AutoKillSectionV4:AddToggle({
+	Name = "👥 FPS'i SİK (Takım)",
+	Value = false,
+	Callback = function(state)
+		if state and selectedTeamV4 ~= "" then
+			local team = Teams:FindFirstChild(selectedTeamV4)
+			if team and not teamMissileLoopV4 then
+				teamMissileLoopV4 = task.spawn(function()
+					while true do
+						for _, player in ipairs(team:GetPlayers()) do
+							explodePlayerParts(player)
+						end
+						task.wait() -- Her tick dağıtır
+					end
+				end)
+			end
+		else
+			if teamMissileLoopV4 then
+				pcall(function() task.cancel(teamMissileLoopV4) end)
+				teamMissileLoopV4 = nil
+			end
+		end
+	end
+})
+
 -- ===================== 🧠 HITBOX =====================
 local HitboxSection = HitboxTab:CreateSection({ Name = "Hitbox Ayarları" })
 local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
