@@ -1,1 +1,925 @@
-print"31"
+-- Wia Menü | Full Revize | Premium UI
+local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
+
+local PepsisWorld = library:CreateWindow({
+	Name = "Wia Menü | Revize",
+	Themeable = { Info = "Tam Sürüm" }
+})
+
+-- Gerekli Servisler
+local RunService = game:GetService('RunService')
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService('Players')
+local Teams = game:GetService("Teams")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local Event = ReplicatedStorage:WaitForChild("Event")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+-- Sekmeler
+local CombatTab = PepsisWorld:CreateTab({ Name = "🥊" })
+local VehicleTab = PepsisWorld:CreateTab({ Name = "🚘" })
+local AutoKillTab = PepsisWorld:CreateTab({ Name = "🚀" })
+local HitboxTab = PepsisWorld:CreateTab({ Name = "🎯" })
+local ExtraTab = PepsisWorld:CreateTab({ Name = "💼" })
+local CharacterTab = PepsisWorld:CreateTab({ Name = "🧍" })
+local SystemTab = PepsisWorld:CreateTab({ Name = "📳" })
+
+-- ===================== 🥊 SAVAŞ =====================
+local CombatSection = CombatTab:CreateSection({ Name = "ESP Kontrol" })
+
+CombatSection:AddButton({
+	Name = "ESP Aç",
+	Callback = function()
+		local function fixNameTag(player)
+			local function apply()
+				local char = player.Character
+				if not char then return end
+				local nameTag = char:FindFirstChild("NameTag")
+				if nameTag then
+					nameTag.AlwaysOnTop = true
+					nameTag.MaxDistance = 10000
+				end
+			end
+			if player.Character then apply() end
+			player.CharacterAdded:Connect(function(char)
+				char:WaitForChild("NameTag", 10)
+				apply()
+			end)
+		end
+		for _, player in ipairs(Players:GetPlayers()) do
+			fixNameTag(player)
+		end
+		Players.PlayerAdded:Connect(fixNameTag)
+	end
+})
+
+CombatSection:AddButton({
+	Name = "ESP Kapat",
+	Callback = function()
+		for _, player in pairs(Players:GetChildren()) do
+			local character = player.Character or player.CharacterAdded:Wait()
+			local nameTag = character:FindFirstChild("NameTag")
+			if nameTag then
+				nameTag.AlwaysOnTop = false
+				nameTag.MaxDistance = 10000
+			end
+		end
+	end
+})
+-- ===================== 🚘 ARAÇLAR =====================
+local VehicleSpawnSection = VehicleTab:CreateSection({ Name = "Araç Spawnlama (Tüm Araçlar)" })
+local selectedVehicle = "Nero"
+
+VehicleSpawnSection:AddDropdown({
+	Name = "Araç Seç",
+	List = {"Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury"},
+	Callback = function(v) selectedVehicle = v end
+})
+
+VehicleSpawnSection:AddButton({
+	Name = "Araç Spawnla",
+	Callback = function()
+		local args = {
+			[1] = "SpawnVehicle",
+			[2] = selectedVehicle
+		}
+		Event:FireServer(unpack(args))
+	end
+})
+
+VehicleSpawnSection:AddButton({
+	Name = "Spawnlanana Bin",
+	Callback = function()
+		local char = LocalPlayer.Character
+		if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+		local HRP = char.HumanoidRootPart
+		local btp = Instance.new("Vector3Value", LocalPlayer)
+		btp.Name = "btp"
+		btp.Value = HRP.Position
+		HRP.CFrame = Workspace.VehicleSpawns[selectedVehicle].Pos.CFrame
+		wait()
+		HRP.CFrame = CFrame.new(btp.Value)
+		wait()
+		local vehicle = Workspace.ObjectSelection[selectedVehicle]
+		if vehicle then
+			vehicle.DriveSeat.Disabled = false
+			vehicle:MoveTo(HRP.Position)
+			wait()
+			HRP.CFrame = vehicle.DriveSeat.CFrame
+			wait()
+			vehicle.DriveSeat.Disabled = true
+		end
+		btp:Destroy()
+	end
+})
+
+local BoostSection = VehicleTab:CreateSection({ Name = "Performans & Boost" })
+
+BoostSection:AddButton({
+	Name = "Super Car",
+	Callback = function()
+		-- Araç parametrelerini güncelle
+		local propertyValues = {
+			Sway = 20,
+			Torque = 7,
+			MaxSpeed = 900,
+			TurnSpeed = 1.7,
+			DriftVelLerp = 0.45,
+			DriftRotLerp = 0.12,
+		}
+
+		for _, v in pairs(getgc(true)) do
+			if type(v) == "table" then
+				for property, value in pairs(propertyValues) do
+					if rawget(v, property) ~= nil then
+						v[property] = value
+					end
+				end
+			end
+		end
+
+		-- Boost değeri ayarı
+		local playerVehicle = workspace.ObjectSelection:FindFirstChild(game.Players.LocalPlayer.Name.."'s Vehicle")
+		if playerVehicle then
+			pcall(function()
+				local carChassis = playerVehicle:FindFirstChild("CarChassis")
+				if carChassis then
+					local boost = carChassis:FindFirstChild("Boost")
+					if boost then
+						boost.Value = 20
+					end
+				end
+			end)
+		end
+	end
+})
+
+BoostSection:AddButton({
+	Name = "Hızlı Dönüş (Uçak)",
+	Callback = function()
+		local propertyValues = {
+			Acceleration = 1,
+			HorizontalTiltSpeed = 7.3,
+			MissileCooldown = 2,
+			MissileLock = 0,
+			SideTiltSpeed = 1.5,
+			MaxSideTilt = 25,
+		}
+
+		for i, v in pairs(getgc(true)) do
+			if type(v) == "table" then
+				for property, value in pairs(propertyValues) do
+					if rawget(v, property) ~= nil then
+						v[property] = value
+					end
+				end
+			end
+		end
+
+		-- Bombayı anında bırak (G tuşuna basıldığında)
+		local Remote = game.ReplicatedStorage:WaitForChild("Event")
+		local UserInputService = game:GetService("UserInputService")
+
+		UserInputService.InputBegan:Connect(function(input, gameProcessed)
+			if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+				Remote:FireServer("DropBomb")
+			end
+		end)
+	end
+})
+
+local OtherSection = VehicleTab:CreateSection({ Name = "Özel Araç Hileleri" })
+
+OtherSection:AddButton({
+	Name = "Suda Araç Sürme",
+	Callback = function()
+		for k,v in pairs(Workspace.Water:GetChildren()) do
+			v.CanCollide = true
+			v.Anchored = true
+			v.Material = "Ice"
+			v:Clone().Parent = v.Parent
+			v:Destroy()
+		end
+		for i, v in pairs(Workspace:GetDescendants()) do
+			if v.Name == "Ocean" then v.Name = "NotWater" end
+		end
+		local newfolder = Instance.new("Folder")
+		newfolder.Name = "Water"
+		newfolder.Parent = Workspace
+		wait(0.1)
+		Workspace.Water.Name = "NotWaterBruh"
+	end
+})
+
+OtherSection:AddToggle({
+	Name = "🕶️ Sonsuz Stealth (Night)",
+	Value = false,
+	Callback = function(state)
+		if state then
+			_G.StealthLoop = RunService.RenderStepped:Connect(function()
+				pcall(function()
+					Event:FireServer("StealthMode", true)
+				end)
+			end)
+		else
+			pcall(function()
+				Event:FireServer("StealthMode", false)
+				task.wait(0.2)
+				Event:FireServer("StealthMode", false)
+			end)
+			if _G.StealthLoop then
+				_G.StealthLoop:Disconnect()
+				_G.StealthLoop = nil
+			end
+		end
+	end
+})
+
+-- ===================== 🎯 AUTO KILL =====================
+local AutoKillPlayerSection = AutoKillTab:CreateSection({ Name = "Oyuncuya Özel Auto Kill (Sunucu Tabanlı)" })
+
+local selectedPlayerName = ""
+local killRunning = false
+local killThread = nil
+local playerDropdown = nil
+
+local blacklist = {
+	["MAD_CITYAIMBOTLOL"] = true
+}
+
+-- Güncel oyuncu listesi
+local function getUpdatedPlayerList()
+	local list = {}
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			table.insert(list, player.Name)
+		end
+	end
+	return list
+end
+
+local function refreshDropdown()
+	if playerDropdown then
+		playerDropdown:UpdateList(getUpdatedPlayerList())
+	end
+end
+
+Players.PlayerAdded:Connect(refreshDropdown)
+Players.PlayerRemoving:Connect(refreshDropdown)
+
+-- Hedef seçimi
+playerDropdown = AutoKillPlayerSection:AddDropdown({
+	Name = "Hedef Oyuncu",
+	List = getUpdatedPlayerList(),
+	Callback = function(playerName)
+		if blacklist[playerName] then
+			game.StarterGui:SetCore("SendNotification", {
+				Title = "❌ Korumalı Oyuncu",
+				Text = playerName .. " BM'den muaf!",
+				Duration = 5
+			})
+			selectedPlayerName = ""
+		else
+			selectedPlayerName = playerName
+		end
+	end
+})
+
+-- BM: Tüm parçalar, sadece 1'er kez (sürekli)
+local function fireFullBMOnce(player)
+	if not player or not player.Character then return end
+	for _, part in ipairs(player.Character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			Event:FireServer("BM", part.Position)
+		end
+	end
+end
+
+-- Sürekli sunucu hızına göre çalışacak spam
+local function startTrueKill()
+	if killThread then return end
+	killRunning = true
+	killThread = game:GetService("RunService").Stepped:Connect(function()
+		if not killRunning or selectedPlayerName == "" then return end
+		local target = Players:FindFirstChild(selectedPlayerName)
+		if target and not blacklist[selectedPlayerName] then
+			fireFullBMOnce(target)
+		end
+	end)
+end
+
+local function stopTrueKill()
+	killRunning = false
+	if killThread then
+		killThread:Disconnect()
+		killThread = nil
+	end
+end
+
+AutoKillPlayerSection:AddToggle({
+	Name = "Auto Kill Aktif",
+	Value = false,
+	Callback = function(state)
+		if state and selectedPlayerName ~= "" then
+			startTrueKill()
+		else
+			stopTrueKill()
+		end
+	end
+})
+
+local AutoKillSectionV1 = AutoKillTab:CreateSection({ Name = "Auto Kill V1 (BM - Hızlandırılmış)" })
+local TeamsService = game:GetService("Teams")
+local Players = game:GetService("Players")
+local Event = game:GetService("ReplicatedStorage"):WaitForChild("Event")
+
+-- Takım başına toggle oluştur
+local function createAutoKillToggleV1(teamName)
+	local team = TeamsService:WaitForChild(teamName)
+	local isActive = false
+	local killThread = nil
+
+	AutoKillSectionV1:AddToggle({
+		Name = teamName,
+		Value = false,
+		Callback = function(state)
+			isActive = state
+
+			-- Başlat
+			if state then
+				if killThread then return end
+				killThread = task.spawn(function()
+					while isActive do
+						for _, player in pairs(team:GetPlayers()) do
+							if player ~= Players.LocalPlayer and player.Character then
+								for _, part in ipairs(player.Character:GetDescendants()) do
+									if part:IsA("BasePart") then
+										Event:FireServer("BM", part.Position)
+									end
+								end
+							end
+						end
+						task.wait() -- Sunucu hızına göre çalışır
+					end
+				end)
+
+			-- Durdur
+			else
+				if killThread then
+					pcall(function() task.cancel(killThread) end)
+					killThread = nil
+				end
+			end
+		end
+	})
+end
+
+-- Bu takımlar için toggle ekle
+for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
+	createAutoKillToggleV1(team)
+end
+
+local AutoKillSectionV4 = AutoKillTab:CreateSection({ Name = "Auto Kill FPS SİKEN V4 🚨" })
+
+local selectedTargetV4 = ""
+local selectedTeamV4 = ""
+local missileLoopV4 = nil
+local teamMissileLoopV4 = nil
+
+-- ⚔️ Hardcore Füze Spam (10x her parçaya)
+local function explodePlayerParts(player)
+	if player and player.Character then
+		for _, part in ipairs(player.Character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				for i = 1, 10 do
+					game.ReplicatedStorage.Event:FireServer("ShootBuzzardMissiles", player.Character, part, part, part, 3)
+				end
+			end
+		end
+	end
+end
+
+-- 🔁 Oyuncu listesi altyapısı
+local playerDropdowns = {}
+
+function registerLiveDropdown(dropdown)
+	table.insert(playerDropdowns, dropdown)
+	dropdown:UpdateList(getPlayerList())
+end
+
+function getPlayerList()
+	local list = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer then
+			table.insert(list, p.Name)
+		end
+	end
+	return list
+end
+
+Players.PlayerAdded:Connect(function()
+	for _, dropdown in ipairs(playerDropdowns) do
+		dropdown:UpdateList(getPlayerList())
+	end
+end)
+
+Players.PlayerRemoving:Connect(function()
+	for _, dropdown in ipairs(playerDropdowns) do
+		dropdown:UpdateList(getPlayerList())
+	end
+end)
+
+-- Takım listesi sabittir
+local function getTeamList()
+	local list = {}
+	for _, team in ipairs(Teams:GetChildren()) do
+		table.insert(list, team.Name)
+	end
+	return list
+end
+
+-- 🎯 FPS'i Sikeceğin Oyuncu
+local playerDropdownV4 = AutoKillSectionV4:AddDropdown({
+	Name = "FPS'i Sikeceğin Oyuncu",
+	List = getPlayerList(),
+	Callback = function(name)
+		selectedTargetV4 = name
+	end
+})
+registerLiveDropdown(playerDropdownV4)
+
+-- 👥 FPS'i Sikeceğin Takım
+local teamDropdownV4 = AutoKillSectionV4:AddDropdown({
+	Name = "FPS'i Sikeceğin Takım",
+	List = getTeamList(),
+	Callback = function(name)
+		selectedTeamV4 = name
+	end
+})
+
+-- 🎯 Oyuncuya Füze Spam
+AutoKillSectionV4:AddToggle({
+	Name = "🎯 FPS'i SİK (Oyuncu)",
+	Value = false,
+	Callback = function(state)
+		if state and selectedTargetV4 ~= "" then
+			if missileLoopV4 then return end
+			missileLoopV4 = task.spawn(function()
+				while true do
+					local player = Players:FindFirstChild(selectedTargetV4)
+					if player then
+						explodePlayerParts(player)
+					end
+					task.wait()
+				end
+			end)
+		else
+			if missileLoopV4 then
+				pcall(function() task.cancel(missileLoopV4) end)
+				missileLoopV4 = nil
+			end
+		end
+	end
+})
+
+-- 👥 Takıma Füze Spam
+AutoKillSectionV4:AddToggle({
+	Name = "👥 FPS'i SİK (Takım)",
+	Value = false,
+	Callback = function(state)
+		if state and selectedTeamV4 ~= "" then
+			local team = Teams:FindFirstChild(selectedTeamV4)
+			if team and not teamMissileLoopV4 then
+				teamMissileLoopV4 = task.spawn(function()
+					while true do
+						for _, player in ipairs(team:GetPlayers()) do
+							explodePlayerParts(player)
+						end
+						task.wait()
+					end
+				end)
+			end
+		else
+			if teamMissileLoopV4 then
+				pcall(function() task.cancel(teamMissileLoopV4) end)
+				teamMissileLoopV4 = nil
+			end
+		end
+	end
+})
+
+-- ===================== 🧠 HITBOX =====================
+local HitboxSection = HitboxTab:CreateSection({ Name = "Hitbox Ayarları" })
+local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
+
+local selectedTeams = {}
+local isHitboxEnabled = false
+local lastSize = 20
+local lastTransparency = 0.5
+local lastColor = Color3.fromRGB(255, 0, 0)
+local hitboxConnection = nil
+
+local function applyHitbox(player)
+	if player and player.Character and player.Character:FindFirstChild("Head") then
+		local head = player.Character.Head
+		head.Size = Vector3.new(lastSize, lastSize, lastSize)
+		head.Transparency = lastTransparency
+		head.BrickColor = BrickColor.new(lastColor)
+		head.CanCollide = false
+		head.Material = Enum.Material.ForceField
+	end
+end
+
+local function resetHitbox(player)
+	if player and player.Character and player.Character:FindFirstChild("Head") then
+		local head = player.Character.Head
+		head.Size = Vector3.new(2, 1, 1)
+		head.Transparency = 0
+		head.BrickColor = BrickColor.new("Medium stone grey")
+		head.CanCollide = true
+		head.Material = Enum.Material.Plastic
+	end
+end
+
+local function updateHitboxes()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Team and table.find(selectedTeams, player.Team.Name) then
+			applyHitbox(player)
+		else
+			resetHitbox(player)
+		end
+	end
+end
+
+HitboxSection:AddToggle({
+	Name = "Hitbox Aktif",
+	Value = false,
+	Callback = function(state)
+		isHitboxEnabled = state
+		if state then
+			if hitboxConnection then hitboxConnection:Disconnect() end
+			hitboxConnection = RunService.Heartbeat:Connect(updateHitboxes)
+		else
+			if hitboxConnection then
+				hitboxConnection:Disconnect()
+				hitboxConnection = nil
+			end
+			for _, player in ipairs(Players:GetPlayers()) do
+				resetHitbox(player)
+			end
+		end
+	end
+})
+
+HitboxSection:AddSlider({
+	Name = "Boyut",
+	Min = 1,
+	Max = 20,
+	Value = lastSize,
+	Callback = function(v)
+		lastSize = v
+	end
+})
+
+HitboxSection:AddSlider({
+	Name = "Şeffaflık",
+	Min = 0,
+	Max = 1,
+	Value = lastTransparency,
+	Callback = function(v)
+		lastTransparency = v
+	end
+})
+
+HitboxSection:AddColorPicker({
+	Name = "Renk",
+	Value = lastColor,
+	Callback = function(v)
+		lastColor = v
+	end
+})
+
+for _, team in ipairs({"Prisoners", "Police", "Criminals", "Heroes", "Villains"}) do
+	TeamSection:AddToggle({
+		Name = team,
+		Value = false,
+		Callback = function(value)
+			if value then
+				if not table.find(selectedTeams, team) then
+					table.insert(selectedTeams, team)
+				end
+			else
+				for i, t in ipairs(selectedTeams) do
+					if t == team then
+						table.remove(selectedTeams, i)
+						break
+					end
+				end
+			end
+			if isHitboxEnabled then updateHitboxes() end
+		end
+	})
+end
+
+-- ===================== 💼 EKSTRA =====================
+local XPSection = ExtraTab:CreateSection({ Name = "Para / XP / Araçlar" })
+
+XPSection:AddButton({
+	Name = "Auto Farm Para",
+	Callback = function()
+		getgenv().fps = false
+		getgenv().whitescreen = false
+		getgenv().Arrest = false
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/AdminEvilDRagon/smallAR/refs/heads/main/SmallAR.lua", true))()
+	end
+})
+
+XPSection:AddButton({
+	Name = "Keycard Çek",
+	Callback = function()
+		for i = 1, 50 do
+			for i, v in pairs(Players:GetChildren()) do
+				local args = {
+					[1] = "Pickpocket",
+					[2] = v
+				}
+				Event:FireServer(unpack(args))
+			end
+		end
+	end
+})
+
+XPSection:AddButton({
+	Name = "XP Scripti",
+	Callback = function()
+		ReplicatedStorage.RemoteFunction:InvokeServer("SetTeam", "Police")
+		wait(0.5)
+		for _, v in pairs(LocalPlayer.Backpack:GetChildren()) do
+			if v.Name == "Handcuffs" then
+				v.Parent = LocalPlayer.Character
+			end
+		end
+		for i = 1, 1000 do  
+			RunService.RenderStepped:Connect(function()
+				Event:FireServer("Eject", LocalPlayer)
+			end)
+		end
+	end
+})
+
+XPSection:AddButton({
+	Name = "💥 Server Crash",
+	Callback = function()
+		local plr = LocalPlayer
+		if plr.Backpack:FindFirstChild("Shotgun") == nil then
+			game.StarterGui:SetCore("SendNotification",{     
+				Title = "Uyarı",     
+				Text = "Shotgun envanterinde ve elinde olmalı!",
+				Duration = 5
+			})
+		else
+			local char = plr.Character
+			for i = 1, 20 do wait()
+				workspace.ObjectSelection.Shotgun.Shotgun.Shotgun.Event:FireServer()
+			end
+			char.Humanoid:EquipTool(plr.Backpack.Shotgun)
+			for i = 1, 8000 do
+				ReplicatedStorage.Event:FireServer("ShootShotgun", workspace[plr.Name], Vector3.new(0, 0, 0), "Shotgun", "inf", "inf", "inf")
+			end
+			game.StarterGui:SetCore("SendNotification",{     
+				Title = "C R A S H",     
+				Text = "Sunucu çöktü!",
+				Duration = 7 
+			})
+		end
+	end
+})
+
+
+-- ===================== 🧍 KARAKTER =====================
+local CharacterSection = CharacterTab:CreateSection({ Name = "Uçuş / Geçiş / Zıplama" })
+
+local FlySpeed = 50
+local flying = false
+local flyConn = nil
+
+CharacterSection:AddSlider({
+	Name = "Uçuş Hızı",
+	Min = 10,
+	Max = 150,
+	Value = 50,
+	Callback = function(v)
+		FlySpeed = v
+	end
+})
+
+CharacterSection:AddToggle({
+	Name = "Uçmayı Aç / Kapat",
+	Value = false,
+	Callback = function(state)
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = char:WaitForChild("HumanoidRootPart")
+		local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+		if state and not flying then
+			flying = true
+			if humanoid then humanoid.PlatformStand = true end
+
+			local bg = Instance.new("BodyGyro", hrp)
+			local bv = Instance.new("BodyVelocity", hrp)
+
+			bg.P = 9e4
+			bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+			bg.CFrame = hrp.CFrame
+
+			bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+			bv.Velocity = Vector3.zero
+
+			local uis = game:GetService("UserInputService")
+
+			flyConn = RunService.Heartbeat:Connect(function()
+				local cam = workspace.CurrentCamera
+				local move = Vector3.zero
+
+				if uis:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+				if uis:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+				if uis:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+				if uis:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+				if uis:IsKeyDown(Enum.KeyCode.Space) then move += cam.CFrame.UpVector end
+				if uis:IsKeyDown(Enum.KeyCode.LeftControl) then move -= cam.CFrame.UpVector end
+
+				bg.CFrame = cam.CFrame
+				bv.Velocity = move.Magnitude > 0 and move.Unit * FlySpeed or Vector3.zero
+			end)
+		else
+			flying = false
+			if flyConn then flyConn:Disconnect() flyConn = nil end
+			for _,v in pairs(hrp:GetChildren()) do
+				if v:IsA("BodyGyro") or v:IsA("BodyVelocity") then
+					v:Destroy()
+				end
+			end
+			if humanoid then humanoid.PlatformStand = false end
+		end
+	end
+})
+
+local NoclipConnection = nil
+
+CharacterSection:AddToggle({
+	Name = "Noclip Aç / Kapat",
+	Value = false,
+	Callback = function(state)
+		if state then
+			NoclipConnection = RunService.Stepped:Connect(function()
+				local char = LocalPlayer.Character
+				if char then
+					for _,v in pairs(char:GetDescendants()) do
+						if v:IsA("BasePart") and v.CanCollide then
+							v.CanCollide = false
+						end
+					end
+				end
+			end)
+		else
+			if NoclipConnection then
+				NoclipConnection:Disconnect()
+				NoclipConnection = nil
+			end
+		end
+	end
+})
+
+local JumpPower = 50
+
+CharacterSection:AddSlider({
+	Name = "Zıplama Gücü",
+	Min = 50,
+	Max = 300,
+	Value = 50,
+	Callback = function(val)
+		JumpPower = val
+		local char = LocalPlayer.Character
+		if char and char:FindFirstChildOfClass("Humanoid") then
+			char:FindFirstChildOfClass("Humanoid").JumpPower = JumpPower
+		end
+	end
+})
+
+-- ===================== ⚙️ SİSTEM =====================
+local ServerhopSection = SystemTab:CreateSection({ Name = "Sunucu İşlemleri" })
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Menü URL (Sunucu sonrası menünün tekrar yüklenmesi için)
+local menuURL = "https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamenü.txt"
+
+-- 🔁 Rejoin (Garantili, TPHandler ile menü tekrar yüklenir)
+local function forceRejoin()
+	local tpCode = string.format("loadstring(game:HttpGet('%s'))()", menuURL)
+	if syn and syn.queue_on_teleport then
+		syn.queue_on_teleport(tpCode)
+	elseif queue_on_teleport then
+		queue_on_teleport(tpCode)
+	end
+	TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+end
+
+-- 🌐 Gelişmiş ServerHop (Retry + Seçim destekli)
+local function advancedServerHop(mode)
+	local placeId = game.PlaceId
+	local currentJobId = game.JobId
+	local servers = {}
+
+	local function getServers(cursor)
+		local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?limit=100"
+		if cursor then url = url.."&cursor="..cursor end
+
+		local success, result = pcall(function()
+			return HttpService:JSONDecode(game:HttpGet(url))
+		end)
+
+		if success and result and result.data then
+			for _, server in ipairs(result.data) do
+				if server.id ~= currentJobId then
+					local playing = server.playing
+					local max = server.maxPlayers
+					if mode == "boş" and playing < max / 2 then
+						table.insert(servers, server.id)
+					elseif mode == "dolu" and playing >= max / 2 then
+						table.insert(servers, server.id)
+					elseif mode == "herhangi" then
+						table.insert(servers, server.id)
+					end
+				end
+			end
+			if result.nextPageCursor then
+				getServers(result.nextPageCursor)
+			end
+		end
+	end
+
+	-- Sunucu listesini topla
+	getServers()
+
+	if #servers > 0 then
+		local target = servers[math.random(1, #servers)]
+		local tpCode = string.format("loadstring(game:HttpGet('%s'))()", menuURL)
+
+		if syn and syn.queue_on_teleport then
+			syn.queue_on_teleport(tpCode)
+		elseif queue_on_teleport then
+			queue_on_teleport(tpCode)
+		end
+
+		-- Başarısız olursa tekrar dene
+		local function tryTeleport()
+			local success, err = pcall(function()
+				TeleportService:TeleportToPlaceInstance(placeId, target, LocalPlayer)
+			end)
+			if not success then
+				warn("❌ Teleport başarısız. Tekrar deneniyor...")
+				task.wait(2)
+				tryTeleport()
+			end
+		end
+
+		tryTeleport()
+	else
+		warn("⚠️ Uygun sunucu bulunamadı.")
+	end
+end
+
+-- 🧠 Menü Butonları
+ServerhopSection:AddButton({
+	Name = "🔁 Garantili Rejoin",
+	Callback = function()
+		forceRejoin()
+	end
+})
+
+ServerhopSection:AddButton({
+	Name = "🌐 Server Hop (Boş Sunucu)",
+	Callback = function()
+		advancedServerHop("boş")
+	end
+})
+
+ServerhopSection:AddButton({
+	Name = "🌐 Server Hop (Dolu Sunucu)",
+	Callback = function()
+		advancedServerHop("dolu")
+	end
+})
+
+ServerhopSection:AddButton({
+	Name = "🌐 Server Hop (Rastgele)",
+	Callback = function()
+		advancedServerHop("herhangi")
+	end
+})
