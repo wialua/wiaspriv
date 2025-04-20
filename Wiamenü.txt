@@ -239,13 +239,13 @@ OtherSection:AddToggle({
 })
 
 -- ===================== 🎯 AUTO KILL =====================
-local AutoKillPlayerSection = AutoKillTab:CreateSection({ Name = "Oyuncuya Özel Auto Kill V1 (10x BM)" })
+local AutoKillPlayerSection = AutoKillTab:CreateSection({ Name = "Oyuncuya Özel Auto Kill (Sunucu Tabanlı)" })
 
 local selectedPlayerName = ""
-local autoKillLoop = nil
+local killRunning = false
+local killThread = nil
 local playerDropdown = nil
 
--- 🔒 Kara liste (dokunulmaz oyuncular)
 local blacklist = {
 	["MAD_CITYAIMBOTLOL"] = true
 }
@@ -270,56 +270,67 @@ end
 Players.PlayerAdded:Connect(refreshDropdown)
 Players.PlayerRemoving:Connect(refreshDropdown)
 
+-- Hedef seçimi
 playerDropdown = AutoKillPlayerSection:AddDropdown({
 	Name = "Hedef Oyuncu",
 	List = getUpdatedPlayerList(),
 	Callback = function(playerName)
-		selectedPlayerName = playerName
-
 		if blacklist[playerName] then
 			game.StarterGui:SetCore("SendNotification", {
 				Title = "❌ Korumalı Oyuncu",
-				Text = playerName .. " Auto Kill'den muaf!",
+				Text = playerName .. " BM'den muaf!",
 				Duration = 5
 			})
-			selectedPlayerName = "" -- Hedef boşaltılır, hiçbir işlem yapılmaz
+			selectedPlayerName = ""
+		else
+			selectedPlayerName = playerName
 		end
 	end
 })
 
-local function fireBM10xAtParts(player)
-	if player and player.Character then
-		for _, part in pairs(player.Character:GetChildren()) do
-			if part:IsA("BasePart") then
-				for i = 1, 10 do
-					Event:FireServer("BM", part.Position)
-				end
-			end
+-- BM: Tüm parçalar, sadece 1'er kez (sürekli)
+local function fireFullBMOnce(player)
+	if not player or not player.Character then return end
+	for _, part in ipairs(player.Character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			Event:FireServer("BM", part.Position)
 		end
+	end
+end
+
+-- Sürekli sunucu hızına göre çalışacak spam
+local function startTrueKill()
+	if killThread then return end
+	killRunning = true
+	killThread = game:GetService("RunService").Stepped:Connect(function()
+		if not killRunning or selectedPlayerName == "" then return end
+		local target = Players:FindFirstChild(selectedPlayerName)
+		if target and not blacklist[selectedPlayerName] then
+			fireFullBMOnce(target)
+		end
+	end)
+end
+
+local function stopTrueKill()
+	killRunning = false
+	if killThread then
+		killThread:Disconnect()
+		killThread = nil
 	end
 end
 
 AutoKillPlayerSection:AddToggle({
 	Name = "Auto Kill Aktif",
 	Value = false,
-	Callback = function(enabled)
-		if enabled and selectedPlayerName ~= "" and not blacklist[selectedPlayerName] then
-			if autoKillLoop then autoKillLoop:Disconnect() end
-			autoKillLoop = task.spawn(function()
-				while true do
-					local target = Players:FindFirstChild(selectedPlayerName)
-					if target then fireBM10xAtParts(target) end
-					task.wait()
-				end
-			end)
+	Callback = function(state)
+		if state and selectedPlayerName ~= "" then
+			startTrueKill()
 		else
-			if autoKillLoop then
-				pcall(function() task.cancel(autoKillLoop) end)
-				autoKillLoop = nil
-			end
+			stopTrueKill()
 		end
 	end
 })
+
 -- ===================== 🧠 HITBOX =====================
 local HitboxSection = HitboxTab:CreateSection({ Name = "Hitbox Ayarları" })
 local TeamSection = HitboxTab:CreateSection({ Name = "Takım Seçimi" })
@@ -620,66 +631,115 @@ CharacterSection:AddSlider({
 
 -- ===================== ⚙️ SİSTEM =====================
 local ServerhopSection = SystemTab:CreateSection({ Name = "Sunucu İşlemleri" })
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
--- 🌐 Server Hop
-local function serverHop()
-	local PlaceId = game.PlaceId
-	local JobId = game.JobId
+-- Menü URL (Sunucu sonrası menünün tekrar yüklenmesi için)
+local menuURL = "https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamenü.txt"
+
+-- 🔁 Rejoin (Garantili, TPHandler ile menü tekrar yüklenir)
+local function forceRejoin()
+	local tpCode = string.format("loadstring(game:HttpGet('%s'))()", menuURL)
+	if syn and syn.queue_on_teleport then
+		syn.queue_on_teleport(tpCode)
+	elseif queue_on_teleport then
+		queue_on_teleport(tpCode)
+	end
+	TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+end
+
+-- 🌐 Gelişmiş ServerHop (Retry + Seçim destekli)
+local function advancedServerHop(mode)
+	local placeId = game.PlaceId
+	local currentJobId = game.JobId
 	local servers = {}
 
-	local function fetchServers(cursor)
-		local url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?limit=100"
-		if cursor then url = url .. "&cursor=" .. cursor end
+	local function getServers(cursor)
+		local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?limit=100"
+		if cursor then url = url.."&cursor="..cursor end
 
-		local response = game:HttpGet(url)
-		local data = HttpService:JSONDecode(response)
+		local success, result = pcall(function()
+			return HttpService:JSONDecode(game:HttpGet(url))
+		end)
 
-		for _, server in pairs(data.data) do
-			if server.playing < server.maxPlayers and server.id ~= JobId then
-				table.insert(servers, server.id)
+		if success and result and result.data then
+			for _, server in ipairs(result.data) do
+				if server.id ~= currentJobId then
+					local playing = server.playing
+					local max = server.maxPlayers
+					if mode == "boş" and playing < max / 2 then
+						table.insert(servers, server.id)
+					elseif mode == "dolu" and playing >= max / 2 then
+						table.insert(servers, server.id)
+					elseif mode == "herhangi" then
+						table.insert(servers, server.id)
+					end
+				end
+			end
+			if result.nextPageCursor then
+				getServers(result.nextPageCursor)
+			end
+		end
+	end
+
+	-- Sunucu listesini topla
+	getServers()
+
+	if #servers > 0 then
+		local target = servers[math.random(1, #servers)]
+		local tpCode = string.format("loadstring(game:HttpGet('%s'))()", menuURL)
+
+		if syn and syn.queue_on_teleport then
+			syn.queue_on_teleport(tpCode)
+		elseif queue_on_teleport then
+			queue_on_teleport(tpCode)
+		end
+
+		-- Başarısız olursa tekrar dene
+		local function tryTeleport()
+			local success, err = pcall(function()
+				TeleportService:TeleportToPlaceInstance(placeId, target, LocalPlayer)
+			end)
+			if not success then
+				warn("❌ Teleport başarısız. Tekrar deneniyor...")
+				task.wait(2)
+				tryTeleport()
 			end
 		end
 
-		if data.nextPageCursor then
-			fetchServers(data.nextPageCursor)
-		end
-	end
-
-	pcall(function() fetchServers() end)
-
-	if #servers > 0 then
-		local randomServer = servers[math.random(1, #servers)]
-		local success, err = pcall(function()
-			TeleportService:TeleportToPlaceInstance(PlaceId, randomServer, Players.LocalPlayer)
-		end)
-
-		if not success then
-			warn("⚠️ Teleport başarısız. Tekrar deneniyor...")
-			task.wait(2)
-			serverHop()
-		end
+		tryTeleport()
 	else
-		warn("🌐 Uygun başka sunucu bulunamadı.")
+		warn("⚠️ Uygun sunucu bulunamadı.")
 	end
 end
 
--- 🔁 Rejoin
-local function rejoinServer()
-	local placeId = game.PlaceId
-	local jobId = game.JobId
-	TeleportService:TeleportToPlaceInstance(placeId, jobId, Players.LocalPlayer)
-end
-
+-- 🧠 Menü Butonları
 ServerhopSection:AddButton({
-	Name = "🌐 Server Hop (Rastgele)",
+	Name = "🔁 Garantili Rejoin",
 	Callback = function()
-		serverHop()
+		forceRejoin()
 	end
 })
 
 ServerhopSection:AddButton({
-	Name = "🔁 Aynı Sunucuya Rejoin",
+	Name = "🌐 Server Hop (Boş Sunucu)",
 	Callback = function()
-		rejoinServer()
+		advancedServerHop("boş")
+	end
+})
+
+ServerhopSection:AddButton({
+	Name = "🌐 Server Hop (Dolu Sunucu)",
+	Callback = function()
+		advancedServerHop("dolu")
+	end
+})
+
+ServerhopSection:AddButton({
+	Name = "🌐 Server Hop (Rastgele)",
+	Callback = function()
+		advancedServerHop("herhangi")
 	end
 })
