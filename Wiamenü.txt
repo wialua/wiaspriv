@@ -599,7 +599,7 @@ local function getTeamList()
 end
 
 -- 📦 Groupbox 1: Oyuncuya Özel
-local V4PlayerBox = Tabs.AutoKill:AddLeftGroupbox("💥 V4 - Oyuncuya Özel")
+local V4PlayerBox = Tabs.AutoKill:AddLeftGroupbox("💥 Oyuncuya Özel Fps siken")
 
 local playerDropdownV4 = V4PlayerBox:AddDropdown("V4PlayerSelect", {
     Text = "FPS'i Sikeceğin Oyuncu",
@@ -681,7 +681,7 @@ V4TeamBox:AddToggle("V4TeamToggle", {
 })
 
 -- 📦 Extra Sekmesi: Para / XP / Araçlar
-local XPBox = Tabs.Extra:AddLeftGroupbox("💰 Para / XP / Araçlar")
+local XPBox = Tabs.Extra:AddLeftGroupbox("💰 Para / XP")
 
 -- 💸 Auto Farm Para
 XPBox:AddButton({
