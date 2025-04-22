@@ -5,7 +5,7 @@ local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 local Window = Library:CreateWindow({
-    Title = 'Wia Menü|Beta',
+    Title = 'Wia Menü | Savaş Sistemi',
     Center = true,
     AutoShow = true
 })
@@ -235,7 +235,7 @@ VehicleSpawnBox:AddDropdown('AraçListesi', {
 })
 
 VehicleSpawnBox:AddButton({
-    Text = '🚘 Sende olan araçı Spawnla',
+    Text = '🚘 Spawnla',
     Func = function()
         if selectedVehicle and selectedVehicle ~= "" then
             Event:FireServer("SpawnVehicle", selectedVehicle)
@@ -599,7 +599,7 @@ local function getTeamList()
 end
 
 -- 📦 Groupbox 1: Oyuncuya Özel
-local V4PlayerBox = Tabs.AutoKill:AddLeftGroupbox("💥 Oyuncuya Özel Fps siken")
+local V4PlayerBox = Tabs.AutoKill:AddLeftGroupbox("💥 V4 - Oyuncuya Özel")
 
 local playerDropdownV4 = V4PlayerBox:AddDropdown("V4PlayerSelect", {
     Text = "FPS'i Sikeceğin Oyuncu",
@@ -681,7 +681,7 @@ V4TeamBox:AddToggle("V4TeamToggle", {
 })
 
 -- 📦 Extra Sekmesi: Para / XP / Araçlar
-local XPBox = Tabs.Extra:AddLeftGroupbox("💰 Para / XP")
+local XPBox = Tabs.Extra:AddLeftGroupbox("💰 Para / XP / Araçlar")
 
 -- 💸 Auto Farm Para
 XPBox:AddButton({
