@@ -868,3 +868,11 @@ ServerhopBox:AddButton({
 		advancedServerHop("herhangi")
 	end
 })
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+
+-- I set NoUI so it does not show up in the keybinds menu
+MenuGroup:AddButton('Menüyü yok et', function() Library:Unload() end)
+MenuGroup:AddLabel('Menü Tuşu'):AddKeyPicker('MenuKeybind', { Default = 'F4', NoUI = true, Text = 'Menu keybind' })
+
+Library.ToggleKeybind = Options.MenuKeybind -- Allows you to have a custom keybind for the menu
