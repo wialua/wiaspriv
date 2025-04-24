@@ -278,7 +278,7 @@ BoostBox:AddButton({
     Text = 'Super Car',
     Func = function()
         local props = {
-            Sway = 20,
+            Sway = 1,
             Torque = 7,
             MaxSpeed = 900,
             TurnSpeed = 1.7,
