@@ -367,6 +367,20 @@ BoostBox:AddButton({
     end
 })
 
+BoostBox:AddToggle('hover_toggle', {
+    Text = '🚀 Hover Modu',
+    Default = false,
+    Callback = function(state)
+        local playerVehicle = Workspace.ObjectSelection:FindFirstChild(LocalPlayer.Name.."'s Vehicle")
+        if playerVehicle then
+            local chassis = playerVehicle:FindFirstChild("CarChassis")
+            if chassis and chassis:FindFirstChild("HoverMode") then
+                chassis.HoverMode.Value = state
+            end
+        end
+    end
+})
+
 
 -- 💻 Özel Araç Hileleri Kutusu
 local CheatBox = Tabs.Vehicles:AddRightGroupbox('💻 Araç Hileleri')
