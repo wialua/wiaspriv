@@ -381,6 +381,24 @@ BoostBox:AddToggle('hover_toggle', {
     end
 })
 
+BoostBox:AddSlider('suspension_slider', {
+    Text = "🛞 Süspansiyon",
+    Min = 2,
+    Max = 100,
+    Default = 2,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(value)
+        local playerVehicle = Workspace.ObjectSelection:FindFirstChild(LocalPlayer.Name.."'s Vehicle")
+        if playerVehicle then
+            local chassis = playerVehicle:FindFirstChild("CarChassis")
+            if chassis and chassis:FindFirstChild("Suspension") then
+                chassis.Suspension.Value = value
+            end
+        end
+    end
+})
+
 
 -- 💻 Özel Araç Hileleri Kutusu
 local CheatBox = Tabs.Vehicles:AddRightGroupbox('💻 Araç Hileleri')
