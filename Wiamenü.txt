@@ -312,7 +312,7 @@ BoostBox:AddButton({
 })
 
 BoostBox:AddButton({
-    Text = 'Hızlı Dönüş (Uçak)',
+    Text = '✈️ Hızlı Dönüş (Uçak)',
     Func = function()
         local props = {
             Acceleration = 1,
@@ -332,14 +332,41 @@ BoostBox:AddButton({
                 end
             end
         end
+    end
+})
 
-        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+local bombingEnabled = false
+
+BoostBox:AddButton({
+    Text = '💣 G Tuşuna Bombalama Aktif Et',
+    Func = function(btn)
+        if bombingEnabled then
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "Zaten Aktif",
+                Text = "Bu özellik zaten aktif!",
+                Duration = 3
+            })
+            return
+        end
+
+        _G.BombInput = UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
                 Event:FireServer("DropBomb")
             end
         end)
+
+        bombingEnabled = true
+        btn:SetText("✅ Bombalama Aktif")
+        btn.Interactable = false
+
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Aktif!",
+            Text = "G tuşuna bombalama etkinleştirildi.",
+            Duration = 4
+        })
     end
 })
+
 
 -- 💻 Özel Araç Hileleri Kutusu
 local CheatBox = Tabs.Vehicles:AddRightGroupbox('💻 Araç Hileleri')
