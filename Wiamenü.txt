@@ -280,7 +280,7 @@ BoostBox:AddButton({
         local props = {
             Sway = 1,
             Torque = 7,
-            MaxSpeed = 900,
+            MaxSpeed = 200,
             TurnSpeed = 1.7,
             DriftVelLerp = 0.45,
             DriftRotLerp = 0.12,
