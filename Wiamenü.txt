@@ -284,6 +284,7 @@ BoostBox:AddButton({
             TurnSpeed = 1.7,
             DriftVelLerp = 0.45,
             DriftRotLerp = 0.12,
+            Suspension = 1, -- ✅ Yeni eklenen değer
         }
 
         for _, v in pairs(getgc(true)) do
@@ -310,6 +311,7 @@ BoostBox:AddButton({
         end
     end
 })
+
 
 BoostBox:AddButton({
     Text = '✈️ Hızlı Dönüş (Uçak)',
