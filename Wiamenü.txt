@@ -29,6 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Event = ReplicatedStorage:WaitForChild("Event")
+local UserInputService = game:GetService("UserInputService")
 
 ---------------------------
 -- 🔴 HITBOX SİSTEMİ
@@ -867,6 +868,141 @@ ServerhopBox:AddButton({
 		advancedServerHop("herhangi")
 	end
 })
+
+-- 🔓 Araç Kilit Açma Kutusu
+local VehicleLockBox = Tabs.Vehicles:AddLeftGroupbox("🔓 Araç Kilitleri")
+
+local unlockLoop
+
+VehicleLockBox:AddToggle('UnlockAllVehiclesToggle', {
+    Text = 'Herkesin Araç Kilidini OFF Yap',
+    Default = false,
+    Callback = function(state)
+        if state then
+            unlockLoop = RunService.Heartbeat:Connect(function()
+                for _, player in ipairs(Players:GetPlayers()) do
+                    local vehicle = Workspace:FindFirstChild("ObjectSelection") and Workspace.ObjectSelection:FindFirstChild(player.Name .. "'s Vehicle")
+                    if vehicle and vehicle:FindFirstChild("VehicleLock") then
+                        vehicle.VehicleLock.Value = "OFF"
+                    end
+                end
+            end)
+        else
+            if unlockLoop then
+                unlockLoop:Disconnect()
+                unlockLoop = nil
+            end
+        end
+    end
+})
+
+-- Güncellenmiş "🚫 Lazerleri Sil" butonu
+CombatBox:AddButton({
+    Text = "🚫 Lazerleri Sil",
+    Func = function()
+        local namesToRemove = {
+            "Lasers",
+            "Lasers Club",
+            "FireTrap",
+            "SpikeSwing",
+            "SpikeTrap"
+        }
+
+        for _, obj in pairs(Workspace.Ignore.WorldObjects:GetChildren()) do
+            if table.find(namesToRemove, obj.Name) then
+                pcall(function()
+                    obj:Destroy()
+                end)
+            end
+        end
+
+        local extraIndexes = {14, 15, 18, 19}
+        local children = Workspace.Ignore.WorldObjects:GetChildren()
+        for _, index in pairs(extraIndexes) do
+            local obj = children[index]
+            if obj and typeof(obj) == "Instance" and obj.Destroy then
+                pcall(function()
+                    obj:Destroy()
+                end)
+            end
+        end
+
+        local laserPaths = {
+            Workspace.Casino.CasinoDoor.SpinLaser1.Parts.Laser1,
+            Workspace.Casino.CasinoDoor.SpinLaser1.Parts.Laser2,
+            Workspace.Casino.CasinoDoor.SpinLaser2.Parts.Laser1,
+            Workspace.Casino.CasinoDoor.SpinLaser2.Parts.Laser2,
+            Workspace.Casino.CasinoDoor.SpinLaser3.Parts.Laser1,
+            Workspace.Casino.CasinoDoor.SpinLaser3.Parts.Laser2,
+            Workspace.Club.SlideLaser.Laser,
+            Workspace.Club.SlideLaser.Pivot,
+            Workspace.ComputerStore.Lasers.Parts.Line,
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[2],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[5],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[6],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[7],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[8],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[9],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[10],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[11],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[12],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[13],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[14],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[15],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[16],
+            Workspace.ComputerStore.Lasers.Parts:GetChildren()[17],
+            Workspace.JewelryStore.JewelryVent.Laser,
+            Workspace.JewelryStore.SlideLaser.Laser,
+            Workspace.JewelryStore.SlideLaser.Pivot,
+            Workspace.JewelryStore.SpinLaser.Parts.Laser1,
+            Workspace.JewelryStore.SpinLaser.Parts.Laser2,
+            Workspace.JewelryStore.SpinLaser2.Parts.Laser1,
+            Workspace.JewelryStore.SpinLaser2.Parts.Laser2,
+            Workspace.JewelryStore.SpinLaser3.Parts.Laser1,
+            Workspace.JewelryStore.SpinLaser3.Parts.Laser2,
+            Workspace.JewelryStore.SpinLaser4.Parts.Laser1,
+            Workspace.JewelryStore.SpinLaser4.Parts.Laser2,
+            Workspace.JewelryStore.SpinLaser5.Parts.Laser1,
+            Workspace.JewelryStore.SpinLaser5.Parts.Laser2,
+            Workspace.JewelryStore.Jewlery.Lasers.Parts.Line,
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[2],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[3],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[4],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[5],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[6],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[7],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[8],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[9],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[13],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[15],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[16],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[17],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[19],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[24],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[26],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[27],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[28],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[31],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[33],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[34],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[36],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[37],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[38],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[39],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[40],
+            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[41],
+        }
+
+        for _, obj in ipairs(laserPaths) do
+            pcall(function()
+                if obj and obj.Destroy then
+                    obj:Destroy()
+                end
+            end)
+        end
+    end
+})
+
 
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 
