@@ -279,7 +279,7 @@ BoostBox:AddButton({
     Text = 'Super Car',
     Func = function()
         local props = {
-            Torque = 7,
+            Torque = 4,
             MaxSpeed = 200,
             TurnSpeed = 1.7,
             DriftVelLerp = 0.45,
@@ -384,7 +384,7 @@ BoostBox:AddToggle('hover_toggle', {
 BoostBox:AddSlider('suspension_slider', {
     Text = "🛞 Süspansiyon",
     Min = 2,
-    Max = 100,
+    Max = 10000,
     Default = 2,
     Rounding = 1,
     Compact = false,
@@ -743,15 +743,6 @@ V4TeamBox:AddToggle("V4TeamToggle", {
 local XPBox = Tabs.Extra:AddLeftGroupbox("💰 Para / XP / Araçlar")
 
 -- 💸 Auto Farm Para
-XPBox:AddButton({
-    Text = "Auto Farm Para",
-    Func = function()
-        getgenv().fps = false
-        getgenv().whitescreen = false
-        getgenv().Arrest = false
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/AdminEvilDRagon/smallAR/refs/heads/main/SmallAR.lua", true))()
-    end
-})
 
 -- 🛂 Keycard Çek
 XPBox:AddButton({
@@ -815,117 +806,6 @@ XPBox:AddButton({
             })
         end
     end
-})
-
-local ServerhopBox = Tabs.System:AddLeftGroupbox("🧩 Sunucu İşlemleri")
-
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-local menuURL = "https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamenü.txt"
-
--- ✅ Rejoin Fonksiyonu
-local function forceRejoin()
-	local tpCode = string.format("loadstring(game:HttpGet('%s'))()", menuURL)
-	if syn and syn.queue_on_teleport then
-		syn.queue_on_teleport(tpCode)
-	elseif queue_on_teleport then
-		queue_on_teleport(tpCode)
-	end
-	TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-end
-
--- 🌐 Server Hop Fonksiyonu
-local function advancedServerHop(mode)
-	local placeId = game.PlaceId
-	local currentJobId = game.JobId
-	local servers = {}
-
-	local function getServers(cursor)
-		local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?limit=100"
-		if cursor then url = url.."&cursor="..cursor end
-
-		local success, result = pcall(function()
-			return HttpService:JSONDecode(game:HttpGet(url))
-		end)
-
-		if success and result and result.data then
-			for _, server in ipairs(result.data) do
-				if server.id ~= currentJobId then
-					local playing = server.playing
-					local max = server.maxPlayers
-					if mode == "boş" and playing < max / 2 then
-						table.insert(servers, server.id)
-					elseif mode == "dolu" and playing >= max / 2 then
-						table.insert(servers, server.id)
-					elseif mode == "herhangi" then
-						table.insert(servers, server.id)
-					end
-				end
-			end
-			if result.nextPageCursor then
-				getServers(result.nextPageCursor)
-			end
-		end
-	end
-
-	getServers()
-
-	if #servers > 0 then
-		local target = servers[math.random(1, #servers)]
-		local tpCode = string.format("loadstring(game:HttpGet('%s'))()", menuURL)
-
-		if syn and syn.queue_on_teleport then
-			syn.queue_on_teleport(tpCode)
-		elseif queue_on_teleport then
-			queue_on_teleport(tpCode)
-		end
-
-		local function tryTeleport()
-			local success, err = pcall(function()
-				TeleportService:TeleportToPlaceInstance(placeId, target, LocalPlayer)
-			end)
-			if not success then
-				warn("❌ Teleport başarısız. Tekrar deneniyor...")
-				task.wait(2)
-				tryTeleport()
-			end
-		end
-
-		tryTeleport()
-	else
-		warn("⚠️ Uygun sunucu bulunamadı.")
-	end
-end
-
-ServerhopBox:AddButton({
-	Text = "🔁 Garantili Rejoin",
-	Func = function()
-		forceRejoin()
-	end
-})
-
-ServerhopBox:AddButton({
-	Text = "🌐 Server Hop (Boş Sunucu)",
-	Func = function()
-		advancedServerHop("boş")
-	end
-})
-
-ServerhopBox:AddButton({
-	Text = "🌐 Server Hop (Dolu Sunucu)",
-	Func = function()
-		advancedServerHop("dolu")
-	end
-})
-
-ServerhopBox:AddButton({
-	Text = "🌐 Server Hop (Rastgele)",
-	Func = function()
-		advancedServerHop("herhangi")
-	end
 })
 
 -- 🔓 Araç Kilit Açma Kutusu
