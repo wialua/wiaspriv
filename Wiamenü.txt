@@ -342,7 +342,7 @@ local SilentAimGroup = SilentAimTab:AddLeftGroupbox("🎯 Oyuncu Seçimi")
 --===[ Ayarlar ]===--
 local maxDistance = 10000
 local blacklistedName = "MAD_CITYAIMBOTLOL"
-local killEffectTime = 1.5
+local killEffectTime = 2.1
 local ESPFolder = Instance.new("Folder", game.CoreGui)
 ESPFolder.Name = "SilentAimEffects"
 
