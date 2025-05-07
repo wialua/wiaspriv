@@ -5,829 +5,576 @@ local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 local Window = Library:CreateWindow({
-    Title = 'Wia Menü | Savaş Sistemi',
+    Title = 'Wia Menü | Beta',
     Center = true,
     AutoShow = true
 })
 
-local Tabs = {
-    Combat = Window:AddTab('🥊 Savaş'),
-     Vehicles = Window:AddTab('🚘 Araçlar'),
-     AutoKill = Window:AddTab("🚀 Auto Kill"),
-     Extra = Window:AddTab("💰 Extra"),
-     System = Window:AddTab("🖥️ Sistem"),
-    ['UI Settings'] = Window:AddTab('UI Settings') 
-}
+local CombatTab = Window:AddTab("⚔️ Combat")
+local SilentAimTab = Window:AddTab("🎯 Silent Aim")
+local VehicleTab = Window:AddTab("🚗 Araç")
 
--- Savaş Grubu
-local CombatBox = Tabs.Combat:AddLeftGroupbox('🎯 Hitbox + ESP')
+-- Combat için ESP Araçları kısmı
+local CombatGroup = CombatTab:AddLeftGroupbox('ESP Araçları')
 
--- Gerekli servisler
-local Players = game:GetService("Players")
-local Teams = game:GetService("Teams")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
-local Event = ReplicatedStorage:WaitForChild("Event")
-local UserInputService = game:GetService("UserInputService")
+-- 🚨 ESP Aç butonu
+CombatGroup:AddButton('ESP Aç', function()
+    local Players = game:GetService("Players")
 
----------------------------
--- 🔴 HITBOX SİSTEMİ
----------------------------
-
-local hitboxEnabled = false
-local hitboxLoop = nil
-local appliedPlayers = {}
-local hitboxSize = 8
-local defaultSize = Vector3.new(2, 1, 1)
-local hitboxColor = BrickColor.Red()
-local hitboxTransparency = 0.6
-
-local function isEnemyTeam(targetTeam)
-    local myTeam = LocalPlayer.Team
-    if not myTeam or not targetTeam then return false end
-
-    local allyMap = {
-        Police = { "Police", "Heroes" },
-        Heroes = { "Police", "Heroes" },
-        Prisoners = { "Prisoners", "Criminals", "Villains" },
-        Criminals = { "Prisoners", "Criminals", "Villains" },
-        Villains = { "Prisoners", "Criminals", "Villains" }
-    }
-
-    local allies = allyMap[myTeam.Name] or {}
-    return not table.find(allies, targetTeam.Name)
-end
-
-local function applyHeadHitbox(player)
-    if not player or not player.Character or not isEnemyTeam(player.Team) then return end
-
-    local head = player.Character:FindFirstChild("Head")
-    if not head or not head:IsA("BasePart") then return end
-    if appliedPlayers[player] == hitboxSize then return end
-
-    head.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-    head.Transparency = hitboxTransparency
-    head.BrickColor = hitboxColor
-    head.CanCollide = false
-    head.Material = Enum.Material.Plastic
-    head.Massless = true
-
-    appliedPlayers[player] = hitboxSize
-end
-
-local function resetHead(player)
-    local head = player.Character and player.Character:FindFirstChild("Head")
-    if head and head:IsA("BasePart") then
-        head.Size = defaultSize
-        head.Transparency = 0
-        head.BrickColor = BrickColor.new("Medium stone grey")
-        head.CanCollide = true
-        head.Material = Enum.Material.Plastic
-    end
-    appliedPlayers[player] = nil
-end
-
-local function startHitboxLoop()
-    if hitboxLoop then hitboxLoop:Disconnect() end
-    hitboxLoop = RunService.Heartbeat:Connect(function()
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                applyHeadHitbox(player)
-            end
-        end
-    end)
-end
-
-local function stopHitboxLoop()
-    if hitboxLoop then hitboxLoop:Disconnect() hitboxLoop = nil end
-    for _, player in ipairs(Players:GetPlayers()) do
-        resetHead(player)
-    end
-end
-
--- Karakter spawn reseti
-local function bindPlayer(player)
-    player.CharacterAdded:Connect(function(char)
-        if not hitboxEnabled then return end
-        for i = 1, 30 do
-            task.wait(0.1)
-            if char:FindFirstChild("Head") then break end
-        end
-        task.wait(0.25)
-        applyHeadHitbox(player)
-    end)
-end
-
-for _, p in ipairs(Players:GetPlayers()) do bindPlayer(p) end
-Players.PlayerAdded:Connect(bindPlayer)
-
--- 🔘 Hitbox Toggle
-CombatBox:AddToggle('HitboxToggle', {
-    Text = '🎯 Head Hitbox',
-    Default = false,
-    Callback = function(state)
-        hitboxEnabled = state
-        if state then startHitboxLoop() else stopHitboxLoop() end
-    end
-})
-
--- 📏 Head Boyutu
-CombatBox:AddSlider('HeadSizeSlider', {
-    Text = 'Head Boyutu',
-    Min = 2,
-    Max = 25,
-    Default = 8,
-    Rounding = 0,
-    Callback = function(val)
-        hitboxSize = val
-        if hitboxEnabled then
-            for _, p in ipairs(Players:GetPlayers()) do
-                appliedPlayers[p] = nil
-            end
-        end
-    end
-})
-
----------------------------
--- 🟢 ESP SİSTEMİ
----------------------------
-
-local function fixNameTag(player)
-    local function apply()
-        local char = player.Character
-        if not char then return end
-        local nameTag = char:FindFirstChild("NameTag")
-        if nameTag then
-            nameTag.AlwaysOnTop = true
-            nameTag.MaxDistance = 10000
-        end
-    end
-
-    if player.Character then apply() end
-
-    player.CharacterAdded:Connect(function(char)
-        char:WaitForChild("NameTag", 10)
-        apply()
-        local nameTag = char:FindFirstChild("NameTag")
-        if nameTag then
-            nameTag:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
+    local function fixNameTag(player)
+        local function apply()
+            local char = player.Character
+            if not char then return end
+            local nameTag = char:FindFirstChild("NameTag")
+            if nameTag then
                 nameTag.AlwaysOnTop = true
-            end)
+                nameTag.MaxDistance = 10000
+            end
         end
-    end)
-end
+        if player.Character then apply() end
+        player.CharacterAdded:Connect(function(char)
+            char:WaitForChild("NameTag", 10)
+            apply()
+            local nameTag = char:FindFirstChild("NameTag")
+            if nameTag then
+                nameTag:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
+                    nameTag.AlwaysOnTop = true
+                end)
+            end
+        end)
+    end
 
-local function disableESP()
-    for _, player in pairs(Players:GetChildren()) do
+    -- Apply the ESP fix to all players currently in the game
+    for _, player in ipairs(Players:GetPlayers()) do
+        fixNameTag(player)
+    end
+
+    -- Apply ESP when new players join the game
+    Players.PlayerAdded:Connect(fixNameTag)
+end)
+
+-- 🚨 ESP Kapat butonu
+CombatGroup:AddButton('ESP Kapat', function()
+    local Players = game:GetService("Players")
+
+    -- Disable the ESP for all players
+    for _, player in pairs(Players:GetPlayers()) do
         local character = player.Character or player.CharacterAdded:Wait()
         local nameTag = character:FindFirstChild("NameTag")
         if nameTag then
             nameTag.AlwaysOnTop = false
-            nameTag.MaxDistance = 10000
+            nameTag.MaxDistance = 200
         end
     end
-end
 
-CombatBox:AddToggle('ESPToggle', {
-    Text = '👀 ESP',
-    Default = false,
-    Callback = function(state)
-        if state then
-            for _, player in ipairs(Players:GetPlayers()) do
-                fixNameTag(player)
-            end
-            Players.PlayerAdded:Connect(fixNameTag)
-        else
-            disableESP()
-        end
-    end
-})
-
----------------------------
--- 🎨 Tema / Config
----------------------------
-
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
-
-ThemeManager:SetFolder('MyScriptHub')
-SaveManager:SetFolder('MyScriptHub/specific-game')
-SaveManager:BuildConfigSection(Tabs['UI Settings'])
-ThemeManager:ApplyToTab(Tabs['UI Settings'])
-SaveManager:LoadAutoloadConfig()
-
--- 🚗 Araç Spawn Kutusu
-local Event = game:GetService("ReplicatedStorage"):WaitForChild("Event")
-local VehicleSpawnBox = Tabs.Vehicles:AddLeftGroupbox('🚗 Araç Spawn')
-
-local selectedVehicle = "Nero"
-
-VehicleSpawnBox:AddDropdown('AraçListesi', {
-    Text = 'Araç Seç',
-    Values = { "Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury" },
-    Default = 1,
-    Callback = function(v)
-        selectedVehicle = v
-    end
-})
-
-VehicleSpawnBox:AddButton({
-    Text = '🚘 Spawnla',
-    Func = function()
-        if selectedVehicle and selectedVehicle ~= "" then
-            Event:FireServer("SpawnVehicle", selectedVehicle)
-        end
-    end
-})
-
-VehicleSpawnBox:AddButton({
-    Text = '⚡ Spawnlanana Bin',
-    Func = function()
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local HRP = char.HumanoidRootPart
-        local btp = Instance.new("Vector3Value", LocalPlayer)
-        btp.Name = "btp"
-        btp.Value = HRP.Position
-
-        HRP.CFrame = Workspace.VehicleSpawns[selectedVehicle].Pos.CFrame
-        task.wait()
-        HRP.CFrame = CFrame.new(btp.Value)
-
-        local vehicle = Workspace.ObjectSelection[selectedVehicle]
-        if vehicle then
-            vehicle.DriveSeat.Disabled = false
-            vehicle:MoveTo(HRP.Position)
-            task.wait()
-            HRP.CFrame = vehicle.DriveSeat.CFrame
-            task.wait()
-            vehicle.DriveSeat.Disabled = true
-        end
-
-        btp:Destroy()
-    end
-})
-
--- ⚙️ Performans Kutusu
-local BoostBox = Tabs.Vehicles:AddRightGroupbox('🛠️ Performans & Boost')
-
-BoostBox:AddButton({
-    Text = 'Super Car',
-    Func = function()
-        local props = {
-            Torque = 4,
-            MaxSpeed = 200,
-            TurnSpeed = 1.7,
-            DriftVelLerp = 0.45,
-            DriftRotLerp = 0.12,
-        }
-
-        for _, v in pairs(getgc(true)) do
-            if type(v) == "table" then
-                for prop, val in pairs(props) do
-                    if rawget(v, prop) ~= nil then
-                        v[prop] = val
-                    end
-                end
-            end
-        end
-
-        local playerVehicle = Workspace.ObjectSelection:FindFirstChild(LocalPlayer.Name.."'s Vehicle")
-        if playerVehicle then
-            pcall(function()
-                local chassis = playerVehicle:FindFirstChild("CarChassis")
-                if chassis then
-                    local boost = chassis:FindFirstChild("Boost")
-                    if boost then
-                        boost.Value = 20
-                    end
-                end
-            end)
-        end
-    end
-})
-
-BoostBox:AddButton({
-    Text = '✈️ Hızlı Dönüş (Uçak)',
-    Func = function()
-        local props = {
-            Acceleration = 1,
-            HorizontalTiltSpeed = 7.3,
-            MissileCooldown = 2,
-            MissileLock = 0,
-            SideTiltSpeed = 1.5,
-            MaxSideTilt = 25,
-        }
-
-        for _, v in pairs(getgc(true)) do
-            if type(v) == "table" then
-                for prop, val in pairs(props) do
-                    if rawget(v, prop) ~= nil then
-                        v[prop] = val
-                    end
-                end
-            end
-        end
-    end
-})
-
-local bombingEnabled = false
-
-BoostBox:AddButton({
-    Text = '💣 G Tuşuna Bombalama Aktif Et',
-    Func = function(btn)
-        if bombingEnabled then
-            game.StarterGui:SetCore("SendNotification", {
-                Title = "Zaten Aktif",
-                Text = "Bu özellik zaten aktif!",
-                Duration = 3
-            })
-            return
-        end
-
-        _G.BombInput = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
-                Event:FireServer("DropBomb")
+    -- Disable ESP for new players that join the game
+    Players.PlayerAdded:Connect(function(player)
+        player.CharacterAdded:Connect(function(character)
+            local nameTag = character:WaitForChild("NameTag", 10)
+            if nameTag then
+                nameTag.AlwaysOnTop = false
+                nameTag.MaxDistance = 200
             end
         end)
+    end)
+end)
 
-        bombingEnabled = true
-        btn:SetText("✅ Bombalama Aktif")
-        btn.Interactable = false
+-- 💥 Shotgun Crash butonu
+local CrashGroup = CombatTab:AddLeftGroupbox('Crash')
 
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "Aktif!",
-            Text = "G tuşuna bombalama etkinleştirildi.",
-            Duration = 4
-        })
-    end
-})
+CrashGroup:AddButton('💥 Shotgun Crash', function()
+    task.spawn(function()
+        pcall(function()
+            local plr = game.Players.LocalPlayer
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-BoostBox:AddToggle('hover_toggle', {
-    Text = '🚀 Hover Modu',
-    Default = false,
-    Callback = function(state)
-        local playerVehicle = Workspace.ObjectSelection:FindFirstChild(LocalPlayer.Name.."'s Vehicle")
-        if playerVehicle then
-            local chassis = playerVehicle:FindFirstChild("CarChassis")
-            if chassis and chassis:FindFirstChild("HoverMode") then
-                chassis.HoverMode.Value = state
+            -- Check if Shotgun is in the player's backpack
+            if not plr.Backpack:FindFirstChild("Shotgun") then
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "Uyarı",
+                    Text = "Shotgun envanterinde ve elinde olmalı!",
+                    Duration = 5
+                })
+                return
             end
-        end
-    end
-})
 
-BoostBox:AddSlider('suspension_slider', {
-    Text = "🛞 Süspansiyon",
-    Min = 2,
-    Max = 10000,
-    Default = 2,
-    Rounding = 1,
-    Compact = false,
+            -- Process when the player has the Shotgun
+            local char = plr.Character
+            if char and char:FindFirstChildOfClass("Humanoid") then
+                -- Event spam for Shotgun (20 times)
+                for i = 1, 20 do
+                    task.wait()
+                    local shotgun = workspace:FindFirstChild("ObjectSelection") and workspace.ObjectSelection:FindFirstChild("Shotgun")
+                    if shotgun and shotgun:FindFirstChild("Shotgun") and shotgun.Shotgun:FindFirstChild("Shotgun") then
+                        shotgun.Shotgun.Shotgun.Event:FireServer()
+                    end
+                end
+
+                -- Equip the Shotgun
+                char.Humanoid:EquipTool(plr.Backpack:FindFirstChild("Shotgun"))
+
+                -- Spam ShootShotgun event 8000 times
+                for i = 1, 8000 do
+                    ReplicatedStorage.Event:FireServer("ShootShotgun", workspace[plr.Name], Vector3.new(0, 0, 0), "Shotgun", "inf", "inf", "inf")
+                end
+
+                -- Send a crash notification to the user
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "💥 C R A S H",
+                    Text = "Sunucu çöktü!",
+                    Duration = 7
+                })
+            end
+        end)
+    end)
+end)
+
+-- 🚗 Sekme adı: Araç
+
+
+-- 🔽 Sol kutu: Araç seç + spawn
+local VehicleSpawnBox = VehicleTab:AddLeftGroupbox("🚘 Araç Spawn")
+local selectedVehicle = "Nero"
+local vehicleList = { "Nero", "Nighthawk", "Fury", "Rhino", "Warhawk", "Light Bike", "Buzzard" }
+
+VehicleSpawnBox:AddDropdown("VehicleDropdown", {
+    Values = vehicleList,
+    Default = 1,
+    Text = "Araç Seç",
+    Tooltip = "Spawnlamak istediğin aracı seç.",
     Callback = function(value)
-        local playerVehicle = Workspace.ObjectSelection:FindFirstChild(LocalPlayer.Name.."'s Vehicle")
-        if playerVehicle then
+        selectedVehicle = value
+    end
+})
+
+VehicleSpawnBox:AddButton("🚀 Aracı Spawnla", function()
+    if selectedVehicle and selectedVehicle ~= "" then
+        game:GetService("ReplicatedStorage").Event:FireServer("SpawnVehicle", selectedVehicle)
+        print("Spawnlandı:", selectedVehicle)
+    end
+end)
+
+-- 🛠️ Sağ kutu: Modifiye butonları
+local VehicleModBox = VehicleTab:AddRightGroupbox("🛠️ Araç Modifiye")
+
+-- Ortak fonksiyon: tüm araçlara uygulama
+local function applyPropertiesToAll(propertyTable)
+    for _, obj in pairs(getgc(true)) do
+        if type(obj) == "table" then
+            for property, value in pairs(propertyTable) do
+                if rawget(obj, property) then
+                    obj[property] = value
+                end
+            end
+        end
+    end
+end
+
+-- 🔧 Araba
+VehicleModBox:AddButton("🚀 Araba Modifiye Et", function()
+    local carProperties = {
+        Torque = 5,
+        BrakeForce = 4,
+        MaxSpeed = 400,
+        TurnSpeed = 1.7,
+        DriftVelLerp = 0.45,
+        DriftRotLerp = 0.12,
+    }
+    applyPropertiesToAll(carProperties)
+
+    -- Boost
+    local playerVehicle = workspace.ObjectSelection:FindFirstChild(game.Players.LocalPlayer.Name.."'s Vehicle")
+    if playerVehicle then
+        pcall(function()
             local chassis = playerVehicle:FindFirstChild("CarChassis")
-            if chassis and chassis:FindFirstChild("Suspension") then
-                chassis.Suspension.Value = value
+            if chassis then
+                local boost = chassis:FindFirstChild("Boost")
+                if boost then boost.Value = 20 end
             end
-        end
+        end)
     end
-})
+end)
 
+-- 🚁 Helikopter
+VehicleModBox:AddButton("🚁 Helikopter Modifiye Et", function()
+    local props = {
+        Acceleration = 3,
+        Deceleration = 1,
+        SpeedDecay = 0.95,
+        BrakeForce = 15,
+        DescentSpeed = 2,
+        MaxVerticalTiltAngle = 25,
+        VerticalTiltSpeed = 0.3,
+        HorizontalRotationSpeed = 8.5,
+        ResponseSpeed = 1,
+        MaxSideTilt = 20,
+        MinHeightAboveGround = 5,
+        MissileCooldown = 2,
+        MissileLock = 0,
+    }
+    applyPropertiesToAll(props)
+end)
 
--- 💻 Özel Araç Hileleri Kutusu
-local CheatBox = Tabs.Vehicles:AddRightGroupbox('💻 Araç Hileleri')
+-- 🛸 UFO
+VehicleModBox:AddButton("🛸 UFO Modifiye Et", function()
+    local props = {
+        Acceleration = 10,
+        Deceleration = 1,
+        SpeedDecay = 0.95,
+        BrakeForce = 15,
+        MaxAltitude = 640,
+        AscentSpeed = 2,
+        DescentSpeed = 3,
+        MaxVerticalTiltAngle = 25,
+        VerticalTiltSpeed = 0.3,
+        HorizontalRotationSpeed = 8.5,
+        ResponseSpeed = 1,
+        HideCharacter = true,
+        MaxSideTilt = 20,
+        MinHeightAboveGround = 5,
+        CameraOffset = 40
+    }
+    applyPropertiesToAll(props)
+end)
 
-CheatBox:AddButton({
-    Text = '🌊 Suda Araç Sür',
-    Func = function()
-        for _, v in pairs(Workspace.Water:GetChildren()) do
-            v.CanCollide = true
-            v.Anchored = true
-            v.Material = "Ice"
-            v:Clone().Parent = v.Parent
-            v:Destroy()
+-- 🚤 Tekne
+VehicleModBox:AddButton("🚤 Tekne Modifiye Et", function()
+    local props = {
+        Height = 1,
+        TurnSpeed = 5.7,
+        Torque = 5,
+        MaxSpeed = 160,
+        BrakeForce = 1,
+        SpeedDecay = 0.5,
+    }
+    applyPropertiesToAll(props)
+end)
+
+-- ✈️ Uçak
+VehicleModBox:AddButton("✈️ Uçak Modifiye Et", function()
+    local props = {
+        MaxSpeed = 270,
+        Acceleration = 2,
+        Bombs = true,
+        DampeningAcceleration = 0.8,
+        MaxVerticalTilt = 10,
+        VerticalTiltUpSpeed = 1,
+        VerticalTiltDownSpeed = 1,
+        VerticalTiltDampening = 0.95,
+        VerticalSpeedLimit = 30,
+        HorizontalTiltSpeed = 7.4,
+        MaxSideTilt = 25,
+        SideTiltSpeed = 1.5,
+        SideTiltDampening = 0.95,
+        MissileTargetRange = 540,
+        MissileCooldown = 2,
+        MissileLock = 0
+    }
+    applyPropertiesToAll(props)
+end)
+
+-- 💣 Sonsuz Bombalama
+local bombLoopStarted = false
+
+VehicleSpawnBox:AddButton("💣 Sonsuz Bombalama", function()
+    if bombLoopStarted then return end -- Bir kez çalıştırılır
+    bombLoopStarted = true
+
+    local Remote = game.ReplicatedStorage:WaitForChild("Event")
+    local UserInputService = game:GetService("UserInputService")
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+            Remote:FireServer("DropBomb")
         end
-        for _, v in pairs(Workspace:GetDescendants()) do
-            if v.Name == "Ocean" then v.Name = "NotWater" end
-        end
-        local newfolder = Instance.new("Folder")
-        newfolder.Name = "Water"
-        newfolder.Parent = Workspace
-        task.wait(0.1)
-        Workspace.Water.Name = "NotWaterBruh"
-    end
-})
+    end)
 
-CheatBox:AddToggle('StealthToggle', {
-    Text = '🕶️ Sonsuz Stealth (Night)',
-    Default = false,
-    Callback = function(state)
-        if state then
-            _G.StealthLoop = RunService.RenderStepped:Connect(function()
-                pcall(function()
-                    Event:FireServer("StealthMode", true)
-                end)
-            end)
-        else
-            pcall(function()
-                Event:FireServer("StealthMode", false)
-                task.wait(0.2)
-                Event:FireServer("StealthMode", false)
-            end)
-            if _G.StealthLoop then
-                _G.StealthLoop:Disconnect()
-                _G.StealthLoop = nil
-            end
-        end
-    end
-})
+    print("💣 Sonsuz bombalama aktif. G tuşuna basınca bomba bırakılacak.")
+end)
 
--- 📦 Servisler
-local TeamsService = game:GetService("Teams")
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LocalPlayer = Players.LocalPlayer
-local Event = ReplicatedStorage:WaitForChild("Event")
+-- ✅ Yeni işlev: Text mesajı ekleme
+local function showMessageFor5Seconds(message)
+    -- Create a text label
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Text = message
+    textLabel.FontSize = Enum.FontSize.Size24
+    textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Position = UDim2.new(0.5, -150, 0.9, -30) -- Position it near the bottom of the screen
+    textLabel.Size = UDim2.new(0, 300, 0, 50)
+    textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+    textLabel.Parent = game.CoreGui
 
--- 🛡️ Kara Liste
-local blacklist = {
-	["MAD_CITYAIMBOTLOL"] = true
-}
+    -- Animate the label fading out after 5 seconds
+    game:GetService("TweenService"):Create(textLabel, TweenInfo.new(5), {TextTransparency = 1}):Play()
 
--- 📦 Grup Kutusu: Auto Kill V1 (Takım Bazlı)
-local AutoKillTeamV1Box = Tabs.AutoKill:AddRightGroupbox("📍 Auto Kill V1 (Takım Bazlı)")
-
--- 🔁 Toggle Oluşturucu
-local function createAutoKillV1Toggle(teamName)
-	local team = TeamsService:FindFirstChild(teamName)
-	if not team then return end
-
-	local isActive = false
-	local killThread = nil
-
-	AutoKillTeamV1Box:AddToggle("AutoKillV1_" .. teamName, {
-		Text = teamName,
-		Default = false,
-		Callback = function(state)
-			isActive = state
-
-			if state then
-				if killThread then return end
-				killThread = task.spawn(function()
-					while isActive do
-						for _, player in ipairs(team:GetPlayers()) do
-							if player ~= LocalPlayer and player.Character and not blacklist[player.Name] then
-								for _, part in ipairs(player.Character:GetDescendants()) do
-									if part:IsA("BasePart") then
-										Event:FireServer("BM", part.Position)
-									end
-								end
-							end
-						end
-						task.wait()
-					end
-				end)
-			else
-				if killThread then
-					pcall(function()
-						task.cancel(killThread)
-					end)
-					killThread = nil
-				end
-			end
-		end
-	})
+    -- Remove the label after 5 seconds
+    wait(5)
+    textLabel:Destroy()
 end
 
--- 🔁 Her takım için toggle oluştur
-for _, team in ipairs({ "Prisoners", "Police", "Criminals", "Heroes", "Villains" }) do
-	createAutoKillV1Toggle(team)
-end
+-- 🚨 Hooking wait function on button click and show the message
+local buttonClicked = false
+VehicleSpawnBox:AddButton("🔥Sınırsız Tank Ateşleme🔥", function()
+    if buttonClicked then
+        print("Already clicked!")
+        return
+    end
 
--- 📦 Gerekli Tanımlar
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
-local Event = ReplicatedStorage:WaitForChild("Event")
+    local old
+    old = hookfunction(wait, function(time)
+        if time == 6.5 then
+            return old(0)
+        end
+        return old(time)
+    end)
 
--- 🎯 Auto Kill Sekmesine kutu ekle
-local AutoKillPlayerBox = Tabs.AutoKill:AddLeftGroupbox("🎯 Oyuncuya Özel Auto Kill")
+    buttonClicked = true
 
--- 🔁 Değişkenler
-local selectedPlayerName = ""
-local killThread = nil
+    -- Show a message for 5 seconds after button click
+    showMessageFor5Seconds("Wait function has been hooked!")
 
-local blacklist = {
-    ["MAD_CITYAIMBOTLOL"] = true
-}
+end)
 
--- 🔄 Oyuncu Listesi
-local function getUpdatedPlayerList()
+-- Silent Aim sekmesinde dropdown oluşturulması
+local SilentAimGroup = SilentAimTab:AddLeftGroupbox("🎯 Oyuncu Seçimi")
+
+--===[ Ayarlar ]===--
+local maxDistance = 10000
+local blacklistedName = "MAD_CITYAIMBOTLOL"
+local killEffectTime = 1.5
+local ESPFolder = Instance.new("Folder", game.CoreGui)
+ESPFolder.Name = "SilentAimEffects"
+
+local selectedPlayer = nil
+local toggleActive = false
+
+--===[ Yardımcı Fonksiyonlar ]===--
+local function getPlayerNames()
     local list = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer then
             table.insert(list, player.Name)
         end
     end
     return list
 end
 
--- 🎯 Dropdown
-local playerDropdown = AutoKillPlayerBox:AddDropdown("TargetPlayerDropdown", {
-    Text = "Hedef Oyuncu",
-    Values = getUpdatedPlayerList(),
-    Default = 1,
-    Callback = function(playerName)
-        if blacklist[playerName] then
-            game.StarterGui:SetCore("SendNotification", {
-                Title = "❌ Kara Listede",
-                Text = playerName .. " BM'den muaf!",
-                Duration = 4
-            })
-            selectedPlayerName = ""
-        else
-            selectedPlayerName = playerName
-            print("[AutoKill] Seçilen hedef:", selectedPlayerName)
+local function createBillboard(player)
+    if ESPFolder:FindFirstChild(player.Name) then return end
+    local char = player.Character
+    if not char or not char:FindFirstChild("Head") then return end
+
+    local billboard = Instance.new("BillboardGui", ESPFolder)
+    billboard.Name = player.Name
+    billboard.Adornee = char:FindFirstChild("Head")
+    billboard.Size = UDim2.new(0, 120, 0, 100)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true
+
+    local frame = Instance.new("Frame", billboard)
+    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1, 0, 1, 0)
+
+    local avatar = Instance.new("ImageLabel", frame)
+    avatar.Size = UDim2.new(1, 0, 1, 0)
+    avatar.BackgroundTransparency = 1
+    avatar.Image = string.format("https://www.roblox.com/headshot-thumbnail/image?userId=%s&width=420&height=420&format=png", player.UserId)
+
+    local healthBar = Instance.new("Frame", frame)
+    healthBar.BackgroundColor3 = Color3.new(0, 1, 0)
+    healthBar.BorderSizePixel = 0
+    healthBar.Position = UDim2.new(0, 0, 1, -4)
+    healthBar.Size = UDim2.new(1, 0, 0, 4)
+    healthBar.Name = "HealthBar"
+
+    local outline = Instance.new("UIStroke", avatar)
+    outline.Thickness = 2
+    outline.Color = player.Team and player.Team.TeamColor.Color or Color3.new(1, 1, 1)
+    outline.Transparency = 0.25
+
+    task.spawn(function()
+        while toggleActive and billboard and player.Character and player.Character:FindFirstChild("Humanoid") do
+            local hp = player.Character.Humanoid.Health
+            local max = player.Character.Humanoid.MaxHealth
+            healthBar.Size = UDim2.new(hp/max, 0, 0, 4)
+            task.wait(0.2)
         end
-    end
-})
-
--- ✅ Hedef oyuncu değerini doğrudan dropdown'dan çek (ilk başta seçilmezse diye)
-selectedPlayerName = Options.TargetPlayerDropdown.Value or getUpdatedPlayerList()[1] or ""
-
--- 🔁 Oyuncular eklenirse listeleri güncelle
-local function refreshDropdown()
-    playerDropdown:UpdateValues(getUpdatedPlayerList())
-end
-Players.PlayerAdded:Connect(refreshDropdown)
-Players.PlayerRemoving:Connect(refreshDropdown)
-
--- 💥 BM Atıcı Fonksiyon
-local function fireFullBMOnce(player)
-    if not player or not player.Character then return end
-    for _, part in ipairs(player.Character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            Event:FireServer("BM", part.Position)
-        end
-    end
-end
-
--- 🔁 Auto Kill Loop
-local function startTrueKill()
-    if killThread then return end
-    print("[AutoKill] Başlatıldı.")
-    killThread = RunService.Heartbeat:Connect(function()
-        local target = Players:FindFirstChild(selectedPlayerName)
-        if target and not blacklist[selectedPlayerName] then
-            fireFullBMOnce(target)
-        end
+        if billboard then billboard:Destroy() end
     end)
 end
 
-local function stopTrueKill()
-    if killThread then
-        print("[AutoKill] Durduruldu.")
-        killThread:Disconnect()
-        killThread = nil
-    end
+local function killEffect(position)
+    local part = Instance.new("Part", workspace)
+    part.Anchored = true
+    part.CanCollide = false
+    part.Position = position
+    part.Size = Vector3.new(1, 1, 1)
+    part.Material = Enum.Material.Neon
+    part.Color = Color3.fromRGB(255, 0, 0)
+    part.Transparency = 0
+    part.Shape = Enum.PartType.Ball
+
+    game:GetService("TweenService"):Create(part, TweenInfo.new(killEffectTime), {Size = Vector3.new(5,5,5), Transparency = 1}):Play()
+    game.Debris:AddItem(part, killEffectTime)
 end
 
--- 🔘 Toggle
-AutoKillPlayerBox:AddToggle("AutoKillToggle", {
-    Text = "Auto Kill Aktif",
+local function createWarning(msg)
+    local screenGui = Instance.new("ScreenGui", game.CoreGui)
+    screenGui.Name = "BlacklistWarning"
+
+    local frame = Instance.new("Frame", screenGui)
+    frame.AnchorPoint = Vector2.new(0.5, 0.5)
+    frame.Position = UDim2.new(0.5, 0, 0.3, 0)
+    frame.Size = UDim2.new(0, 400, 0, 100)
+    frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    frame.BackgroundTransparency = 0.2
+    frame.BorderSizePixel = 0
+
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = Color3.fromRGB(255, 0, 0)
+    stroke.Thickness = 3
+
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 0, 0)
+    label.TextStrokeTransparency = 0
+    label.TextScaled = true
+    label.Text = msg
+    label.Font = Enum.Font.GothamBold
+
+    task.delay(3, function()
+        screenGui:Destroy()
+    end)
+end
+
+--===[ UI: Dropdown ve Toggle ]===--
+SilentAimGroup:AddDropdown("PlayerListDropdown", {
+    Values = getPlayerNames(),
+    Default = 1,
+    Text = "Oyuncu Seç",
+    Tooltip = "Silent Aim için hedef oyuncuyu seç.",
+    Callback = function(value)
+        if value == blacklistedName then
+            createWarning("BU OYUNCUYA SİLENT AİM KULLANAMAZSIN!")
+            selectedPlayer = nil
+        else
+            selectedPlayer = game.Players:FindFirstChild(value)
+            if toggleActive and selectedPlayer then
+                createBillboard(selectedPlayer)
+            end
+        end
+    end
+})
+
+SilentAimGroup:AddToggle("EnableSilentAim", {
+    Text = "Silent Aim Açık/Kapalı",
     Default = false,
     Callback = function(state)
-        if state then
-            if selectedPlayerName == "" then
-                warn("[AutoKill] Hedef seçilmemiş.")
-            else
-                startTrueKill()
+        toggleActive = state
+        if not state then
+            for _, v in pairs(ESPFolder:GetChildren()) do
+                v:Destroy()
             end
-        else
-            stopTrueKill()
+        elseif selectedPlayer then
+            createBillboard(selectedPlayer)
         end
     end
 })
 
--- 🔥 FPS Siken Auto Kill V4 (Oyuncu + Takım)
+--===[ Mouse Sol Tıklama Olayı ]===--
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+    if not toggleActive or not selectedPlayer then return end
+
+    local char = selectedPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    local distance = (char.HumanoidRootPart.Position - game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+    if distance <= maxDistance then
+        game:GetService("ReplicatedStorage").Event:FireServer("VR", char.HumanoidRootPart)
+        killEffect(char.HumanoidRootPart.Position)
+    end
+end)
+
+--===[ Oyuncu Listesi Güncel Kalmalı ]===--
+game.Players.PlayerAdded:Connect(function()
+    SilentAimGroup:UpdateDropdown("PlayerListDropdown", {
+        Values = getPlayerNames(),
+    })
+end)
+
+game.Players.PlayerRemoving:Connect(function()
+    SilentAimGroup:UpdateDropdown("PlayerListDropdown", {
+        Values = getPlayerNames(),
+    })
+end)
 
 
+-- Sağ tarafta Silent Aim için Toggle ve Dropdown
+local SilentAimRightGroup = SilentAimTab:AddRightGroupbox("🎯 Silent Aim Sağ Taraf")
 
--- 📦 Extra Sekmesi: Para / XP / Araçlar
-local XPBox = Tabs.Extra:AddLeftGroupbox("💰 Para / XP / Araçlar")
-
--- 💸 Auto Farm Para
-
--- 🛂 Keycard Çek
-XPBox:AddButton({
-    Text = "Keycard Çek",
-    Func = function()
-        for i = 1, 50 do
-            for _, v in pairs(Players:GetChildren()) do
-                local args = {
-                    [1] = "Pickpocket",
-                    [2] = v
-                }
-                Event:FireServer(unpack(args))
-            end
-        end
+-- Sağ tarafta Dropdown ekle
+SilentAimRightGroup:AddDropdown("PlayerListDropdownRight", {
+    Values = getPlayerNames(),
+    Default = 1,
+    Text = "Hedef Oyuncu Seç",
+    Tooltip = "Sağ Tarafta Silent Aim için hedef oyuncuyu seç.",
+    Callback = function(value)
+        selectedPlayer = game.Players:FindFirstChild(value) -- Seçilen oyuncuyu bul
+        print("Seçilen oyuncu: " .. value)
     end
 })
 
--- ⚡ XP Scripti
-XPBox:AddButton({
-    Text = "XP Scripti",
-    Func = function()
-        ReplicatedStorage.RemoteFunction:InvokeServer("SetTeam", "Police")
-        task.wait(0.5)
-        for _, v in pairs(LocalPlayer.Backpack:GetChildren()) do
-            if v.Name == "Handcuffs" then
-                v.Parent = LocalPlayer.Character
-            end
-        end
-        for i = 1, 1000 do  
-            RunService.RenderStepped:Connect(function()
-                Event:FireServer("Eject", LocalPlayer)
-            end)
-        end
-    end
-})
-
--- 💥 Server Crash
-XPBox:AddButton({
-    Text = "💥 Server Crash",
-    Func = function()
-        local plr = LocalPlayer
-        if plr.Backpack:FindFirstChild("Shotgun") == nil then
-            game.StarterGui:SetCore("SendNotification",{     
-                Title = "Uyarı",     
-                Text = "Shotgun envanterinde ve elinde olmalı!",
-                Duration = 5
-            })
-        else
-            local char = plr.Character
-            for i = 1, 20 do task.wait()
-                workspace.ObjectSelection.Shotgun.Shotgun.Shotgun.Event:FireServer()
-            end
-            char.Humanoid:EquipTool(plr.Backpack.Shotgun)
-            for i = 1, 8000 do
-                ReplicatedStorage.Event:FireServer("ShootShotgun", workspace[plr.Name], Vector3.new(0, 0, 0), "Shotgun", "inf", "inf", "inf")
-            end
-            game.StarterGui:SetCore("SendNotification",{     
-                Title = "C R A S H",     
-                Text = "Sunucu çöktü!",
-                Duration = 7 
-            })
-        end
-    end
-})
-
--- 🔓 Araç Kilit Açma Kutusu
-local VehicleLockBox = Tabs.Vehicles:AddLeftGroupbox("🔓 Araç Kilitleri")
-
-local unlockLoop
-
-VehicleLockBox:AddToggle('UnlockAllVehiclesToggle', {
-    Text = 'Herkesin Araç Kilidini OFF Yap',
+-- Sağ tarafta Silent Aim Toggle
+SilentAimRightGroup:AddToggle("EnableSilentAimRight", {
+    Text = "Silent Aim (Sağ Taraf)",
     Default = false,
-    Callback = function(state)
-        if state then
-            unlockLoop = RunService.Heartbeat:Connect(function()
-                for _, player in ipairs(Players:GetPlayers()) do
-                    local vehicle = Workspace:FindFirstChild("ObjectSelection") and Workspace.ObjectSelection:FindFirstChild(player.Name .. "'s Vehicle")
-                    if vehicle and vehicle:FindFirstChild("VehicleLock") then
-                        vehicle.VehicleLock.Value = "OFF"
+    Callback = function(value)
+        -- Toggle aktifse, F tuşuna basıldığında işlemi gerçekleştireceğiz
+        if value then
+            game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end  -- Eğer oyun tarafından işleniyorsa, geç
+
+                -- F tuşuna basıldığında
+                if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.F then
+                    -- Seçilen oyuncu var mı kontrol et
+                    if selectedPlayer then
+                        -- Seçilen oyuncunun karakteri
+                        local targetCharacter = selectedPlayer.Character
+                        if targetCharacter then
+                            local humanoidRootPart = targetCharacter:FindFirstChild("HumanoidRootPart")
+                            if humanoidRootPart then
+                                -- Canlı konumu al
+                                local playerPosition = humanoidRootPart.CFrame.Position
+
+                                -- ShootTank event'ini tetikle
+                                local args1 = {
+                                    [1] = "ShootTank",
+                                    [2] = workspace:WaitForChild("Emiraganz"),
+                                    [3] = workspace:WaitForChild("ObjectSelection"):WaitForChild("Emiraganz's Vehicle"):WaitForChild("Body"),
+                                    [4] = playerPosition
+                                }
+                                game:GetService("ReplicatedStorage").Event:FireServer(unpack(args1))
+
+                                -- TA event'ini tetikle
+                                local args2 = {
+                                    [1] = "TA",
+                                    [2] = playerPosition
+                                }
+                                game:GetService("ReplicatedStorage"):WaitForChild("Event"):FireServer(unpack(args2))
+
+                                print("ShootTank ve TA event'leri tetiklendi: " .. selectedPlayer.Name)
+                            else
+                                print("Seçilen oyuncunun HumanoidRootPart'ı bulunamadı.")
+                            end
+                        else
+                            print("Seçilen oyuncunun karakteri yok.")
+                        end
                     end
                 end
             end)
-        else
-            if unlockLoop then
-                unlockLoop:Disconnect()
-                unlockLoop = nil
-            end
         end
     end
 })
-
--- Güncellenmiş "🚫 Lazerleri Sil" butonu
-CombatBox:AddButton({
-    Text = "🚫 Lazerleri Sil",
-    Func = function()
-        local namesToRemove = {
-            "Lasers",
-            "Lasers Club",
-            "FireTrap",
-            "SpikeSwing",
-            "SpikeTrap"
-        }
-
-        for _, obj in pairs(Workspace.Ignore.WorldObjects:GetChildren()) do
-            if table.find(namesToRemove, obj.Name) then
-                pcall(function()
-                    obj:Destroy()
-                end)
-            end
-        end
-
-        local extraIndexes = {14, 15, 18, 19}
-        local children = Workspace.Ignore.WorldObjects:GetChildren()
-        for _, index in pairs(extraIndexes) do
-            local obj = children[index]
-            if obj and typeof(obj) == "Instance" and obj.Destroy then
-                pcall(function()
-                    obj:Destroy()
-                end)
-            end
-        end
-
-        local laserPaths = {
-            Workspace.Casino.CasinoDoor.SpinLaser1.Parts.Laser1,
-            Workspace.Casino.CasinoDoor.SpinLaser1.Parts.Laser2,
-            Workspace.Casino.CasinoDoor.SpinLaser2.Parts.Laser1,
-            Workspace.Casino.CasinoDoor.SpinLaser2.Parts.Laser2,
-            Workspace.Casino.CasinoDoor.SpinLaser3.Parts.Laser1,
-            Workspace.Casino.CasinoDoor.SpinLaser3.Parts.Laser2,
-            Workspace.Club.SlideLaser.Laser,
-            Workspace.Club.SlideLaser.Pivot,
-            Workspace.ComputerStore.Lasers.Parts.Line,
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[2],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[5],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[6],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[7],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[8],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[9],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[10],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[11],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[12],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[13],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[14],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[15],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[16],
-            Workspace.ComputerStore.Lasers.Parts:GetChildren()[17],
-            Workspace.JewelryStore.JewelryVent.Laser,
-            Workspace.JewelryStore.SlideLaser.Laser,
-            Workspace.JewelryStore.SlideLaser.Pivot,
-            Workspace.JewelryStore.SpinLaser.Parts.Laser1,
-            Workspace.JewelryStore.SpinLaser.Parts.Laser2,
-            Workspace.JewelryStore.SpinLaser2.Parts.Laser1,
-            Workspace.JewelryStore.SpinLaser2.Parts.Laser2,
-            Workspace.JewelryStore.SpinLaser3.Parts.Laser1,
-            Workspace.JewelryStore.SpinLaser3.Parts.Laser2,
-            Workspace.JewelryStore.SpinLaser4.Parts.Laser1,
-            Workspace.JewelryStore.SpinLaser4.Parts.Laser2,
-            Workspace.JewelryStore.SpinLaser5.Parts.Laser1,
-            Workspace.JewelryStore.SpinLaser5.Parts.Laser2,
-            Workspace.JewelryStore.Jewlery.Lasers.Parts.Line,
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[2],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[3],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[4],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[5],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[6],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[7],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[8],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[9],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[13],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[15],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[16],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[17],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[19],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[24],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[26],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[27],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[28],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[31],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[33],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[34],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[36],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[37],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[38],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[39],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[40],
-            Workspace.JewelryStore.Jewlery.Lasers.Parts:GetChildren()[41],
-        }
-
-        for _, obj in ipairs(laserPaths) do
-            pcall(function()
-                if obj and obj.Destroy then
-                    obj:Destroy()
-                end
-            end)
-        end
-    end
-})
-
-
-local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
-
--- I set NoUI so it does not show up in the keybinds menu
-MenuGroup:AddButton('Menüyü yok et', function() Library:Unload() end)
-MenuGroup:AddLabel('Menü Tuşu'):AddKeyPicker('MenuKeybind', { Default = 'F4', NoUI = true, Text = 'Menu keybind' })
-
-Library.ToggleKeybind = Options.MenuKeybind -- Allows you to have a custom keybind for the menu
