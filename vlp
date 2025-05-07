@@ -1,1 +1,33 @@
 loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt"))()
+
+task.spawn(function()
+    local lighting = game:GetService("Lighting")
+    local terrain = game:GetService("Workspace").Terrain
+
+    lighting.Ambient = Color3.fromRGB(128, 128, 128)
+    lighting.Brightness = 2
+    lighting.ColorShift_Bottom = Color3.fromRGB(255, 255, 255)
+    lighting.ColorShift_Top = Color3.fromRGB(255, 255, 255)
+    lighting.EnvironmentDiffuseScale = 0
+    lighting.EnvironmentSpecularScale = 0
+    lighting.GlobalShadows = false
+    lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    lighting.ShadowSoftness = 0
+    lighting.Technology = Enum.Technology.Legacy
+    lighting.ClockTime = 14
+    lighting.GeographicLatitude = 0
+    lighting.ExposureCompensation = 0
+    lighting.FogEnabled = false
+    lighting.FogColor = Color3.fromRGB(255, 255, 255)
+    lighting.FogStart = 0
+    lighting.FogEnd = 100
+
+    terrain.WaterReflectance = 0
+    terrain.WaterTransparency = 0
+    terrain.WaterWaveSize = 0
+    terrain.WaterWaveSpeed = 0
+    terrain.EnableFluidForces = false
+    terrain.CanCollide = false
+    terrain.CanQuery = false
+    terrain.CanTouch = false
+end)
