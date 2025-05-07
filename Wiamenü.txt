@@ -339,10 +339,9 @@ end)
 -- Silent Aim sekmesinde dropdown oluşturulması
 local SilentAimGroup = SilentAimTab:AddLeftGroupbox("🎯 Oyuncu Seçimi")
 
---===[ Ayarlar ]===--
 local maxDistance = 10000
 local blacklistedName = "MAD_CITYAIMBOTLOL"
-local killEffectTime = 2.1
+local killEffectTime = 1.5
 local ESPFolder = Instance.new("Folder", game.CoreGui)
 ESPFolder.Name = "SilentAimEffects"
 
@@ -405,18 +404,21 @@ local function createBillboard(player)
 end
 
 local function killEffect(position)
-    local part = Instance.new("Part", workspace)
-    part.Anchored = true
-    part.CanCollide = false
-    part.Position = position
-    part.Size = Vector3.new(1, 1, 1)
-    part.Material = Enum.Material.Neon
-    part.Color = Color3.fromRGB(255, 0, 0)
-    part.Transparency = 0
-    part.Shape = Enum.PartType.Ball
-
-    game:GetService("TweenService"):Create(part, TweenInfo.new(killEffectTime), {Size = Vector3.new(5,5,5), Transparency = 1}):Play()
-    game.Debris:AddItem(part, killEffectTime)
+    -- Kan patlaması efekti oluşturma
+    local bloodExplosion = Instance.new("ParticleEmitter", workspace)
+    bloodExplosion.Position = position
+    bloodExplosion.Lifetime = NumberRange.new(0.5, 1)
+    bloodExplosion.Rate = 100
+    bloodExplosion.Speed = NumberRange.new(50, 100)
+    bloodExplosion.Size = NumberSequence.new(0.5, 2)
+    bloodExplosion.Texture = "http://www.robloxlabs.com/assets/images/particles/blood.png"
+    bloodExplosion.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+    bloodExplosion.Acceleration = Vector3.new(0, -10, 0)
+    
+    -- 5 saniye sonra kan patlaması efekti ve avatarın kaybolmasını temizle
+    task.delay(5, function()
+        bloodExplosion:Destroy()
+    end)
 end
 
 local function createWarning(msg)
@@ -495,6 +497,16 @@ game:GetService("UserInputService").InputBegan:Connect(function(input, gameProce
     if distance <= maxDistance then
         game:GetService("ReplicatedStorage").Event:FireServer("VR", char.HumanoidRootPart)
         killEffect(char.HumanoidRootPart.Position)
+
+        -- Avatarın tamamen kaybolması işlemi
+        if char:FindFirstChild("Head") then
+            char:Destroy()  -- Avatarı tamamen yok et
+        end
+
+        -- Kan patlaması 5 saniye sürecek
+        task.delay(5, function()
+            -- Avatar yeniden geri gelebilir, istenirse yeni bir avatar yüklenecek
+        end)
     end
 end)
 
