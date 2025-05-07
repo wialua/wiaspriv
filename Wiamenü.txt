@@ -13,6 +13,7 @@ local Window = Library:CreateWindow({
 local CombatTab = Window:AddTab("⚔️ Combat")
 local SilentAimTab = Window:AddTab("🎯 Silent Aim")
 local VehicleTab = Window:AddTab("🚗 Araç")
+local ServerTab = Window:AddTab("Server")
 
 -- Combat için ESP Araçları kısmı
 local CombatGroup = CombatTab:AddLeftGroupbox('ESP Araçları')
@@ -339,9 +340,11 @@ end)
 -- Silent Aim sekmesinde dropdown oluşturulması
 local SilentAimGroup = SilentAimTab:AddLeftGroupbox("🎯 Oyuncu Seçimi")
 
+--===[ Ayarlar ve Başlangıç ]===--
+local SilentAimGroup = SilentAimTab:AddLeftGroupbox("🎯 Oyuncu Seçimi")
+
 local maxDistance = 10000
 local blacklistedName = "MAD_CITYAIMBOTLOL"
-local killEffectTime = 1.5
 local ESPFolder = Instance.new("Folder", game.CoreGui)
 ESPFolder.Name = "SilentAimEffects"
 
@@ -367,18 +370,20 @@ local function createBillboard(player)
     local billboard = Instance.new("BillboardGui", ESPFolder)
     billboard.Name = player.Name
     billboard.Adornee = char:FindFirstChild("Head")
-    billboard.Size = UDim2.new(0, 120, 0, 100)
+    billboard.Size = UDim2.new(0, 60, 0, 60)
     billboard.StudsOffset = Vector3.new(0, 2, 0)
     billboard.AlwaysOnTop = true
 
     local frame = Instance.new("Frame", billboard)
     frame.BackgroundTransparency = 1
     frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.ClipsDescendants = true
 
     local avatar = Instance.new("ImageLabel", frame)
     avatar.Size = UDim2.new(1, 0, 1, 0)
     avatar.BackgroundTransparency = 1
-    avatar.Image = string.format("https://www.roblox.com/headshot-thumbnail/image?userId=%s&width=420&height=420&format=png", player.UserId)
+    avatar.Image = string.format("https://www.roblox.com/headshot-thumbnail/image?userId=%s&width=150&height=150&format=png", player.UserId)
+    avatar.ScaleType = Enum.ScaleType.Fit
 
     local healthBar = Instance.new("Frame", frame)
     healthBar.BackgroundColor3 = Color3.new(0, 1, 0)
@@ -404,49 +409,56 @@ local function createBillboard(player)
 end
 
 local function killEffect(position)
-    -- Kan patlaması efekti oluşturma
-    local bloodExplosion = Instance.new("ParticleEmitter", workspace)
-    bloodExplosion.Position = position
-    bloodExplosion.Lifetime = NumberRange.new(0.5, 1)
-    bloodExplosion.Rate = 100
-    bloodExplosion.Speed = NumberRange.new(50, 100)
-    bloodExplosion.Size = NumberSequence.new(0.5, 2)
-    bloodExplosion.Texture = "http://www.robloxlabs.com/assets/images/particles/blood.png"
-    bloodExplosion.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
-    bloodExplosion.Acceleration = Vector3.new(0, -10, 0)
-    
-    -- 5 saniye sonra kan patlaması efekti ve avatarın kaybolmasını temizle
+    local part = Instance.new("Part", workspace)
+    part.Anchored = true
+    part.CanCollide = false
+    part.Position = position
+    part.Size = Vector3.new(1, 1, 1)
+    part.Transparency = 1
+    part.Name = "BloodEmitterAnchor"
+
+    local blood = Instance.new("ParticleEmitter", part)
+    blood.Texture = "rbxassetid://241837157"
+    blood.Lifetime = NumberRange.new(0.5, 1)
+    blood.Rate = 1000
+    blood.Speed = NumberRange.new(30, 60)
+    blood.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(1, 0)
+    })
+    blood.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+    blood.LightEmission = 1
+    blood.VelocitySpread = 180
+    blood.Acceleration = Vector3.new(0, -20, 0)
+
     task.delay(5, function()
-        bloodExplosion:Destroy()
+        part:Destroy()
     end)
 end
 
-local function createWarning(msg)
+local function showNotification(text, color)
     local screenGui = Instance.new("ScreenGui", game.CoreGui)
-    screenGui.Name = "BlacklistWarning"
+    screenGui.Name = "SilentAimNotification"
 
-    local frame = Instance.new("Frame", screenGui)
-    frame.AnchorPoint = Vector2.new(0.5, 0.5)
-    frame.Position = UDim2.new(0.5, 0, 0.3, 0)
-    frame.Size = UDim2.new(0, 400, 0, 100)
-    frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-    frame.BackgroundTransparency = 0.2
-    frame.BorderSizePixel = 0
-
-    local stroke = Instance.new("UIStroke", frame)
-    stroke.Color = Color3.fromRGB(255, 0, 0)
-    stroke.Thickness = 3
-
-    local label = Instance.new("TextLabel", frame)
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.new(1, 0, 0)
-    label.TextStrokeTransparency = 0
-    label.TextScaled = true
-    label.Text = msg
+    local label = Instance.new("TextLabel", screenGui)
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.Position = UDim2.new(0.5, 0, 0.2, 0)
+    label.Size = UDim2.new(0, 400, 0, 50)
+    label.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    label.BackgroundTransparency = 0.1
+    label.TextColor3 = color or Color3.new(1, 1, 1)
+    label.Text = text
     label.Font = Enum.Font.GothamBold
+    label.TextScaled = true
+    label.TextStrokeTransparency = 0.6
+    label.TextStrokeColor3 = Color3.new(0, 0, 0)
+    label.BorderSizePixel = 0
 
-    task.delay(3, function()
+    local stroke = Instance.new("UIStroke", label)
+    stroke.Thickness = 2
+    stroke.Color = color or Color3.new(1, 1, 1)
+
+    task.delay(2, function()
         screenGui:Destroy()
     end)
 end
@@ -459,7 +471,7 @@ SilentAimGroup:AddDropdown("PlayerListDropdown", {
     Tooltip = "Silent Aim için hedef oyuncuyu seç.",
     Callback = function(value)
         if value == blacklistedName then
-            createWarning("BU OYUNCUYA SİLENT AİM KULLANAMAZSIN!")
+            showNotification("BU OYUNCUYA SİLENT AIM KULLANAMAZSIN!", Color3.new(1, 0, 0))
             selectedPlayer = nil
         else
             selectedPlayer = game.Players:FindFirstChild(value)
@@ -485,27 +497,29 @@ SilentAimGroup:AddToggle("EnableSilentAim", {
     end
 })
 
---===[ Mouse Sol Tıklama Olayı ]===--
+--===[ Mouse Sol Tıklama: VR ve Efekt ]===--
 game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed or input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
     if not toggleActive or not selectedPlayer then return end
 
     local char = selectedPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then return end
 
     local distance = (char.HumanoidRootPart.Position - game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
     if distance <= maxDistance then
+        local oldHp = char.Humanoid.Health
         game:GetService("ReplicatedStorage").Event:FireServer("VR", char.HumanoidRootPart)
         killEffect(char.HumanoidRootPart.Position)
 
-        -- Avatarın tamamen kaybolması işlemi
-        if char:FindFirstChild("Head") then
-            char:Destroy()  -- Avatarı tamamen yok et
-        end
-
-        -- Kan patlaması 5 saniye sürecek
-        task.delay(5, function()
-            -- Avatar yeniden geri gelebilir, istenirse yeni bir avatar yüklenecek
+        task.delay(0.2, function()
+            if char and char:FindFirstChild("Humanoid") then
+                local newHp = char.Humanoid.Health
+                if newHp <= 0 then
+                    showNotification("HEDEF ÖLDÜRÜLDÜ", Color3.new(1, 0, 0))
+                elseif newHp < oldHp then
+                    showNotification("HEDEFE HASAR VERİLDİ", Color3.new(1, 1, 0))
+                end
+            end
         end)
     end
 end)
@@ -590,3 +604,54 @@ SilentAimRightGroup:AddToggle("EnableSilentAimRight", {
         end
     end
 })
+
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+
+local localPlayer = Players.LocalPlayer
+local placeId = game.PlaceId
+local maxPlayers = 28
+
+-- Server sekmesini alıyoruz
+local ServerTab = Window:AddTab("Server")
+local ServerHopBox = ServerTab:AddLeftGroupbox("🔀 ServerHop")
+
+local function findAndHop()
+    local success, response = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(
+            string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100", placeId)
+        ))
+    end)
+
+    if not success or not response or not response.data then
+        return warn("[ServerHop Hata]: Sunucu verileri alınamadı.")
+    end
+
+    for _, server in ipairs(response.data) do
+        if server.playing < maxPlayers and server.id ~= game.JobId then
+            local valid = true
+
+            if filterEmpty and server.playing >= 10 then valid = false end
+            if filterFull and server.playing < 26 then valid = false end
+
+            if valid then
+                print("Geçiş yapılıyor sunucu:", server.id, "Oyuncular:", server.playing)
+                TeleportService:TeleportToPlaceInstance(placeId, server.id, localPlayer)
+                return
+            end
+        end
+    end
+
+    warn("[ServerHop Hata]: Uygun sunucu bulunamadı.")
+end
+
+-- Butonlar
+ServerHopBox:AddButton("🔄 Sunucu Değiştir", function()
+    print("Sunucu aranıyor...")
+    findAndHop()
+end)
+
+ServerHopBox:AddButton("♻️ Sunucuya Tekrar Katıl", function()
+    TeleportService:TeleportToPlaceInstance(placeId, game.JobId, localPlayer)
+end):AddTooltip("Aynı sunucuya garanti şekilde yeniden bağlanır.")
