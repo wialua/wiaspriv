@@ -1,0 +1,188 @@
+--// Gerekli Hizmetler
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+
+-- Tam ortalanmış ekran tasarımı
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "UltraPremiumLoader"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game.CoreGui
+
+-- Blur efekti
+local blur = Instance.new("BlurEffect", workspace.CurrentCamera)
+blur.Size = 0
+
+-- Ana çerçeve
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 700, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -350, 0.5, -175)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+mainFrame.BackgroundTransparency = 0.75
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+
+-- Blur ve Fade-in Animasyonu
+task.spawn(function()
+    for i = 0, 20 do
+        blur.Size = i
+        mainFrame.BackgroundTransparency = 0.75 - i * 0.025
+        wait(0.02)  -- Dengeli açılma hızı
+    end
+end)
+
+-- Gradient Arka Plan Efekti
+local gradient = Instance.new("UIGradient", mainFrame)
+gradient.Rotation = 30
+gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 40)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 20, 120)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 40)),
+})
+
+-- Köşe yuvarlatma ve gölge
+local corner = Instance.new("UICorner", mainFrame)
+corner.CornerRadius = UDim.new(0, 30)
+local shadow = Instance.new("ImageLabel", mainFrame)
+shadow.Image = "rbxassetid://1316045217"
+shadow.ImageTransparency = 0.6
+shadow.Size = UDim2.new(1, 80, 1, 80)
+shadow.Position = UDim2.new(0, -40, 0, -40)
+shadow.BackgroundTransparency = 1
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+
+-- Başlık (Pulsing Animasyonlu)
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 60)
+title.Position = UDim2.new(0, 0, 0, 15)
+title.BackgroundTransparency = 1
+title.Text = "💎 Ultra Premium Loader 💎"
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 44
+title.TextColor3 = Color3.fromRGB(230, 230, 255)
+title.TextStrokeTransparency = 0.4
+title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+
+task.spawn(function()
+    while screenGui.Parent do
+        for i = 0, 1, 0.02 do
+            title.TextColor3 = Color3.fromRGB(230, 230, 255):Lerp(Color3.fromRGB(255, 255, 255), i)
+            wait(0.02)
+        end
+        for i = 0, 1, 0.02 do
+            title.TextColor3 = Color3.fromRGB(255, 255, 255):Lerp(Color3.fromRGB(230, 230, 255), i)
+            wait(0.02)
+        end
+    end
+end)
+
+-- Kullanıcı adı ve saat
+local username = Instance.new("TextLabel", mainFrame)
+username.Size = UDim2.new(1, 0, 0, 30)
+username.Position = UDim2.new(0, 0, 0.15, 0)
+username.BackgroundTransparency = 1
+username.Text = "Kullanıcı: " .. Players.LocalPlayer.Name
+username.Font = Enum.Font.Gotham
+username.TextSize = 18
+username.TextColor3 = Color3.fromRGB(200, 200, 255)
+
+local timeLabel = Instance.new("TextLabel", mainFrame)
+timeLabel.Size = UDim2.new(1, 0, 0, 30)
+timeLabel.Position = UDim2.new(0, 0, 0.2, 0)
+timeLabel.BackgroundTransparency = 1
+timeLabel.Font = Enum.Font.Gotham
+timeLabel.TextSize = 18
+timeLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+
+task.spawn(function()
+    while screenGui.Parent do
+        timeLabel.Text = "Saat: " .. os.date("%H:%M:%S", os.time())
+        wait(1)
+    end
+end)
+
+-- Yükleme Bar Çerçevesi
+local barBG = Instance.new("Frame", mainFrame)
+barBG.Size = UDim2.new(0.85, 0, 0, 40)
+barBG.Position = UDim2.new(0.075, 0, 0.55, 0)
+barBG.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+barBG.BorderSizePixel = 0
+local barCorner = Instance.new("UICorner", barBG)
+barCorner.CornerRadius = UDim.new(0, 20)
+
+-- Yükleme Bar Dolgu ve Glow
+local barFill = Instance.new("Frame", barBG)
+barFill.Size = UDim2.new(0, 0, 1, 0)
+barFill.BackgroundColor3 = Color3.fromRGB(100, 20, 200)
+barFill.BorderSizePixel = 0
+local fillCorner = Instance.new("UICorner", barFill)
+fillCorner.CornerRadius = UDim.new(0, 20)
+local glow = Instance.new("UIStroke", barFill)
+glow.Thickness = 3
+glow.Transparency = 0.6
+
+-- Yüzde Metni
+local percentText = Instance.new("TextLabel", mainFrame)
+percentText.Size = UDim2.new(1, 0, 0, 30)
+percentText.Position = UDim2.new(0, 0, 0.9, 0)
+percentText.BackgroundTransparency = 1
+percentText.Font = Enum.Font.GothamBold
+percentText.TextSize = 20
+percentText.TextColor3 = Color3.fromRGB(255, 255, 255)
+percentText.Text = "Yükleniyor: 0%"
+
+-- Yükleme Animasyon Metni
+local loadingText = Instance.new("TextLabel", mainFrame)
+loadingText.Size = UDim2.new(1, 0, 0, 25)
+loadingText.Position = UDim2.new(0, 0, 0.8, 0)
+loadingText.BackgroundTransparency = 1
+loadingText.Font = Enum.Font.Gotham
+loadingText.TextSize = 18
+loadingText.TextColor3 = Color3.fromRGB(180, 180, 255)
+loadingText.Text = "Hazırlanıyor"
+
+-- Tween Fonksiyonu
+local function tween(o, goal, t)
+    return TweenService:Create(o, TweenInfo.new(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal)
+end
+
+-- Yükleme Döngüsü
+task.spawn(function()
+    for i = 0, 100 do
+        tween(barFill, {Size = UDim2.new(i/100, 0, 1, 0)}, 0.08):Play()
+        percentText.Text = "Yükleniyor: " .. i .. "%"
+        barFill.BackgroundColor3 = Color3.fromHSV(0.7 - i/150, 0.8, 1)
+        wait(0.1)
+    end
+
+    -- Blur geri çekme ve silme
+    for i = 20, 0, -1 do
+        blur.Size = i
+        mainFrame.BackgroundTransparency = 0.75 + (20 - i) * 0.025
+        wait(0.02)
+    end
+
+    screenGui:Destroy()
+
+    -- Script Yükle ve Çalıştır\    
+    local url = "https://raw.githubusercontent.com/wialua/wiaspriv/main/vlp"
+    local success, code = pcall(function()
+        return game:HttpGet(url, true)
+    end)
+    if success and code then
+        loadstring(code)()
+    else
+        warn("Yükleme hatası:", code)
+    end
+end)
+
+-- Animasyonlu Nokta Effekti
+task.spawn(function()
+    local dots = ""
+    while screenGui.Parent do
+        dots = #dots < 3 and dots .. "." or ""
+        loadingText.Text = "Hazırlanıyor" .. dots
+        wait(0.3)
+    end
+end)
