@@ -338,7 +338,6 @@ VehicleSpawnBox:AddButton("🔥Sınırsız Tank Ateşleme🔥", function()
 end)
 
 -- Silent Aim sekmesinde dropdown oluşturulması
-local SilentAimGroup = SilentAimTab:AddLeftGroupbox("🎯 Oyuncu Seçimi")
 
 --===[ Ayarlar ve Başlangıç ]===--
 local SilentAimGroup = SilentAimTab:AddLeftGroupbox("🎯 Oyuncu Seçimi")
@@ -614,7 +613,6 @@ local placeId = game.PlaceId
 local maxPlayers = 28
 
 -- Server sekmesini alıyoruz
-local ServerTab = Window:AddTab("Server")
 local ServerHopBox = ServerTab:AddLeftGroupbox("🔀 ServerHop")
 
 local function findAndHop()
