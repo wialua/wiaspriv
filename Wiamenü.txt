@@ -538,7 +538,7 @@ end)
 
 
 -- Sağ tarafta Silent Aim için Toggle ve Dropdown
-local SilentAimRightGroup = SilentAimTab:AddRightGroupbox("🎯 Silent Aim Sağ Taraf")
+local SilentAimRightGroup = SilentAimTab:AddRightGroupbox("🎯Tank Silent aim")
 
 -- Sağ tarafta Dropdown ekle
 SilentAimRightGroup:AddDropdown("PlayerListDropdownRight", {
