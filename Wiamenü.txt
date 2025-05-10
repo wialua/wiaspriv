@@ -653,3 +653,277 @@ end)
 ServerHopBox:AddButton("♻️ Sunucuya Tekrar Katıl", function()
     TeleportService:TeleportToPlaceInstance(placeId, game.JobId, localPlayer)
 end):AddTooltip("Aynı sunucuya garanti şekilde yeniden bağlanır.")
+
+local Players     = game:GetService("Players")
+local RunService  = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local EXCLUDE_NAME = "MAD_CITYAIMBOTLOL"
+
+-- UI
+local HitboxTab = Window:AddTab("Hitbox")
+local HitboxBox = HitboxTab:AddLeftGroupbox("Hitbox Controls")
+
+HitboxBox:AddToggle("HitboxEnabled", { Text = "Enable Hitbox Expander", Default = false })
+HitboxBox:AddSlider("HitboxSize",     { Text = "Hitbox Size", Default = 5, Min = 1, Max = 20, Rounding = 1 })
+HitboxBox:AddLabel("Hitbox Color"):AddColorPicker("HitboxColor", { Default = Color3.new(1,0,0), Title = "Hitbox Color" })
+HitboxBox:AddDropdown("HitboxPart",   { Values = {"Head","Torso","HumanoidRootPart"}, Default = 3, Text = "Target Part" })
+
+-- State
+local ModifiedParts = {}   -- [player][partName] = originalProps
+local HeartbeatConn
+
+-- Takım kontrolü
+local function IsEnemy(pl)
+    if pl == LocalPlayer or pl.Name == EXCLUDE_NAME then
+        return false
+    end
+    local myT = LocalPlayer.Team and LocalPlayer.Team.Name or ""
+    local ot  = pl.Team        and pl.Team.Name        or ""
+    if myT=="Police" or myT=="Heroes" then
+        return not (ot=="Police" or ot=="Heroes")
+    elseif myT=="Prisoners" then
+        return (ot=="Criminals" or ot=="Villains")
+    elseif myT=="Criminals" or myT=="Villains" then
+        return not (ot=="Criminals" or ot=="Villains")
+    end
+    return true
+end
+
+-- Bir part'ı eski haline döndür
+local function ResetPart(pl, partName)
+    local data = ModifiedParts[pl] and ModifiedParts[pl][partName]
+    if data then
+        local char = pl.Character
+        if char then
+            local p = char:FindFirstChild(partName)
+            if p and p:IsA("BasePart") then
+                p.Size        = data.Size
+                p.Transparency= data.Transparency
+                p.Material    = data.Material
+                p.Color       = data.Color
+                p.CanCollide  = data.CanCollide
+            end
+        end
+        ModifiedParts[pl][partName] = nil
+    end
+end
+
+-- Tüm part'ları sıfırla
+local function ResetPlayer(pl)
+    if ModifiedParts[pl] then
+        for partName in pairs(ModifiedParts[pl]) do
+            ResetPart(pl, partName)
+        end
+        ModifiedParts[pl] = nil
+    end
+end
+
+-- Hitbox uygula (sadece toggle açık ve enemy ise)
+local function ApplyToPart(pl)
+    if not Toggles.HitboxEnabled.Value then return end
+    if not IsEnemy(pl) then return end
+    local char = pl.Character
+    if not char then return end
+
+    local partName = Options.HitboxPart.Value
+    local success, part = pcall(function()
+        return char:WaitForChild(partName, 2)
+    end)
+    if not success or not part or not part:IsA("BasePart") then
+        return
+    end
+
+    ModifiedParts[pl] = ModifiedParts[pl] or {}
+    if not ModifiedParts[pl][partName] then
+        ModifiedParts[pl][partName] = {
+            Size        = part.Size,
+            Transparency= part.Transparency,
+            Material    = part.Material,
+            Color       = part.Color,
+            CanCollide  = part.CanCollide,
+        }
+    end
+
+    part.Size        = Vector3.new(Options.HitboxSize.Value, Options.HitboxSize.Value, Options.HitboxSize.Value)
+    part.Material    = Enum.Material.ForceField
+    part.Color       = Options.HitboxColor.Value
+    part.Transparency= 0.4
+    part.CanCollide  = true
+end
+
+-- Oyuncuyu izlemeye al
+local function MonitorPlayer(pl)
+    -- Ölüm anında sıfırla
+    pl.CharacterRemoving:Connect(function()
+        ResetPlayer(pl)
+    end)
+    -- Yeniden doğunca uygula (ancak toggle açıksa)
+    pl.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        ApplyToPart(pl)
+    end)
+end
+
+-- Toggle açma/kapama
+Toggles.HitboxEnabled:OnChanged(function(enabled)
+    -- 1) Var olan Heartbeat'i kes
+    if HeartbeatConn then
+        HeartbeatConn:Disconnect()
+        HeartbeatConn = nil
+    end
+
+    -- 2) Toggle kapalıysa: tüm oyuncuları resetle, hiçbir listener ekleme
+    if not enabled then
+        for _, pl in ipairs(Players:GetPlayers()) do
+            ResetPlayer(pl)
+        end
+        return
+    end
+
+    -- 3) Toggle açıldıysa: herkesi izle + heartbeat başlat
+    for _, pl in ipairs(Players:GetPlayers()) do
+        MonitorPlayer(pl)
+    end
+    Players.PlayerAdded:Connect(MonitorPlayer)
+
+    HeartbeatConn = RunService.Heartbeat:Connect(function()
+        for _, pl in ipairs(Players:GetPlayers()) do
+            ApplyToPart(pl)
+        end
+    end)
+end)
+
+-- UI ayarları değiştiğinde de anında güncelle
+Options.HitboxSize:OnChanged(function()
+    if Toggles.HitboxEnabled.Value then
+        for _,pl in ipairs(Players:GetPlayers()) do ApplyToPart(pl) end
+    end
+end)
+Options.HitboxColor:OnChanged(function()
+    if Toggles.HitboxEnabled.Value then
+        for _,pl in ipairs(Players:GetPlayers()) do ApplyToPart(pl) end
+    end
+end)
+Options.HitboxPart:OnChanged(function()
+    for _,pl in ipairs(Players:GetPlayers()) do
+        ResetPlayer(pl)
+        if Toggles.HitboxEnabled.Value then ApplyToPart(pl) end
+    end
+end)
+
+local Players           = game:GetService("Players")
+local RunService        = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer       = Players.LocalPlayer
+local Event             = ReplicatedStorage:WaitForChild("Event")
+
+local EXCLUDE_NAME = "MAD_CITYAIMBOTLOL"
+local TEAM_NAMES   = {"Prisoners","Police","Criminals","Heroes","Villains"}
+
+-- Helper: Anlık oyuncu isim listesi (LocalPlayer ve exclude hariç)
+local function GetPlayerNames()
+    local t = {}
+    for _,pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer and pl.Name ~= EXCLUDE_NAME then
+            table.insert(t, pl.Name)
+        end
+    end
+    return t
+end
+
+-- —— UI: Auto Kill Sekmesi —— --
+local AutoKillTab = Window:AddTab("Auto Kill")
+local AutoKillBox = AutoKillTab:AddLeftGroupbox("Auto Kill Ayarları")
+
+-- 1) Master Toggle
+AutoKillBox:AddToggle("AutoKillEnabled", {
+    Text    = "Auto Kill aktifleştir",
+    Default = false,
+})
+
+-- 2) Dropdown: Hedef Oyuncu
+AutoKillBox:AddDropdown("AutoKillTarget", {
+    Values    = GetPlayerNames(),
+    Default   = nil,
+    AllowNull = true,
+    Text      = "Oyuncuya özel istiyorsan seç",
+})
+
+-- 3) Takım Toggles
+for _,teamName in ipairs(TEAM_NAMES) do
+    AutoKillBox:AddToggle("Team_"..teamName, {
+        Text    = "AutoKill "..teamName,
+        Default = false,
+    })
+end
+
+-- 4) Dinamik dropdown güncellemesi
+local function UpdatePlayerDropdown()
+    Options.AutoKillTarget:Update(GetPlayerNames())
+    local cur = Options.AutoKillTarget.Value
+    if cur and not Players:FindFirstChild(cur) then
+        Options.AutoKillTarget:Set(nil)
+    end
+end
+Players.PlayerAdded:Connect(UpdatePlayerDropdown)
+Players.PlayerRemoving:Connect(UpdatePlayerDropdown)
+
+-- 5) Auto kill döngüsü
+local conn
+Toggles.AutoKillEnabled:OnChanged(function(enabled)
+    if conn then
+        conn:Disconnect()
+        conn = nil
+    end
+    if not enabled then
+        return
+    end
+
+    conn = RunService.Heartbeat:Connect(function()
+        -- her oyuncu için kontrol
+        for _,pl in ipairs(Players:GetPlayers()) do
+            if pl ~= LocalPlayer and pl.Name ~= EXCLUDE_NAME and pl.Character then
+                local shouldFire = false
+
+                -- a) Dropdown hedefi
+                local targetName = Options.AutoKillTarget.Value
+                if targetName == pl.Name then
+                    shouldFire = true
+                end
+
+                -- b) Takım toggles
+                local teamName = pl.Team and pl.Team.Name or ""
+                local teamToggle = Toggles["Team_"..teamName]
+                if teamToggle and teamToggle.Value then
+                    shouldFire = true
+                end
+
+                if shouldFire then
+                    -- karakterin tüm BasePart'larına event gönder
+                    for _, part in ipairs(pl.Character:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            Event:FireServer("BM", part.Position)
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+local CombatBoxL = CombatTab:AddLeftGroupbox("Extra")
+
+local MyButton = CombatBoxL:AddButton("Keycard Al", function()
+    for i = 1, 50 do
+        for _, v in pairs(game.Players:GetChildren()) do
+            local args = {
+                [1] = "Pickpocket",
+                [2] = v
+            }
+            game:GetService("ReplicatedStorage").Event:FireServer(unpack(args))
+        end
+    end
+end)
+
+MyButton:AddTooltip("Keycard alır")
