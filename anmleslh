@@ -84,7 +84,7 @@ local otherSec = tabs.Other:AddSection("Hileler", 1)
 
 -- ClickRate Hook
 otherSec:AddButton({
-	text = "Hızlı tıklama",
+	text = "Seri tıklama",
 	flag = "Click_Hook",
 	callback = function()
 		local PlayerUtil = require(game:GetService("ReplicatedStorage").Modules.Player.PlayerUtil)
@@ -123,7 +123,7 @@ end
 LockWalkSpeed()
 
 otherSec:AddSlider({
-	text = "Yürüyüş Hızı",
+	text = "Yürüme Hızı",
 	flag = "Speed_Slider",
 	value = 16, min = 0, max = 500, increment = 1,
 	callback = function(v)
