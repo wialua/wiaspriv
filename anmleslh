@@ -1,169 +1,14 @@
-local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/lib"))()
-
-library:init()
-
-local Window = library.NewWindow({
-	title = "Wia.Wtf",
-	size = UDim2.new(0, 525, 0, 650)
-})
-
-local tabs = {
-    Teleport = Window:AddTab("Teleport"),
-	Settings = library:CreateSettingsTab(Window),
+-- Credits To The Original Devs @xz, @goof
+getgenv().Config = {
+	Invite = "informant.wtf",
+	Version = "0.0",
 }
 
-local sections = {
-	World1 = tabs.Teleport:AddSection("World 1", 1),
+getgenv().luaguardvars = {
+	DiscordName = "username#0000",
 }
-
-local function teleportTo(position)
-    local player = game.Players.LocalPlayer
-    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        player.Character.HumanoidRootPart.CFrame = CFrame.new(position)
-    end
-end
-
-sections.World1:AddButton({
-	enabled = true,
-	text = "1. Yer",
-	flag = "Teleport_1",
-	tooltip = "Konum: Vector3.new(89.58, 4.09, 464.90)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(89.58, 4.09, 464.90))
-	end
-})
-
-sections.World1:AddButton({
-	enabled = true,
-	text = "2. Yer",
-	flag = "Teleport_2",
-	tooltip = "Konum: Vector3.new(72.27, 4.09, 600.08)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(72.27, 4.09, 600.08))
-	end
-})
-
-sections.World1:AddButton({
-	enabled = true,
-	text = "3. Yer",
-	flag = "Teleport_3",
-	tooltip = "Konum: Vector3.new(91.06, 4.09, 873.79)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(91.06, 4.09, 873.79))
-	end
-})
-
-sections.World1:AddButton({
-	enabled = true,
-	text = "4. Yer",
-	flag = "Teleport_4",
-	tooltip = "Konum: Vector3.new(79.89, 4.09, 1119.59)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(79.89, 4.09, 1119.59))
-	end
-})
-
-sections.World1:AddButton({
-	enabled = true,
-	text = "5. Yer",
-	flag = "Teleport_5",
-	tooltip = "Konum: Vector3.new(85.60, 4.09, 1358.98)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(85.60, 4.09, 1358.98))
-	end
-})
-
-local World2 = tabs.Teleport:AddSection("World 2", 1)
-
-World2:AddButton({
-	enabled = true,
-	text = "1. Yer",
-	flag = "World2_Teleport_1",
-	tooltip = "Konum: Vector3.new(5094.49, 4.16, 297.40)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(5094.49, 4.16, 297.40))
-	    end
-	end
-})
-
-World2:AddButton({
-	enabled = true,
-	text = "2. Yer",
-	flag = "World2_Teleport_2",
-	tooltip = "Konum: Vector3.new(5076.71, 4.09, 609.92)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(5076.71, 4.09, 609.92))
-	    end
-	end
-})
-
-World2:AddButton({
-	enabled = true,
-	text = "3. Yer",
-	flag = "World2_Teleport_3",
-	tooltip = "Konum: Vector3.new(5074.81, 4.09, 865.44)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(5074.81, 4.09, 865.44))
-	    end
-	end
-})
-
-local Extra = tabs.Teleport:AddSection("Extra", 2)
-
-Extra:AddButton({
-	enabled = true,
-	text = "Golden Pet Machine",
-	flag = "Extra_Teleport_2",
-	tooltip = "Konum: Vector3.new(158.47, 3.92, 725.00)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(158.47, 3.92, 725.00))
-	    end
-	end
-})
-
-Extra:AddButton({
-	enabled = true,
-	text = "Void Pet Machine",
-	flag = "Extra_Teleport_1",
-	tooltip = "Konum: Vector3.new(5166.22, 4.13, 378.49)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(5166.22, 4.13, 378.49))
-	    end
-	end
-})
 
 local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/drillygzzly/Other/main/1"))()
-
 library:init()
 
 local Window = library.NewWindow({
@@ -172,299 +17,171 @@ local Window = library.NewWindow({
 })
 
 local tabs = {
-    Teleport = Window:AddTab("Teleport"),
+	Teleport = Window:AddTab("Teleport"),
+	Other = Window:AddTab("Other"),
 	Settings = library:CreateSettingsTab(Window),
 }
 
-local sections = {
-	World1 = tabs.Teleport:AddSection("World 1", 1),
+-- === TELEPORT ===
+local function teleportTo(pos)
+	local plr = game.Players.LocalPlayer
+	if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+		plr.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
+	end
+end
+
+local tpSections = {
+	World1 = tabs.Teleport:AddSection("Dünya 1", 1),
+	World2 = tabs.Teleport:AddSection("Dünya 2", 2),
+	Extra = tabs.Teleport:AddSection("Extra", 2),
 }
 
-local function teleportTo(position)
-    local player = game.Players.LocalPlayer
-    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        player.Character.HumanoidRootPart.CFrame = CFrame.new(position)
-    end
+local World1_Positions = {
+	{"1. Yer", Vector3.new(89.58, 4.09, 464.90)},
+	{"2. Yer", Vector3.new(72.27, 4.09, 600.08)},
+	{"3. Yer", Vector3.new(91.06, 4.09, 873.79)},
+	{"4. Yer", Vector3.new(79.89, 4.09, 1119.59)},
+	{"5. Yer", Vector3.new(85.60, 4.09, 1358.98)},
+}
+for i, data in ipairs(World1_Positions) do
+	tpSections.World1:AddButton({
+		text = data[1],
+		flag = "TP_W1_"..i,
+		callback = function() teleportTo(data[2]) end
+	})
 end
 
-sections.World1:AddButton({
-	enabled = true,
-	text = "1. Yer",
-	flag = "Teleport_1",
-	tooltip = "Konum: Vector3.new(89.58, 4.09, 464.90)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(89.58, 4.09, 464.90))
-	end
-})
+local World2_Positions = {
+	{"1. Yer", Vector3.new(5094.49, 4.16, 297.40)},
+	{"2. Yer", Vector3.new(5076.71, 4.09, 609.92)},
+	{"3. Yer", Vector3.new(5074.81, 4.09, 865.44)},
+}
+for i, data in ipairs(World2_Positions) do
+	tpSections.World2:AddButton({
+		text = data[1],
+		flag = "TP_W2_"..i,
+		callback = function() teleportTo(data[2]) end
+	})
+end
 
-sections.World1:AddButton({
-	enabled = true,
-	text = "2. Yer",
-	flag = "Teleport_2",
-	tooltip = "Konum: Vector3.new(72.27, 4.09, 600.08)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(72.27, 4.09, 600.08))
-	end
-})
-
-sections.World1:AddButton({
-	enabled = true,
-	text = "3. Yer",
-	flag = "Teleport_3",
-	tooltip = "Konum: Vector3.new(91.06, 4.09, 873.79)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(91.06, 4.09, 873.79))
-	end
-})
-
-sections.World1:AddButton({
-	enabled = true,
-	text = "4. Yer",
-	flag = "Teleport_4",
-	tooltip = "Konum: Vector3.new(79.89, 4.09, 1119.59)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(79.89, 4.09, 1119.59))
-	end
-})
-
-sections.World1:AddButton({
-	enabled = true,
-	text = "5. Yer",
-	flag = "Teleport_5",
-	tooltip = "Konum: Vector3.new(85.60, 4.09, 1358.98)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    teleportTo(Vector3.new(85.60, 4.09, 1358.98))
-	end
-})
-
-local World2 = tabs.Teleport:AddSection("World 2", 1)
-
-World2:AddButton({
-	enabled = true,
-	text = "1. Yer",
-	flag = "World2_Teleport_1",
-	tooltip = "Konum: Vector3.new(5094.49, 4.16, 297.40)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(5094.49, 4.16, 297.40))
-	    end
-	end
-})
-
-World2:AddButton({
-	enabled = true,
-	text = "2. Yer",
-	flag = "World2_Teleport_2",
-	tooltip = "Konum: Vector3.new(5076.71, 4.09, 609.92)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(5076.71, 4.09, 609.92))
-	    end
-	end
-})
-
-World2:AddButton({
-	enabled = true,
-	text = "3. Yer",
-	flag = "World2_Teleport_3",
-	tooltip = "Konum: Vector3.new(5074.81, 4.09, 865.44)",
-	risky = false,
-	confirm = false,
-	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(5074.81, 4.09, 865.44))
-	    end
-	end
-})
-
-local Extra = tabs.Teleport:AddSection("Extra", 2)
-
-Extra:AddButton({
-	enabled = true,
+tpSections.Extra:AddButton({
 	text = "Golden Pet Machine",
-	flag = "Extra_Teleport_2",
-	tooltip = "Konum: Vector3.new(158.47, 3.92, 725.00)",
-	risky = false,
-	confirm = false,
+	flag = "TP_Golden",
 	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(158.47, 3.92, 725.00))
-	    end
+		teleportTo(Vector3.new(158.47, 3.92, 725.00))
 	end
 })
-
-Extra:AddButton({
-	enabled = true,
+tpSections.Extra:AddButton({
 	text = "Void Pet Machine",
-	flag = "Extra_Teleport_1",
-	tooltip = "Konum: Vector3.new(5166.22, 4.13, 378.49)",
-	risky = false,
-	confirm = false,
+	flag = "TP_Void",
 	callback = function()
-	    local player = game.Players.LocalPlayer
-	    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	        player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(5166.22, 4.13, 378.49))
-	    end
+		teleportTo(Vector3.new(5166.22, 4.13, 378.49))
 	end
 })
 
--- Other sekmesini oluştur
-local OtherTab = Window:AddTab("Other")
-local OtherSection = OtherTab:AddSection("Other", 1)
+-- === OTHER ===
+local otherSec = tabs.Other:AddSection("Hileler", 1)
 
--- ClickRate Hook Butonu
-OtherSection:AddButton({
-	enabled = true,
+-- ClickRate Hook
+otherSec:AddButton({
 	text = "Hızlı tıklama",
-	flag = "HookClickRateBtn",
-	tooltip = "GetClickRate fonksiyonunu 0 dönecek şekilde değiştirir",
-	risky = true,
-	confirm = false,
+	flag = "Click_Hook",
 	callback = function()
-	    local PlayerUtil = require(game:GetService("ReplicatedStorage").Modules.Player.PlayerUtil)
-	    hookfunction(PlayerUtil.GetClickRate, function()
-	        return 0
-	    end)
-	    print("GetClickRate fonksiyonu başarıyla hooklandı.")
+		local PlayerUtil = require(game:GetService("ReplicatedStorage").Modules.Player.PlayerUtil)
+		hookfunction(PlayerUtil.GetClickRate, function() return 0 end)
+		print("ClickRate hooklandı.")
 	end
 })
 
--- WalkSpeed sabit değeri
+-- Speed Lock
 local WalkSpeedValue = 16
 
--- WalkSpeed Sabitleyici Fonksiyon
 local function LockWalkSpeed()
-    local plr = game.Players.LocalPlayer
-    if not plr then return end
+	local plr = game.Players.LocalPlayer
+	if not plr then return end
+	local function apply(hum)
+		if not hum then return end
+		hum.WalkSpeed = WalkSpeedValue
+		hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+			if hum.WalkSpeed ~= WalkSpeedValue then
+				hum.WalkSpeed = WalkSpeedValue
+			end
+		end)
+	end
 
-    local function apply(hum)
-        if not hum then return end
-        hum.WalkSpeed = WalkSpeedValue
-        hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-            if hum.WalkSpeed ~= WalkSpeedValue then
-                hum.WalkSpeed = WalkSpeedValue
-            end
-        end)
-    end
+	if plr.Character then
+		local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+		if hum then apply(hum) end
+	end
 
-    if plr.Character then
-        local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-        if hum then apply(hum) end
-    end
-
-    plr.CharacterAdded:Connect(function(char)
-        local hum = char:WaitForChild("Humanoid")
-        apply(hum)
-    end)
+	plr.CharacterAdded:Connect(function(char)
+		local hum = char:WaitForChild("Humanoid")
+		apply(hum)
+	end)
 end
 
--- WalkSpeed Slider
-OtherSection:AddSlider({
-	text = "Hız",
-	flag = "Locked_WalkSpeed",
-	value = 16,
-	min = 0,
-	max = 500,
-	increment = 1,
-	tooltip = "",
+LockWalkSpeed()
+
+otherSec:AddSlider({
+	text = "Yürüyüş Hızı",
+	flag = "Speed_Slider",
+	value = 16, min = 0, max = 500, increment = 1,
 	callback = function(v)
 		WalkSpeedValue = v
 		local plr = game.Players.LocalPlayer
-		if plr and plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") then
+		if plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") then
 			plr.Character.Humanoid.WalkSpeed = WalkSpeedValue
 		end
 	end
 })
 
--- Sabitlemeyi başlat
-LockWalkSpeed()
-
--- Noclip Değişkeni
+-- NoClip
 local noclipEnabled = false
-local noclipConnection
+local noclipConn
 
--- NoClip Fonksiyonu
 local function toggleNoclip(state)
-    noclipEnabled = state
-
-    if noclipEnabled then
-        noclipConnection = game:GetService("RunService").Stepped:Connect(function()
-            local char = game.Players.LocalPlayer.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") and part.CanCollide == true then
-                        part.CanCollide = false
-                    end
-                end
-            end
-        end)
-    else
-        if noclipConnection then
-            noclipConnection:Disconnect()
-            noclipConnection = nil
-        end
-        -- NoClip kapatıldığında collider'ları geri aç
-        local char = game.Players.LocalPlayer.Character
-        if char then
-            for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
-            end
-        end
-    end
+	noclipEnabled = state
+	if noclipEnabled then
+		noclipConn = game:GetService("RunService").Stepped:Connect(function()
+			local char = game.Players.LocalPlayer.Character
+			if char then
+				for _, part in pairs(char:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.CanCollide = false
+					end
+				end
+			end
+		end)
+	else
+		if noclipConn then
+			noclipConn:Disconnect()
+			noclipConn = nil
+		end
+	end
 end
 
--- GUI Toggle
-OtherSection:AddToggle({
-	text = "NoClip Aç/Kapat",
+otherSec:AddToggle({
+	text = "NoClip",
 	flag = "Toggle_Noclip",
-	tooltip = "Duvarlardan geçmeyi açar veya kapatır",
-	risky = false,
-	callback = function(state)
-		toggleNoclip(state)
-		print("NoClip durumu:", state)
-	end
+	callback = toggleNoclip
 })
 
--- Infinite Jump Toggle
-local infJumpEnabled = false
-
-OtherSection:AddToggle({
+-- Infinite Jump
+local infJump = false
+otherSec:AddToggle({
 	text = "Infinite Jump",
 	flag = "Toggle_InfJump",
-	tooltip = "Sınırsız zıplama aç/kapat",
-	risky = false,
-	callback = function(state)
-		infJumpEnabled = state
-		print("InfJump durumu:", state)
-	end
+	callback = function(state) infJump = state end
 })
 
--- Inf Jump event
 game:GetService("UserInputService").JumpRequest:Connect(function()
-	if infJumpEnabled then
+	if infJump then
 		local plr = game.Players.LocalPlayer
 		if plr.Character and plr.Character:FindFirstChild("Humanoid") then
 			plr.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 		end
 	end
 end)
+
+-- Bildirim
+library:SendNotification("Script başarıyla yüklendi!", 5, Color3.fromRGB(0, 255, 0))
