@@ -84,7 +84,7 @@ local otherSec = tabs.Other:AddSection("Hileler", 1)
 
 -- ClickRate Hook
 otherSec:AddButton({
-	text = "Seri tıklama",
+	text = "Hizli click",
 	flag = "Click_Hook",
 	callback = function()
 		local PlayerUtil = require(game:GetService("ReplicatedStorage").Modules.Player.PlayerUtil)
