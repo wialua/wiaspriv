@@ -1,187 +1,262 @@
--- Credits To The Original Devs @xz, @goof
-getgenv().Config = {
-	Invite = "informant.wtf",
-	Version = "0.0",
-}
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
 
-getgenv().luaguardvars = {
-	DiscordName = "username#0000",
-}
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
-local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/drillygzzly/Other/main/1"))()
-library:init()
-
-local Window = library.NewWindow({
-	title = "Wia.Wtf",
-	size = UDim2.new(0, 525, 0, 650)
+local Window = Library:CreateWindow({
+    Title = 'Auto Farm Menu',
+    Center = true,
+    AutoShow = true,
 })
 
-local tabs = {
-	Teleport = Window:AddTab("Teleport"),
-	Other = Window:AddTab("Other"),
-	Settings = library:CreateSettingsTab(Window),
+local Tabs = {
+    AutoFarm = Window:AddTab('Auto Farm'),
 }
 
--- === TELEPORT ===
-local function teleportTo(pos)
-	local plr = game.Players.LocalPlayer
-	if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-		plr.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
-	end
+local AutoFarmTab = Tabs.AutoFarm
+local LeftGroup = AutoFarmTab:AddLeftGroupbox('Left Dropdowns')
+local RightGroup = AutoFarmTab:AddRightGroupbox('Right Dropdowns')
+
+local cardboardKingdomEnemies = {
+    "Nooblin", "Magical Noob", "Noobian Soldier", "King Noob"
+}
+local candylandEnemies = {
+    "Gingernoob", "Chocolate Warrior", "Gumpdrop Guardian", "Candy God"
+}
+local toyTownEnemies = {
+    "Toy Noobstar", "Plastic Pillager", "Toy Brute", "Bounty Buggy"
+}
+local sandyDunesEnemies = {
+    "Desert Archer", "Fossil Dweller", "Desert Lord", "Pharaoh Noobia"
+}
+local moltenRealmEnemies = {
+    "Lavaborn", "Molten Spearsman", "Heavy Lavaman", "Lava King"
+}
+local articVillageEnemies = {
+    "Snowman", "Artic Mage", "Artic Soldier", "Artic Overlord"
+}
+local steampunkSocietyEnemies = {
+    "Gearling", "Steam Soldier", "Cog Colonel", "Steambot"
+}
+local cybervilleEnemies = {
+    "Noobot", "Rocketeer", "Noobroyer", "Robo Overlord"
+}
+local alchemistSwampEnemies = {
+    "Gladiator Shroom", "Warrior Shroom", "Alchemist Shroom", "Decomposer"
+}
+local doomSpireEnemies = {
+    "Shrine Hunter", "Doom Hunter", "Abomination"
+}
+local northPoleEnemies = {
+    "Boss Statue1", "Catastrophic Noob", "Boss Statue2", "Boss Statue3", "Boss Statue4", "Boss Statue5"
+}
+local sakuraIslesEnemies = {
+    "Ice Breaker", "Frost Guard", "Frost Knight", "Kaos Kringle", "Kringle", "Shinobi Noob", "Kage Shadow", "Dragon Sensei"
+}
+
+local leftDropdowns = {
+    {Name = "Cardboard Kingdom", Values = cardboardKingdomEnemies},
+    {Name = "Candyland", Values = candylandEnemies},
+    {Name = "Toy Town", Values = toyTownEnemies},
+    {Name = "Sandy Dunes", Values = sandyDunesEnemies},
+    {Name = "Molten Realm", Values = moltenRealmEnemies},
+    {Name = "Artic Village", Values = articVillageEnemies},
+}
+
+local rightDropdowns = {
+    {Name = "Steampunk Society", Values = steampunkSocietyEnemies},
+    {Name = "Cyberville", Values = cybervilleEnemies},
+    {Name = "Alchemist Swamp", Values = alchemistSwampEnemies},
+    {Name = "DoomSpire", Values = doomSpireEnemies},
+    {Name = "North Pole", Values = northPoleEnemies},
+    {Name = "Sakura Isles", Values = sakuraIslesEnemies},
+}
+
+for i, dropdown in ipairs(leftDropdowns) do
+    LeftGroup:AddDropdown('LeftDropdown' .. i, {
+        Values = dropdown.Values,
+        Default = 1,
+        Multi = false,
+        Text = dropdown.Name,
+        Tooltip = 'Select an option',
+    })
+    LeftGroup:AddToggle('LeftToggle' .. i, {
+        Text = 'Enable ' .. dropdown.Name,
+        Default = false,
+        Tooltip = 'Toggle for ' .. dropdown.Name,
+    })
 end
 
-local tpSections = {
-	World1 = tabs.Teleport:AddSection("Dünya 1", 1),
-	World2 = tabs.Teleport:AddSection("Dünya 2", 2),
-	Extra = tabs.Teleport:AddSection("Extra", 2),
-}
-
-local World1_Positions = {
-	{"1. Yer", Vector3.new(89.58, 4.09, 464.90)},
-	{"2. Yer", Vector3.new(72.27, 4.09, 600.08)},
-	{"3. Yer", Vector3.new(91.06, 4.09, 873.79)},
-	{"4. Yer", Vector3.new(79.89, 4.09, 1119.59)},
-	{"5. Yer", Vector3.new(85.60, 4.09, 1358.98)},
-}
-for i, data in ipairs(World1_Positions) do
-	tpSections.World1:AddButton({
-		text = data[1],
-		flag = "TP_W1_"..i,
-		callback = function() teleportTo(data[2]) end
-	})
+for i, dropdown in ipairs(rightDropdowns) do
+    RightGroup:AddDropdown('RightDropdown' .. i, {
+        Values = dropdown.Values,
+        Default = 1,
+        Multi = false,
+        Text = dropdown.Name,
+        Tooltip = 'Select an option',
+    })
+    RightGroup:AddToggle('RightToggle' .. i, {
+        Text = 'Enable ' .. dropdown.Name,
+        Default = false,
+        Tooltip = 'Toggle for ' .. dropdown.Name,
+    })
 end
 
-local World2_Positions = {
-	{"1. Yer", Vector3.new(5094.49, 4.16, 297.40)},
-	{"2. Yer", Vector3.new(5076.71, 4.09, 609.92)},
-	{"3. Yer", Vector3.new(5074.81, 4.09, 865.44)},
-}
-for i, data in ipairs(World2_Positions) do
-	tpSections.World2:AddButton({
-		text = data[1],
-		flag = "TP_W2_"..i,
-		callback = function() teleportTo(data[2]) end
-	})
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local lp = Players.LocalPlayer
+local char = lp.Character or lp.CharacterAdded:Wait()
+local enemiesFolder = Workspace:WaitForChild("GameObjects"):WaitForChild("ActiveEnemies")
+
+local toggle = false
+local currentTarget = nil
+local targetColorToSwitch = Color3.new(1, 1, 1)
+
+local function getTargets(name)
+    local list = {}
+    for _, v in ipairs(enemiesFolder:GetChildren()) do
+        if v.Name == name and v:FindFirstChild("HumanoidRootPart") then
+            table.insert(list, v)
+        end
+    end
+    return list
 end
 
-tpSections.Extra:AddButton({
-	text = "Golden Pet Machine",
-	flag = "TP_Golden",
-	callback = function()
-		teleportTo(Vector3.new(158.47, 3.92, 725.00))
-	end
-})
-tpSections.Extra:AddButton({
-	text = "Void Pet Machine",
-	flag = "TP_Void",
-	callback = function()
-		teleportTo(Vector3.new(5166.22, 4.13, 378.49))
-	end
-})
-
--- === OTHER ===
-local otherSec = tabs.Other:AddSection("Hileler", 1)
-
--- ClickRate Hook
-otherSec:AddButton({
-	text = "Hizli click",
-	flag = "Click_Hook",
-	callback = function()
-		local PlayerUtil = require(game:GetService("ReplicatedStorage").Modules.Player.PlayerUtil)
-		hookfunction(PlayerUtil.GetClickRate, function() return 0 end)
-		print("ClickRate hooklandı.")
-	end
-})
-
--- Speed Lock
-local WalkSpeedValue = 16
-
-local function LockWalkSpeed()
-	local plr = game.Players.LocalPlayer
-	if not plr then return end
-	local function apply(hum)
-		if not hum then return end
-		hum.WalkSpeed = WalkSpeedValue
-		hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-			if hum.WalkSpeed ~= WalkSpeedValue then
-				hum.WalkSpeed = WalkSpeedValue
-			end
-		end)
-	end
-
-	if plr.Character then
-		local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-		if hum then apply(hum) end
-	end
-
-	plr.CharacterAdded:Connect(function(char)
-		local hum = char:WaitForChild("Humanoid")
-		apply(hum)
-	end)
+local function isTargetColorChanged(target)
+    if not target or not target:FindFirstChild("HumanoidRootPart") then return false end
+    return target.HumanoidRootPart.Color == targetColorToSwitch
 end
 
-LockWalkSpeed()
+local function moveTo(pos)
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-otherSec:AddSlider({
-	text = "Yürüme Hızı",
-	flag = "Speed_Slider",
-	value = 16, min = 0, max = 500, increment = 1,
-	callback = function(v)
-		WalkSpeedValue = v
-		local plr = game.Players.LocalPlayer
-		if plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") then
-			plr.Character.Humanoid.WalkSpeed = WalkSpeedValue
-		end
-	end
-})
+    pos = Vector3.new(pos.X, hrp.Position.Y, pos.Z)
 
--- NoClip
-local noclipEnabled = false
-local noclipConn
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(1e6, 0, 1e6)
+    bv.Velocity = Vector3.zero
+    bv.Parent = hrp
 
-local function toggleNoclip(state)
-	noclipEnabled = state
-	if noclipEnabled then
-		noclipConn = game:GetService("RunService").Stepped:Connect(function()
-			local char = game.Players.LocalPlayer.Character
-			if char then
-				for _, part in pairs(char:GetDescendants()) do
-					if part:IsA("BasePart") then
-						part.CanCollide = false
-					end
-				end
-			end
-		end)
-	else
-		if noclipConn then
-			noclipConn:Disconnect()
-			noclipConn = nil
-		end
-	end
+    local reached = false
+
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if not toggle then
+            bv.Velocity = Vector3.zero
+            reached = true
+            conn:Disconnect()
+            bv:Destroy()
+            return
+        end
+        local horizontalPos = Vector3.new(hrp.Position.X, 0, hrp.Position.Z)
+        local targetHorizontalPos = Vector3.new(pos.X, 0, pos.Z)
+        local dist = (targetHorizontalPos - horizontalPos).Magnitude
+        if dist < 3 then
+            bv.Velocity = Vector3.zero
+            reached = true
+            conn:Disconnect()
+            bv:Destroy()
+        else
+            local dir = (targetHorizontalPos - horizontalPos).Unit
+            bv.Velocity = dir * math.clamp(dist * 6, 100, 350)
+        end
+    end)
+
+    repeat task.wait() until reached
 end
 
-otherSec:AddToggle({
-	text = "NoClip",
-	flag = "Toggle_Noclip",
-	callback = toggleNoclip
-})
+local function updateCurrentTarget()
+    currentTarget = nil
+    for i = 1, 6 do
+        if Toggles['LeftToggle' .. i].Value then
+            local enemyName = Options['LeftDropdown' .. i].Value
+            local targets = getTargets(enemyName)
+            for _, target in ipairs(targets) do
+                if not isTargetColorChanged(target) then
+                    currentTarget = target
+                    toggle = true
+                    return
+                end
+            end
+        end
+        if Toggles['RightToggle' .. i].Value then
+            local enemyName = Options['RightDropdown' .. i].Value
+            local targets = getTargets(enemyName)
+            for _, target in ipairs(targets) do
+                if not isTargetColorChanged(target) then
+                    currentTarget = target
+                    toggle = true
+                    return
+                end
+            end
+        end
+    end
+    toggle = false
+end
 
--- Infinite Jump
-local infJump = false
-otherSec:AddToggle({
-	text = "Infinite Jump",
-	flag = "Toggle_InfJump",
-	callback = function(state) infJump = state end
-})
-
-game:GetService("UserInputService").JumpRequest:Connect(function()
-	if infJump then
-		local plr = game.Players.LocalPlayer
-		if plr.Character and plr.Character:FindFirstChild("Humanoid") then
-			plr.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-		end
-	end
+task.spawn(function()
+    while true do
+        if toggle and char and char:FindFirstChild("HumanoidRootPart") then
+            if not currentTarget or not currentTarget.Parent or isTargetColorChanged(currentTarget) then
+                updateCurrentTarget()
+            end
+            if currentTarget and currentTarget:FindFirstChild("HumanoidRootPart") then
+                local pos = currentTarget.HumanoidRootPart.Position + Vector3.new(0, 5, 0)
+                moveTo(pos)
+            end
+        else
+            currentTarget = nil
+            toggle = false
+            task.wait(0.5)
+        end
+        task.wait(0.2)
+    end
 end)
 
--- Bildirim
-library:SendNotification("Script başarıyla yüklendi!", 5, Color3.fromRGB(0, 255, 0))
+lp.CharacterAdded:Connect(function(c)
+    char = c
+end)
+
+for i = 1, 6 do
+    Options['LeftDropdown' .. i]:OnChanged(function()
+        toggle = false
+        currentTarget = nil
+    end)
+    Toggles['LeftToggle' .. i]:OnChanged(function()
+        toggle = Toggles['LeftToggle' .. i].Value
+        if toggle then
+            currentTarget = nil
+        end
+    end)
+    Options['RightDropdown' .. i]:OnChanged(function()
+        toggle = false
+        currentTarget = nil
+    end)
+    Toggles['RightToggle' .. i]:OnChanged(function()
+        toggle = Toggles['RightToggle' .. i].Value
+        if toggle then
+            currentTarget = nil
+        end
+    end)
+end
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+ThemeManager:SetFolder('AutoFarmHub')
+SaveManager:SetFolder('AutoFarmHub/configs')
+SaveManager:BuildConfigSection(Tabs['Auto Farm'])
+ThemeManager:ApplyToTab(Tabs['Auto Farm'])
+
+Library:SetWatermarkVisibility(true)
+Library:SetWatermark('Auto Farm Menu')
+
+Library:OnUnload(function()
+    print('Auto Farm Menu unloaded!')
+    Library.Unloaded = true
+end)
