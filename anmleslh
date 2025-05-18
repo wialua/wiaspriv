@@ -12,6 +12,7 @@ local Window = Library:CreateWindow({
 
 local Tabs = {
     AutoFarm = Window:AddTab('Auto Farm'),
+    Pet = Window:AddTab('Pet'),
 }
 
 local AutoFarmTab = Tabs.AutoFarm
@@ -243,6 +244,59 @@ for i = 1, 6 do
         end
     end)
 end
+
+-- Pet Satın Alma Scripti
+local PetGroup = Tabs.Pet:AddLeftGroupbox('Pet Satın Alma')
+
+PetGroup:AddInput('PetEggName', {
+    Default = '',
+    Numeric = false,
+    Finished = true,
+    Text = 'Egg Adı',
+    Tooltip = 'Satın almak istediğiniz pet egg adını yazın',
+    Placeholder = 'Örnek: Pharaoh Egg',
+})
+
+PetGroup:AddToggle('PetBuyToggle', {
+    Text = 'Pet Satın Al',
+    Default = false,
+    Tooltip = 'Yazdığınız eggi satın almak için aç/kapa',
+})
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local lp = Players.LocalPlayer
+local EggService = ReplicatedStorage:WaitForChild("Packages")._Index["sleitnick_knit@1.4.7"].knit.Services.EggService.RF
+
+local buying = false
+
+Toggles.PetBuyToggle:OnChanged(function()
+    buying = Toggles.PetBuyToggle.Value
+    if buying then
+        local eggName = Options.PetEggName.Value
+        if eggName ~= '' then
+            task.spawn(function()
+                while buying do
+                    pcall(function()
+                        EggService.Buy:InvokeServer(eggName, 1)
+                    end)
+                    task.wait(1)
+                end
+            end)
+        else
+            Toggles.PetBuyToggle:SetValue(false)
+            buying = false
+        end
+    end
+end)
+
+Options.PetEggName:OnChanged(function()
+    if Toggles.PetBuyToggle.Value then
+        Toggles.PetBuyToggle:SetValue(false)
+    end
+end)
+
 
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
