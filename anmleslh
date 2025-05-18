@@ -297,6 +297,198 @@ Options.PetEggName:OnChanged(function()
     end
 end)
 
+-- Vampir Speed GUI
+local VampirSpeedTab = Window:AddTab('Vampir Speed')
+local VampirGroup = VampirSpeedTab:AddLeftGroupbox('Vampir Modu')
+
+getgenv().VampirSpeedSettings = {
+    Enabled = false,
+    Speed = 250,
+    Effect = true,
+    AfterImage = true,
+    Aura = true,
+    Sound = true,
+    Eyes = true,
+    VampireAnim = true
+}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local lp = Players.LocalPlayer
+local char = lp.Character or lp.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local hum = char:WaitForChild("Humanoid")
+
+local redEyes = nil
+local animTrack = nil
+
+local function makeAura()
+    local aura = Instance.new("ParticleEmitter")
+    aura.Texture = "rbxassetid://10825330444"
+    aura.Rate = 60
+    aura.Lifetime = NumberRange.new(0.3)
+    aura.Size = NumberSequence.new(1.2)
+    aura.Speed = NumberRange.new(0)
+    aura.VelocitySpread = 100
+    aura.Color = ColorSequence.new(Color3.fromRGB(170, 0, 0))
+    aura.Enabled = true
+    aura.Parent = hrp
+    return aura
+end
+
+local function playSound()
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://9118823103"
+    sound.Volume = 1.5
+    sound.Looped = true
+    sound.Name = "VampirSpeedSound"
+    sound.Parent = hrp
+    sound:Play()
+    return sound
+end
+
+local function createAfterimage()
+    local model = char:Clone()
+    for _, v in ipairs(model:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Anchored = true
+            v.CanCollide = false
+            v.Transparency = 0.6
+        elseif not v:IsA("Humanoid") then
+            v:Destroy()
+        end
+    end
+    model.Parent = workspace
+    task.delay(0.4, function()
+        model:Destroy()
+    end)
+end
+
+local function makeRedEyes()
+    for _, eye in ipairs({"LeftEye", "RightEye"}) do
+        local att = Instance.new("Attachment")
+        att.Name = eye .. "Attachment"
+        att.Parent = char:FindFirstChild("Head")
+
+        local glow = Instance.new("ParticleEmitter")
+        glow.Texture = "rbxassetid://6859678177"
+        glow.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+        glow.LightEmission = 1
+        glow.Size = NumberSequence.new(0.2)
+        glow.Rate = 40
+        glow.Lifetime = NumberRange.new(0.2)
+        glow.Speed = NumberRange.new(0)
+        glow.Parent = att
+    end
+end
+
+local function playVampireAnim()
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://7828414986" -- Vampire idle style
+    animTrack = hum:LoadAnimation(anim)
+    animTrack:Play()
+end
+
+local auraInstance = nil
+local soundInstance = nil
+
+RunService.Heartbeat:Connect(function()
+    if getgenv().VampirSpeedSettings.Enabled and hrp then
+        local moveDir = char:FindFirstChild("Humanoid") and char.Humanoid.MoveDirection or Vector3.zero
+        if moveDir.Magnitude > 0 then
+            hrp.CFrame = hrp.CFrame + moveDir.Unit * (getgenv().VampirSpeedSettings.Speed * RunService.Heartbeat:Wait())
+            if getgenv().VampirSpeedSettings.AfterImage then
+                createAfterimage()
+            end
+        end
+    end
+end)
+
+VampirGroup:AddToggle("VampirSpeedEnabled", {
+    Text = "Vampir Hızını Aç",
+    Default = false,
+    Tooltip = "Vampir hızını aç/kapat",
+}):OnChanged(function(val)
+    getgenv().VampirSpeedSettings.Enabled = val
+
+    if val then
+        if getgenv().VampirSpeedSettings.Aura and not auraInstance then
+            auraInstance = makeAura()
+        end
+        if getgenv().VampirSpeedSettings.Sound and not soundInstance then
+            soundInstance = playSound()
+        end
+        if getgenv().VampirSpeedSettings.Eyes and not redEyes then
+            makeRedEyes()
+            redEyes = true
+        end
+        if getgenv().VampirSpeedSettings.VampireAnim then
+            playVampireAnim()
+        end
+    else
+        if auraInstance then
+            auraInstance.Enabled = false
+            auraInstance:Destroy()
+            auraInstance = nil
+        end
+        if soundInstance then
+            soundInstance:Stop()
+            soundInstance:Destroy()
+            soundInstance = nil
+        end
+        if animTrack then
+            animTrack:Stop()
+        end
+    end
+end)
+
+VampirGroup:AddSlider("VampirSpeedSlider", {
+    Text = "Hız Ayarı",
+    Default = 250,
+    Min = 100,
+    Max = 800,
+    Rounding = 0,
+    Compact = false,
+}):OnChanged(function(val)
+    getgenv().VampirSpeedSettings.Speed = val
+end)
+
+VampirGroup:AddToggle("VampirAuraToggle", {
+    Text = "Aura Efekti",
+    Default = true,
+}):OnChanged(function(val)
+    getgenv().VampirSpeedSettings.Aura = val
+end)
+
+VampirGroup:AddToggle("VampirAfterToggle", {
+    Text = "Afterimage",
+    Default = true,
+}):OnChanged(function(val)
+    getgenv().VampirSpeedSettings.AfterImage = val
+end)
+
+VampirGroup:AddToggle("VampirSoundToggle", {
+    Text = "Ses Efekti",
+    Default = true,
+}):OnChanged(function(val)
+    getgenv().VampirSpeedSettings.Sound = val
+end)
+
+VampirGroup:AddToggle("VampirEyesToggle", {
+    Text = "Kırmızı Göz",
+    Default = true,
+}):OnChanged(function(val)
+    getgenv().VampirSpeedSettings.Eyes = val
+end)
+
+VampirGroup:AddToggle("VampirAnimToggle", {
+    Text = "Vampir Animasyonu",
+    Default = true,
+}):OnChanged(function(val)
+    getgenv().VampirSpeedSettings.VampireAnim = val
+end)
 
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
