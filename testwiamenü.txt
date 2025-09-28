@@ -1,0 +1,1286 @@
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = true
+Library.NotifySide = "Left"
+
+local MarketplaceService = game:GetService("MarketplaceService")
+local gameInfo = MarketplaceService:GetProductInfo(game.PlaceId)
+local gameName = gameInfo.Name
+
+local Window = Library:CreateWindow({
+	Title = '🔥 ' .. gameName,
+	Center = true,
+	AutoShow = true,
+	Resizable = true,
+	ShowCustomCursor = true,
+	NotifySide = "Left",
+	TabPadding = 8,
+	MenuFadeTime = 0.2
+})
+
+local Tabs = {
+	Combat = Window:AddTab('Combat'),
+	Vehicle = Window:AddTab('Vehicle'),
+	VIP = Window:AddTab('VIP'),
+	Hitbox = Window:AddTab('Hitbox'),
+	['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Event = ReplicatedStorage:WaitForChild("Event")
+local RemoteFunction = ReplicatedStorage:WaitForChild("RemoteFunction")
+local Teams = game:GetService("Teams")
+
+local playerConnections = {}
+local loops = {}
+local fovCircle = nil
+local hitboxConnections = {}
+local bombConnection = nil
+local vrMouseConnection = nil
+local espEnabled = false
+local espConnections = {}
+
+local function clearConnections()
+	for _, conn in pairs(playerConnections) do
+		if conn then conn:Disconnect() end
+	end
+	playerConnections = {}
+end
+
+local function clearLoops()
+	for _, loop in pairs(loops) do
+		if loop then loop:Disconnect() end
+	end
+	loops = {}
+end
+
+local function clearHitboxConnections()
+	for _, conn in pairs(hitboxConnections) do
+		if conn then conn:Disconnect() end
+	end
+	hitboxConnections = {}
+	for _, player in pairs(Players:GetPlayers()) do
+		if player.Character then
+			local part = player.Character:FindFirstChild(Options.HitboxPart.Value) or player.Character:FindFirstChild("HumanoidRootPart")
+			if part and part:FindFirstChild("HitboxExtender") then
+				part.HitboxExtender:Destroy()
+			end
+		end
+	end
+end
+
+local function clearEspConnections()
+	for _, conn in pairs(espConnections) do
+		if conn then conn:Disconnect() end
+	end
+	espConnections = {}
+	espEnabled = false
+end
+
+local function fireEventSafely(args)
+	pcall(function()
+		Event:FireServer(unpack(args))
+	end)
+end
+
+local function invokeRemoteSafely(args)
+	pcall(function()
+		RemoteFunction:InvokeServer(unpack(args))
+	end)
+end
+
+local function getBodyPart(character, partName)
+	if not character then return nil end
+	local part = character:FindFirstChild(partName) or character:FindFirstChild("HumanoidRootPart")
+	return part
+end
+
+local function getTargets(dropdownValue, isMulti, targetType)
+	local targets = {}
+	if targetType == "Player" then
+		if isMulti then
+			for playerName, selected in pairs(dropdownValue) do
+				if selected then
+					local player = Players:FindFirstChild(playerName)
+					if player and player.Character then
+						table.insert(targets, player)
+					end
+				end
+			end
+		else
+			local playerName = dropdownValue
+			local player = Players:FindFirstChild(playerName)
+			if player and player.Character then
+				table.insert(targets, player)
+			end
+		end
+	elseif targetType == "Team" then
+		if isMulti then
+			for teamName, selected in pairs(dropdownValue) do
+				if selected then
+					local team = Teams:FindFirstChild(teamName)
+					if team then
+						for _, player in pairs(team:GetPlayers()) do
+							if player ~= LocalPlayer and player.Character then
+								table.insert(targets, player)
+							end
+						end
+					end
+				end
+			end
+		else
+			local teamName = dropdownValue
+			local team = Teams:FindFirstChild(teamName)
+			if team then
+				for _, player in pairs(team:GetPlayers()) do
+					if player ~= LocalPlayer and player.Character then
+						table.insert(targets, player)
+					end
+				end
+			end
+		end
+	end
+	return targets
+end
+
+local function throttleFire(targets, eventFunc, baseDelay, spamMode)
+	if #targets == 0 then return nil end
+	local lastFireTime = 0
+	local minDelay = spamMode and 0.0005 or baseDelay
+	local function fireThrottled()
+		local currentTime = tick()
+		if currentTime - lastFireTime >= minDelay then
+			for _, target in pairs(targets) do
+				if target and target.Character then
+					pcall(eventFunc, target)
+				end
+			end
+			lastFireTime = currentTime
+		end
+	end
+	if spamMode then
+		return RunService.Heartbeat:Connect(fireThrottled)
+	else
+		fireThrottled()
+		return nil
+	end
+end
+
+local function createFOVCircle(radius)
+	if fovCircle then fovCircle:Remove() end
+	fovCircle = Drawing.new("Circle")
+	fovCircle.Thickness = 1
+	fovCircle.NumSides = 50
+	fovCircle.Radius = radius
+	fovCircle.Color = Color3.fromRGB(255, 0, 0)
+	fovCircle.Filled = false
+	fovCircle.Transparency = 0.8
+	fovCircle.Visible = false
+end
+
+local function updateFOVCircle()
+	if fovCircle and Toggles.ShowFOV and Toggles.ShowFOV.Value then
+		fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+		fovCircle.Radius = Options.FOVSlider.Value
+		fovCircle.Visible = true
+	else
+		if fovCircle then fovCircle.Visible = false end
+	end
+end
+
+local function isInFOV(targetPart, fovRadius)
+	if not targetPart or not Camera then return false end
+	local targetPos = targetPart.Position
+	local screenPos, onScreen = Camera:WorldToScreenPoint(targetPos)
+	if not onScreen then return false end
+	local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+	return distance <= fovRadius
+end
+
+local function scanFOV(fovRadius, bodyPart, eventFunc)
+	local lastScanTime = 0
+	local scanDelay = 0.005
+	local function scanLoop()
+		local currentTime = tick()
+		if currentTime - lastScanTime < scanDelay then return end
+		lastScanTime = currentTime
+		for _, player in pairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character then
+				local part = getBodyPart(player.Character, bodyPart)
+				if part and isInFOV(part, fovRadius) then
+					pcall(eventFunc, player)
+				end
+			end
+		end
+	end
+	return RunService.Heartbeat:Connect(scanLoop)
+end
+
+local function getLocalVehicle()
+	local vehicleName = LocalPlayer.Name .. "'s Vehicle"
+	return Workspace:FindFirstChild(vehicleName)
+end
+
+local function getVehicleByType(vehicleType)
+	local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+	if not objectSelection then return nil end
+	for _, obj in pairs(objectSelection:GetChildren()) do
+		if obj.Name:find(vehicleType) and obj:FindFirstChild("Body") and obj.Body:FindFirstChild("Body") then
+			return obj
+		end
+	end
+	return nil
+end
+
+local function findVehicleInFOV(vehicleTypes, fovRadius)
+	local closestVehicle = nil
+	local minDist = math.huge
+	for _, vType in pairs(vehicleTypes) do
+		local vehicle = getVehicleByType(vType)
+		if vehicle then
+			local body = vehicle.Body.Body
+			if body and isInFOV(body, fovRadius) then
+				local screenPos, _ = Camera:WorldToScreenPoint(body.Position)
+				local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+				local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+				if dist < minDist then
+					minDist = dist
+					closestVehicle = vehicle
+				end
+			end
+		end
+	end
+	return closestVehicle
+end
+
+local function setNameTagForPlayer(player, alwaysOnTop, maxDistance)
+	local function apply(char)
+		pcall(function()
+			local nt = char:WaitForChild("NameTag", 1)
+			if nt then
+				nt.AlwaysOnTop = alwaysOnTop
+				nt.MaxDistance = maxDistance
+				local conn = nt:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
+					nt.AlwaysOnTop = alwaysOnTop
+				end)
+				table.insert(espConnections, conn)
+			end
+		end)
+	end
+	if player.Character then
+		apply(player.Character)
+	end
+	local charAddedConn = player.CharacterAdded:Connect(apply)
+	table.insert(espConnections, charAddedConn)
+end
+
+local function setupVIP()
+	local vipGroup = Tabs.VIP:AddLeftGroupbox('Auto Kill')
+	local vipRightGroup = Tabs.VIP:AddRightGroupbox('Team Kill & Keycard')
+
+	vipGroup:AddDropdown('VIPPlayerDropdown', {
+		Values = {},
+		Default = 1,
+		Multi = true,
+		Text = 'Target Players',
+		SpecialType = 'Player',
+		ExcludeLocalPlayer = true,
+		Callback = function(value)
+			if Toggles.AutoKillToggle and Toggles.AutoKillToggle.Value then
+				Toggles.AutoKillToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.AutoKillToggle:SetValue(true)
+			end
+		end
+	})
+
+	vipGroup:AddToggle('AutoKillToggle', {
+		Text = 'Auto Kill',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local targets = getTargets(Options.VIPPlayerDropdown.Value, true, "Player")
+				if #targets > 0 then
+					local function fireBM(target)
+						local part = getBodyPart(target.Character, "HumanoidRootPart")
+						if part then
+							local args = {"BM", part.Position}
+							fireEventSafely(args)
+						end
+					end
+					local conn = throttleFire(targets, fireBM, 0.0005, Toggles.AutoKillSpam.Value)
+					if conn then
+						table.insert(loops, conn)
+					end
+				else
+					Toggles.AutoKillToggle:SetValue(false)
+					Library:Notify("No targets selected!", 3)
+				end
+			else
+				clearLoops()
+			end
+		end
+	})
+
+	vipGroup:AddToggle('AutoKillSpam', {
+		Text = 'Spam Mode',
+		Default = false
+	})
+
+	vipGroup:AddButton({
+		Text = 'Single Kill',
+		Func = function()
+			local targets = getTargets(Options.VIPPlayerDropdown.Value, true, "Player")
+			if #targets > 0 then
+				local function fireBM(target)
+					local part = getBodyPart(target.Character, "HumanoidRootPart")
+					if part then
+						local args = {"BM", part.Position}
+						fireEventSafely(args)
+					end
+				end
+				throttleFire(targets, fireBM, 0.0005, Toggles.AutoKillSpam.Value)
+				Library:Notify("Single kill fired!", 2)
+			else
+				Library:Notify("No targets selected!", 3)
+			end
+		end
+	})
+
+	vipRightGroup:AddDropdown('VIPTeamDropdown', {
+		Values = {"Police", "Prisoners", "Heroes", "Criminals", "Villains"},
+		Default = 1,
+		Multi = true,
+		Text = 'Target Teams',
+		Callback = function(value)
+			if Toggles.TeamKillToggle and Toggles.TeamKillToggle.Value then
+				Toggles.TeamKillToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.TeamKillToggle:SetValue(true)
+			end
+		end
+	})
+
+	vipRightGroup:AddToggle('TeamKillToggle', {
+		Text = 'Team Kill',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local targets = getTargets(Options.VIPTeamDropdown.Value, true, "Team")
+				if #targets > 0 then
+					local function fireBM(target)
+						local part = getBodyPart(target.Character, "HumanoidRootPart")
+						if part then
+							local args = {"BM", part.Position}
+							fireEventSafely(args)
+						end
+					end
+					local conn = throttleFire(targets, fireBM, 0.0005, Toggles.TeamKillSpam.Value)
+					if conn then
+						table.insert(loops, conn)
+					end
+				else
+					Toggles.TeamKillToggle:SetValue(false)
+					Library:Notify("No teams selected!", 3)
+				end
+			else
+				clearLoops()
+			end
+		end
+	})
+
+	vipRightGroup:AddToggle('TeamKillSpam', {
+		Text = 'Spam Mode',
+		Default = false
+	})
+
+	vipRightGroup:AddButton({
+		Text = 'Single Team Kill',
+		Func = function()
+			local targets = getTargets(Options.VIPTeamDropdown.Value, true, "Team")
+			if #targets > 0 then
+				local function fireBM(target)
+					local part = getBodyPart(target.Character, "HumanoidRootPart")
+					if part then
+						local args = {"BM", part.Position}
+						fireEventSafely(args)
+					end
+				end
+				throttleFire(targets, fireBM, 0.0005, Toggles.TeamKillSpam.Value)
+				Library:Notify("Single team kill fired!", 2)
+			else
+				Library:Notify("No teams selected!", 3)
+			end
+		end
+	})
+
+	vipRightGroup:AddButton({
+		Text = 'Keycard Pickpocket',
+		Func = function()
+			task.spawn(function()
+				for i = 1, 50 do
+					for _, v in pairs(Players:GetPlayers()) do
+						if v ~= LocalPlayer then
+							local args = {"Pickpocket", v}
+							fireEventSafely(args)
+						end
+					end
+					task.wait(0.001)
+				end
+				Library:Notify("Keycard pickpocket executed!", 2)
+			end)
+		end
+	})
+end
+
+local function setupVehicle()
+	local vehicleSpawnGroup = Tabs.Vehicle:AddLeftGroupbox('🚗 Araç Spawn')
+	local vehicleModGroup = Tabs.Vehicle:AddRightGroupbox('🛠️ Araç Modifiye')
+
+	local selectedVehicle = SaveManager:Load("AraçListesi") or "Nero"
+
+	vehicleSpawnGroup:AddDropdown('AraçListesi', {
+		Text = 'Araç Seç',
+		Values = {"Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury"},
+		Default = table.find({"Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury"}, selectedVehicle) or 1,
+		Multi = false,
+		Callback = function(v)
+			selectedVehicle = v
+			SaveManager:Save("AraçListesi", v)
+			Library:Notify("Seçilen araç: " .. v, 3)
+		end
+	})
+
+	vehicleSpawnGroup:AddButton({
+		Text = '🚘 Spawnla',
+		Func = function()
+			pcall(function()
+				if Event then
+					Event:FireServer("SpawnVehicle", selectedVehicle)
+					Library:Notify("Araç spawnlandı: " .. selectedVehicle, 3)
+				else
+					Library:Notify("SpawnVehicle eventi bulunamadı!", 3)
+				end
+			end)
+		end
+	})
+
+	local defaults = {
+		carProps = {Sway=60, Torque=10, BrakeForce=4, MaxSpeed=400, TurnSpeed=1.7, DriftVelLerp=0.45, DriftRotLerp=0.12},
+		heliProps = {Acceleration=3, Deceleration=1, SpeedDecay=0.95, BrakeForce=15, DescentSpeed=2, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=14, ResponseSpeed=1, MaxSideTilt=20, MinHeightAboveGround=5, MissileCooldown=2, MissileLock=0},
+		ufoProps = {Acceleration=10, Deceleration=1, MaxSpeed=340, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=2, DescentSpeed=3, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=14, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40},
+		boatProps = {Height=1, TurnSpeed=7.5, Torque=5, MaxSpeed=160, BrakeForce=1, SpeedDecay=0.5},
+		planeProps = {Bombs=true, Acceleration=0.6, DampeningAcceleration=0.8, MaxVerticalTilt=10, VerticalTiltUpSpeed=1, VerticalTiltDownSpeed=1, VerticalTiltDampening=0.95, VerticalSpeedLimit=30, HorizontalTiltSpeed=15.2, MaxSideTilt=25, SideTiltSpeed=1.5, SideTiltDampening=0.95, MissileTargetRange=540, MissileCooldown=2, MissileLock=0},
+		ArchProps = {Acceleration=10, MaxSpeed=270, Deceleration=1, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=3, DescentSpeed=3, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=20, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40},
+	}
+
+	local function applyProperties(props)
+		pcall(function()
+			local objectSelection = Workspace:WaitForChild("ObjectSelection", 1)
+			local vehicle = objectSelection and objectSelection:FindFirstChild(LocalPlayer.Name .. "'s Vehicle")
+			if not vehicle then return end
+			for _, obj in pairs(getgc(true)) do
+				if type(obj) == "table" and obj ~= defaults then
+					for k, v in pairs(props) do
+						if rawget(obj, k) ~= nil then
+							rawset(obj, k, v)
+						end
+					end
+				end
+			end
+			local carChassis = vehicle:FindFirstChild("CarChassis")
+			if carChassis then
+				local boost = carChassis:FindFirstChild("Boost") or Instance.new("NumberValue")
+				boost.Name = "Boost"
+				boost.Value = 20
+				boost.Parent = carChassis
+			end
+			Library:Notify("Araç özellikleri uygulandı!", 3)
+		end)
+	end
+
+	vehicleModGroup:AddButton({Text='🚀 Araba Modifiye Et', Func=function() applyProperties(defaults.carProps) end})
+	vehicleModGroup:AddButton({Text='🚁 Helikopter Modifiye Et', Func=function() applyProperties(defaults.heliProps) end})
+	vehicleModGroup:AddButton({Text='🛸 UFO Modifiye Et', Func=function() applyProperties(defaults.ufoProps) end})
+	vehicleModGroup:AddButton({Text='🛸 ArchAngel Modifiye Et', Func=function() applyProperties(defaults.ArchProps) end})
+	vehicleModGroup:AddButton({Text='🚤 Tekne Modifiye Et', Func=function() applyProperties(defaults.boatProps) end})
+	vehicleModGroup:AddButton({Text='✈️ Uçak Modifiye Et', Func=function() applyProperties(defaults.planeProps) end})
+	vehicleModGroup:AddButton({Text='🔄 Modları Sıfırla', Func=function() applyProperties(defaults.carProps) end})
+
+	vehicleSpawnGroup:AddLabel("🚗 Sway Özelleştirme")
+	for _, val in ipairs({10, 20, 30, 40, 50, 60, 70, 80, 90, 100}) do
+		vehicleSpawnGroup:AddButton({
+			Text = string.format("Sway %d", val),
+			Func = function() applyProperties({Sway = val}) end
+		})
+	end
+
+	vehicleModGroup:AddLabel("🔄 TurnSpeed Özelleştirme")
+	for _, val in ipairs({0.5, 1, 1.5, 2, 2.5, 3}) do
+		vehicleModGroup:AddButton({
+			Text = string.format("TurnSpeed %0.1f", val),
+			Func = function() applyProperties({TurnSpeed = val}) end
+		})
+	end
+
+	vehicleModGroup:AddLabel("⚡ Acceleration Özelleştirme")
+	for _, val in ipairs({0.5, 1}) do
+		vehicleModGroup:AddButton({
+			Text = string.format("Acceleration %0.1f", val),
+			Func = function() applyProperties({Acceleration = val}) end
+		})
+	end
+
+	local vehicleGroup = Tabs.Vehicle:AddLeftGroupbox('Missile Shoot')
+	local vehicleRightGroup = Tabs.Vehicle:AddRightGroupbox('Team Missiles')
+
+	vehicleGroup:AddDropdown('VehicleBodyPart', {
+		Values = {"Head", "UpperTorso", "HumanoidRootPart"},
+		Default = 1,
+		Multi = false,
+		Text = 'Body Part',
+		Callback = function(value)
+			if Toggles.MissileToggle and Toggles.MissileToggle.Value then
+				Toggles.MissileToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.MissileToggle:SetValue(true)
+			end
+		end
+	})
+
+	vehicleGroup:AddDropdown('VehiclePlayerDropdown', {
+		Values = {},
+		Default = 1,
+		Multi = true,
+		Text = 'Target Players',
+		SpecialType = 'Player',
+		ExcludeLocalPlayer = true,
+		Callback = function(value)
+			if Toggles.MissileToggle and Toggles.MissileToggle.Value then
+				Toggles.MissileToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.MissileToggle:SetValue(true)
+			end
+		end
+	})
+
+	vehicleGroup:AddToggle('MissileToggle', {
+		Text = 'Auto Missiles',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local targets = getTargets(Options.VehiclePlayerDropdown.Value, true, "Player")
+				local vehicle = getLocalVehicle()
+				if #targets > 0 and vehicle and vehicle:FindFirstChild("Body") then
+					local body = vehicle.Body
+					local rightMissile = body:FindFirstChild("RightMissile")
+					if rightMissile then
+						local function fireMissile(target)
+							local part = getBodyPart(target.Character, Options.VehicleBodyPart.Value)
+							if part then
+								local args = {
+									"ShootBuzzardMissiles",
+									Workspace:FindFirstChild(LocalPlayer.Name),
+									body,
+									part,
+									rightMissile,
+									3
+								}
+								fireEventSafely(args)
+							end
+						end
+						local conn = throttleFire(targets, fireMissile, 0.0005, Toggles.MissileSpam.Value)
+						if conn then
+							table.insert(loops, conn)
+						end
+					else
+						Toggles.MissileToggle:SetValue(false)
+						Library:Notify("No missile found!", 3)
+					end
+				else
+					Toggles.MissileToggle:SetValue(false)
+					Library:Notify("No vehicle or targets!", 3)
+				end
+			else
+				clearLoops()
+			end
+		end
+	})
+
+	vehicleGroup:AddToggle('MissileSpam', {
+		Text = 'Spam Mode',
+		Default = false
+	})
+
+	vehicleGroup:AddButton({
+		Text = 'Single Missile',
+		Func = function()
+			local targets = getTargets(Options.VehiclePlayerDropdown.Value, true, "Player")
+			local vehicle = getLocalVehicle()
+			if #targets > 0 and vehicle and vehicle:FindFirstChild("Body") then
+				local body = vehicle.Body
+				local rightMissile = body:FindFirstChild("RightMissile")
+				if rightMissile then
+					local function fireMissile(target)
+						local part = getBodyPart(target.Character, Options.VehicleBodyPart.Value)
+						if part then
+							local args = {
+								"ShootBuzzardMissiles",
+								Workspace:FindFirstChild(LocalPlayer.Name),
+								body,
+								part,
+								rightMissile,
+								3
+							}
+							fireEventSafely(args)
+						end
+					end
+					throttleFire(targets, fireMissile, 0.0005, Toggles.MissileSpam.Value)
+					Library:Notify("Single missile fired!", 2)
+				else
+					Library:Notify("No missile found!", 3)
+				end
+			else
+				Library:Notify("No vehicle or targets!", 3)
+			end
+		end
+	})
+
+	vehicleRightGroup:AddDropdown('VehicleTeamDropdown', {
+		Values = {"Police", "Prisoners", "Heroes", "Criminals", "Villains"},
+		Default = 1,
+		Multi = true,
+		Text = 'Target Teams',
+		Callback = function(value)
+			if Toggles.TeamMissileToggle and Toggles.TeamMissileToggle.Value then
+				Toggles.TeamMissileToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.TeamMissileToggle:SetValue(true)
+			end
+		end
+	})
+
+	vehicleRightGroup:AddToggle('TeamMissileToggle', {
+		Text = 'Team Missiles',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local targets = getTargets(Options.VehicleTeamDropdown.Value, true, "Team")
+				local vehicle = getLocalVehicle()
+				if #targets > 0 and vehicle and vehicle:FindFirstChild("Body") then
+					local body = vehicle.Body
+					local rightMissile = body:FindFirstChild("RightMissile")
+					if rightMissile then
+						local function fireMissile(target)
+							local part = getBodyPart(target.Character, Options.VehicleBodyPart.Value)
+							if part then
+								local args = {
+									"ShootBuzzardMissiles",
+									Workspace:FindFirstChild(LocalPlayer.Name),
+									body,
+									part,
+									rightMissile,
+									3
+								}
+								fireEventSafely(args)
+							end
+						end
+						local conn = throttleFire(targets, fireMissile, 0.0005, Toggles.TeamMissileSpam.Value)
+						if conn then
+							table.insert(loops, conn)
+						end
+					else
+						Toggles.TeamMissileToggle:SetValue(false)
+						Library:Notify("No missile found!", 3)
+					end
+				else
+					Toggles.TeamMissileToggle:SetValue(false)
+					Library:Notify("No vehicle or teams!", 3)
+				end
+			else
+				clearLoops()
+			end
+		end
+	})
+
+	vehicleRightGroup:AddToggle('TeamMissileSpam', {
+		Text = 'Spam Mode',
+		Default = false
+	})
+
+	vehicleRightGroup:AddButton({
+		Text = 'Single Team Missile',
+		Func = function()
+			local targets = getTargets(Options.VehicleTeamDropdown.Value, true, "Team")
+			local vehicle = getLocalVehicle()
+			if #targets > 0 and vehicle and vehicle:FindFirstChild("Body") then
+				local body = vehicle.Body
+				local rightMissile = body:FindFirstChild("RightMissile")
+				if rightMissile then
+					local function fireMissile(target)
+						local part = getBodyPart(target.Character, Options.VehicleBodyPart.Value)
+						if part then
+							local args = {
+								"ShootBuzzardMissiles",
+								Workspace:FindFirstChild(LocalPlayer.Name),
+								body,
+								part,
+								rightMissile,
+								3
+							}
+							fireEventSafely(args)
+						end
+					end
+					throttleFire(targets, fireMissile, 0.0005, Toggles.TeamMissileSpam.Value)
+					Library:Notify("Single team missile fired!", 2)
+				else
+					Library:Notify("No missile found!", 3)
+				end
+			else
+				Library:Notify("No vehicle or teams!", 3)
+			end
+		end
+	})
+end
+
+local function setupCombat()
+	local espGroup = Tabs.Combat:AddLeftGroupbox('ESP Araçları')
+	local fovGroup = Tabs.Combat:AddRightGroupbox('VR FOV')
+	local singleGroup = Tabs.Combat:AddLeftGroupbox('Single VR')
+	local vehicleGroup = Tabs.Combat:AddRightGroupbox('Vehicle VR')
+	local mouseGroup = Tabs.Combat:AddLeftGroupbox('Mouse VR')
+
+	espGroup:AddButton('ESP Aç', function()
+		pcall(function()
+			for _, pl in ipairs(Players:GetPlayers()) do
+				setNameTagForPlayer(pl, true, 10000)
+			end
+			local playerAddedConn = Players.PlayerAdded:Connect(function(pl)
+				setNameTagForPlayer(pl, true, 10000)
+			end)
+			table.insert(espConnections, playerAddedConn)
+			espEnabled = true
+			Library:Notify("ESP açıldı!", 3)
+		end)
+	end)
+
+	espGroup:AddButton('ESP Kapat', function()
+		pcall(function()
+			for _, pl in ipairs(Players:GetPlayers()) do
+				setNameTagForPlayer(pl, false, 200)
+			end
+			local playerAddedConn = Players.PlayerAdded:Connect(function(pl)
+				setNameTagForPlayer(pl, false, 200)
+			end)
+			table.insert(espConnections, playerAddedConn)
+			espEnabled = false
+			Library:Notify("ESP kapatıldı!", 3)
+		end)
+	end)
+
+	fovGroup:AddSlider('FOVSlider', {
+		Text = 'FOV Radius',
+		Default = 100,
+		Min = 50,
+		Max = 500,
+		Rounding = 0,
+		Callback = function(value)
+			if Toggles.FOVVRToggle and Toggles.FOVVRToggle.Value then
+				Toggles.FOVVRToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.FOVVRToggle:SetValue(true)
+			end
+		end
+	})
+
+	fovGroup:AddToggle('ShowFOV', {
+		Text = 'Show FOV Circle',
+		Default = true,
+		Callback = function(value)
+			updateFOVCircle()
+		end
+	})
+
+	createFOVCircle(Options.FOVSlider.Value)
+
+	fovGroup:AddDropdown('VRBodyPart', {
+		Values = {"HumanoidRootPart", "Head", "UpperTorso"},
+		Default = 1,
+		Multi = false,
+		Text = 'Body Part',
+		Callback = function(value)
+			if Toggles.FOVVRToggle and Toggles.FOVVRToggle.Value then
+				Toggles.FOVVRToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.FOVVRToggle:SetValue(true)
+			end
+		end
+	})
+
+	fovGroup:AddToggle('FOVVRToggle', {
+		Text = 'FOV VR',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local function fireVR(target)
+					local part = getBodyPart(target.Character, Options.VRBodyPart.Value)
+					if part then
+						local args = {"VR", part}
+						fireEventSafely(args)
+					end
+				end
+				local conn = scanFOV(Options.FOVSlider.Value, Options.VRBodyPart.Value, fireVR)
+				if conn then
+					table.insert(loops, conn)
+				end
+			else
+				clearLoops()
+			end
+		end
+	})
+
+	singleGroup:AddDropdown('SingleVRDropdown', {
+		Values = {},
+		Default = 1,
+		Multi = true,
+		Text = 'Target Player',
+		SpecialType = 'Player',
+		ExcludeLocalPlayer = true,
+		Callback = function(value)
+			if Toggles.SingleVRToggle and Toggles.SingleVRToggle.Value then
+				Toggles.SingleVRToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.SingleVRToggle:SetValue(true)
+			end
+		end
+	})
+
+	singleGroup:AddDropdown('SingleVRBodyPart', {
+		Values = {"HumanoidRootPart", "Head", "UpperTorso"},
+		Default = 1,
+		Multi = false,
+		Text = 'Body Part',
+		Callback = function(value)
+			if Toggles.SingleVRToggle and Toggles.SingleVRToggle.Value then
+				Toggles.SingleVRToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.SingleVRToggle:SetValue(true)
+			end
+		end
+	})
+
+	singleGroup:AddToggle('SingleVRToggle', {
+		Text = 'Single VR',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local targets = getTargets(Options.SingleVRDropdown.Value, true, "Player")
+				if #targets > 0 then
+					local function fireVR(target)
+						local part = getBodyPart(target.Character, Options.SingleVRBodyPart.Value)
+						if part then
+							local args = {"VR", part}
+							fireEventSafely(args)
+						end
+					end
+					local conn = throttleFire(targets, fireVR, 0.0005, true)
+					if conn then
+						table.insert(loops, conn)
+					end
+				else
+					Toggles.SingleVRToggle:SetValue(false)
+					Library:Notify("No targets found!", 3)
+				end
+			else
+				clearLoops()
+			end
+		end
+	})
+
+	singleGroup:AddButton({
+		Text = 'Single Fire VR',
+		Func = function()
+			local targets = getTargets(Options.SingleVRDropdown.Value, true, "Player")
+			if #targets > 0 then
+				local function fireVR(target)
+					local part = getBodyPart(target.Character, Options.SingleVRBodyPart.Value)
+					if part then
+						local args = {"VR", part}
+						fireEventSafely(args)
+					end
+				end
+				throttleFire(targets, fireVR, 0.0005, true)
+				Library:Notify("Single VR fired!", 2)
+			else
+				Library:Notify("No targets found!", 3)
+			end
+		end
+	})
+
+	vehicleGroup:AddSlider('VehicleFOVSlider', {
+		Text = 'Vehicle FOV Radius',
+		Default = 150,
+		Min = 50,
+		Max = 500,
+		Rounding = 0,
+		Callback = function(value)
+			if Toggles.VehicleVRToggle and Toggles.VehicleVRToggle.Value then
+				Toggles.VehicleVRToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.VehicleVRToggle:SetValue(true)
+			end
+		end
+	})
+
+	vehicleGroup:AddDropdown('VehicleVRType', {
+		Values = {"Nighthawk", "Warhawk", "Scout", "Helicopter", "UFO", "Buzzard", "Cobra"},
+		Default = 1,
+		Multi = true,
+		Text = 'Vehicle Types',
+		Callback = function(value)
+			if Toggles.VehicleVRToggle and Toggles.VehicleVRToggle.Value then
+				Toggles.VehicleVRToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.VehicleVRToggle:SetValue(true)
+			end
+		end
+	})
+
+	vehicleGroup:AddToggle('VehicleVRToggle', {
+		Text = 'FOV Vehicle VR',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local vehicleTypes = {}
+				for vType, selected in pairs(Options.VehicleVRType.Value) do
+					if selected then
+						table.insert(vehicleTypes, vType)
+					end
+				end
+				local function fireVehicleVR(vehicle)
+					local body = vehicle.Body.Body
+					if body then
+						local args = {"VR", body}
+						fireEventSafely(args)
+					end
+				end
+				local lastScan = 0
+				local function scanVehicles()
+					local current = tick()
+					if current - lastScan < 0.005 then return end
+					lastScan = current
+					local vehicle = findVehicleInFOV(vehicleTypes, Options.VehicleFOVSlider.Value)
+					if vehicle then
+						fireVehicleVR(vehicle)
+					end
+				end
+				local conn = RunService.Heartbeat:Connect(scanVehicles)
+				table.insert(loops, conn)
+			else
+				clearLoops()
+			end
+		end
+	})
+
+	mouseGroup:AddDropdown('MouseVRMode', {
+		Values = {"Player", "Team", "Vehicle"},
+		Default = 1,
+		Multi = false,
+		Text = 'VR Mode',
+		Callback = function(value)
+			if Toggles.MouseVRToggle and Toggles.MouseVRToggle.Value then
+				Toggles.MouseVRToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.MouseVRToggle:SetValue(true)
+			end
+		end
+	})
+
+	mouseGroup:AddDropdown('MouseVRDropdown', {
+		Values = {},
+		Default = 1,
+		Multi = true,
+		Text = 'Targets',
+		SpecialType = 'Player',
+		ExcludeLocalPlayer = true,
+		Callback = function(value)
+			if Toggles.MouseVRToggle and Toggles.MouseVRToggle.Value then
+				Toggles.MouseVRToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.MouseVRToggle:SetValue(true)
+			end
+		end
+	})
+
+	mouseGroup:AddToggle('MouseVRToggle', {
+		Text = 'Mouse Button1 VR',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local mode = Options.MouseVRMode.Value
+				local targets = getTargets(Options.MouseVRDropdown.Value, true, mode == "Player" and "Player" or "Team")
+				local lastPress = 0
+				local function onMouseDown()
+					local current = tick()
+					if current - lastPress < 0.001 then return end
+					if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+						lastPress = current
+						if mode == "Vehicle" then
+							local vehicleTypes = {"Nighthawk", "Warhawk", "Scout", "Helicopter", "UFO", "Buzzard", "Cobra"}
+							local vehicle = findVehicleInFOV(vehicleTypes, 100)
+							if vehicle then
+								local body = vehicle.Body.Body
+								if body then
+									local args = {"VR", body}
+									fireEventSafely(args)
+								end
+							end
+						else
+							for _, target in pairs(targets) do
+								local part = getBodyPart(target.Character, "HumanoidRootPart")
+								if part then
+									local args = {"VR", part}
+									fireEventSafely(args)
+								end
+							end
+						end
+					end
+				end
+				vrMouseConnection = RunService.Heartbeat:Connect(onMouseDown)
+			else
+				if vrMouseConnection then
+					vrMouseConnection:Disconnect()
+					vrMouseConnection = nil
+				end
+			end
+		end
+	})
+end
+
+local function setupHitbox()
+	local hitboxGroup = Tabs.Hitbox:AddLeftGroupbox('Hitbox Expander')
+	local teamGroup = Tabs.Hitbox:AddRightGroupbox('Team Settings')
+
+	hitboxGroup:AddSlider('HitboxSize', {
+		Text = 'Hitbox Size',
+		Default = 20,
+		Min = 5,
+		Max = 50,
+		Rounding = 0,
+		Callback = function(value)
+			if Toggles.HitboxToggle.Value then
+				Toggles.HitboxToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.HitboxToggle:SetValue(true)
+			end
+		end
+	})
+
+	hitboxGroup:AddDropdown('HitboxPart', {
+		Values = {"Head", "UpperTorso", "HumanoidRootPart"},
+		Default = 1,
+		Multi = false,
+		Text = 'Body Part',
+		Callback = function(value)
+			if Toggles.HitboxToggle.Value then
+				Toggles.HitboxToggle:SetValue(false)
+				task.wait(0.05)
+				Toggles.HitboxToggle:SetValue(true)
+			end
+		end
+	})
+
+	hitboxGroup:AddToggle('HitboxToggle', {
+		Text = 'Enable Hitbox',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local size = Vector3.new(Options.HitboxSize.Value, Options.HitboxSize.Value, Options.HitboxSize.Value)
+				local partName = Options.HitboxPart.Value
+				local myTeam = LocalPlayer.Team and LocalPlayer.Team.Name or ""
+				local allyTeams = {}
+				if myTeam == "Heroes" then
+					allyTeams = {"Police", "Heroes"}
+				elseif myTeam == "Police" then
+					allyTeams = {"Police", "Heroes"}
+				elseif myTeam == "Prisoners" then
+					allyTeams = {"Criminals", "Prisoners", "Villains"}
+				elseif myTeam == "Criminals" then
+					allyTeams = {"Criminals", "Prisoners", "Villains"}
+				elseif myTeam == "Villains" then
+					allyTeams = {"Criminals", "Prisoners", "Villains"}
+				end
+				local function onCharacterAdded(player)
+					local charConn
+					charConn = player.CharacterAdded:Connect(function(char)
+						charConn:Disconnect()
+						local playerTeam = player.Team and player.Team.Name or ""
+						local isAlly = false
+						for _, ally in pairs(allyTeams) do
+							if playerTeam == ally then
+								isAlly = true
+								break
+							end
+						end
+						if not isAlly and player ~= LocalPlayer then
+							local childAddedConn
+							childAddedConn = char.ChildAdded:Connect(function(child)
+								if child.Name == partName then
+									childAddedConn:Disconnect()
+									task.wait(0.1)
+									local extender = Instance.new("Part")
+									extender.Name = "HitboxExtender"
+									extender.Size = size
+									extender.Transparency = 1
+									extender.CanCollide = false
+									extender.Anchored = false
+									extender.Parent = child
+									local weld = Instance.new("WeldConstraint")
+									weld.Part0 = child
+									weld.Part1 = extender
+									weld.Parent = child
+								end
+							end)
+							table.insert(hitboxConnections, childAddedConn)
+						end
+					end)
+					table.insert(hitboxConnections, charConn)
+				end
+				for _, player in pairs(Players:GetPlayers()) do
+					onCharacterAdded(player)
+				end
+				local playerAddedConn = Players.PlayerAdded:Connect(onCharacterAdded)
+				table.insert(hitboxConnections, playerAddedConn)
+			else
+				clearHitboxConnections()
+			end
+		end
+	})
+
+	teamGroup:AddLabel('Current Team: ' .. (LocalPlayer.Team and LocalPlayer.Team.Name or "None"))
+	teamGroup:AddDropdown('ChangeTeam', {
+		Values = {"Police", "Prisoners", "Heroes"},
+		Default = 1,
+		Multi = false,
+		Text = 'Change Team',
+		Callback = function(value)
+			local args = {"SetTeam", value}
+			invokeRemoteSafely(args)
+			Library:Notify("Team changed to " .. value, 2)
+		end
+	})
+end
+
+local function setupInfiniteBomb()
+	local bombGroup = Tabs.VIP:AddRightGroupbox('Infinite Bomb')
+	bombGroup:AddToggle('InfiniteBomb', {
+		Text = 'Infinite Bomb (G Key)',
+		Default = false,
+		Callback = function(value)
+			if value then
+				local function onKeyPress(input)
+					if input.KeyCode == Enum.KeyCode.G and not input.GameProcessed then
+						local args = {"DropBomb"}
+						fireEventSafely(args)
+					end
+				end
+				bombConnection = UserInputService.InputBegan:Connect(onKeyPress)
+			else
+				if bombConnection then
+					bombConnection:Disconnect()
+					bombConnection = nil
+				end
+			end
+		end
+	})
+end
+
+pcall(function()
+	local CameraShaker = require(ReplicatedStorage.Modules.CameraShaker)
+	local returnnil = function() return nil end
+	CameraShaker.StartShake = returnnil
+	CameraShaker.ShakeOnce = returnnil
+	CameraShaker.ShakeSustain = returnnil
+	CameraShaker.CameraShakeInstance = returnnil
+	CameraShaker.Shake = returnnil
+	CameraShaker.Start = returnnil
+end)
+
+setupVIP()
+setupInfiniteBomb()
+setupVehicle()
+setupCombat()
+setupHitbox()
+
+local fovUpdateConn = RunService.RenderStepped:Connect(updateFOVCircle)
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+MenuGroup:AddToggle("KeybindMenuOpen", {
+	Default = Library.KeybindFrame.Visible,
+	Text = "Open Keybind Menu",
+	Callback = function(value) Library.KeybindFrame.Visible = value end
+})
+MenuGroup:AddToggle("ShowCustomCursor", {
+	Text = "Custom Cursor",
+	Default = true,
+	Callback = function(Value) Library.ShowCustomCursor = Value end
+})
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
+	Default = "RightShift",
+	NoUI = true,
+	Text = "Menu keybind"
+})
+MenuGroup:AddButton("Unload", function()
+	clearConnections()
+	clearLoops()
+	clearHitboxConnections()
+	clearEspConnections()
+	if fovCircle then fovCircle:Remove() end
+	if fovUpdateConn then fovUpdateConn:Disconnect() end
+	if bombConnection then bombConnection:Disconnect() end
+	if vrMouseConnection then vrMouseConnection:Disconnect() end
+	Library:Unload()
+end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+ThemeManager:SetFolder('MyScriptHub')
+SaveManager:SetFolder('MyScriptHub/specific-game')
+SaveManager:SetSubFolder('specific-place')
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
+
+Library:OnUnload(function()
+	clearConnections()
+	clearLoops()
+	clearHitboxConnections()
+	clearEspConnections()
+	if fovCircle then fovCircle:Remove() end
+	if fovUpdateConn then fovUpdateConn:Disconnect() end
+	if bombConnection then bombConnection:Disconnect() end
+	if vrMouseConnection then vrMouseConnection:Disconnect() end
+	print('Unloaded!')
+	Library.Unloaded = true
+end)
+
+print("Menu loaded successfully!")
