@@ -429,23 +429,21 @@ local function setupVIP()
 	})
 
 	vipRightGroup:AddButton({
-		Text = 'Keycard Pickpocket',
-		Func = function()
-			task.spawn(function()
-				for i = 1, 50 do
-					for _, v in pairs(Players:GetPlayers()) do
-						if v ~= LocalPlayer then
-							local args = {"Pickpocket", v}
-							fireEventSafely(args)
-						end
+	Text = 'Keycard Pickpocket',
+	Func = function()
+		task.spawn(function()
+			for i = 1, 50 do
+				for _, v in pairs(Players:GetPlayers()) do
+					if v ~= LocalPlayer then
+						ReplicatedStorage.Event:FireServer("Pickpocket", v)
 					end
-					task.wait(0.001)
 				end
-				Library:Notify("Keycard pickpocket executed!", 2)
-			end)
-		end
-	})
-end
+				task.wait(0.001)
+			end
+			Library:Notify("Keycard pickpocket executed!", 2)
+		end)
+	end
+})
 
 local function setupVehicle()
 	local vehicleSpawnGroup = Tabs.Vehicle:AddLeftGroupbox('🚗 Araç Spawn')
@@ -1282,5 +1280,6 @@ Library:OnUnload(function()
 	print('Unloaded!')
 	Library.Unloaded = true
 end)
+
 
 print("Menu loaded successfully!")
