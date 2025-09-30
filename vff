@@ -1,1398 +1,269 @@
-local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
-local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
-local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
-
-local CollectionService = game:GetService("CollectionService")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
+local SoundService = game:GetService("SoundService")
+local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local Camera = Workspace.CurrentCamera
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local LocalPlayer = Players.LocalPlayer
-local Options = Library.Options
-local Toggles = Library.Toggles
+local SCRIPT_URL = "https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/fer"
+local LOADER_DURATION = 6
 
-Library.ShowToggleFrameInKeybinds = true
-Library.ShowCustomCursor = true
-Library.NotifySide = "Left"
-
-local gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
-local Window = Library:CreateWindow({
-    Title = '🔥 ' .. gameName .. ' 🔥',
-    Center = true,
-    AutoShow = true,
-    Resizable = true,
-    ShowCustomCursor = true,
-    UnlockMouseWhileOpen = true,
-    NotifySide = "Left",
-    TabPadding = 8,
-    MenuFadeTime = 0.2
-})
-
-local Tabs = {
-    Hitbox = Window:AddTab('Hitbox'),
-    Aimbot = Window:AddTab('Aimbot'),
-    SilentAim = Window:AddTab('Silent Aim'),
-    VIP = Window:AddTab('VIP'),
-    ['UI Ayarları'] = Window:AddTab('UI Ayarları'),
-}
-
-Library:SetWatermarkVisibility(false)
-
--- Settings
-local HitboxSettings = {
-    Enabled = false,
-    Size = 8,
-    Transparency = 0.7,
-    BodyPart = "Head",
-    Optimized = false,
-}
-
-local AimbotSettings = {
-    Enabled = false,
-    Mode = "Hold",
-    Keybind = Enum.UserInputType.MouseButton2,
-    FOV = 100,
-    FOVVisible = true,
-    FOVTransparency = 0.5,
-    FOVColor = Color3.fromRGB(255, 255, 255),
-    FOVThickness = 1,
-    FOVNumSides = 64,
-    MaxDistance = 1000,
-    WallCheck = true,
-    VisibleCheck = true,
-    TeamCheck = true,
-    TargetAimbot = false,
-    TargetPlayer = nil,
-    Triggerbot = false,
-    TriggerbotWallCheck = true,
-    TriggerbotVisibleCheck = true,
-    TriggerbotTeamCheck = true,
-    AimbotBodyPart = "Head",
-}
-
-local SilentAimSettings = {
-    Enabled = false,
-    Mode = "All", -- All, Nearby, FOV
-    BodyPart = "HumanoidRootPart",
-    HitboxEnabled = false,
-    HitboxSize = 100,
-    HitboxTransparency = 0.7,
-    Distance = 50, -- for Nearby
-    FOV = 200,
-    FOVVisible = true,
-    FOVTransparency = 0.5,
-    FOVColor = Color3.fromRGB(255, 255, 255),
-    FOVThickness = 1,
-    FOVNumSides = 64,
-    MaxDistance = 1000,
-    TeamCheck = true,
-}
-
-local VIPSettings = {
-    PunchKillAura = false,
-    MeleeKillAura = false,
-    GrenadeKeybind = Enum.KeyCode.G,
-    ShottySilentAim = false,
-    ShottyDistance = 30,
-    SelectedPlayer = nil,
-    SelectedWheel = "Random",
-}
-
-local ActiveHitboxes = {} -- for regular hitbox
-local ActiveVRHitboxes = {} -- separate for VR hitbox to avoid conflicts
-local IgnoredPlayerName = "MAD_CITYAIMBOTLOL"
-local Connections = {}
-local HitboxTag = "HitboxExpanded"
-local VRHitboxTag = "VRHitboxExpanded"
-local AimbotLocked = false
-local AimbotTarget = nil
-local FixedTargetPart = nil
-local TriggerbotDebounce = false
-local OptimizedConn = nil
-local KillAuraDebounce = false
-local ShottyDebounce = false
-local SilentAimDebounce = false
-
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Visible = false
-FOVCircle.Radius = AimbotSettings.FOV
-FOVCircle.Thickness = AimbotSettings.FOVThickness
-FOVCircle.Color = AimbotSettings.FOVColor
-FOVCircle.Transparency = AimbotSettings.FOVTransparency
-FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-FOVCircle.NumSides = AimbotSettings.FOVNumSides
-
-local VRFOVCircle = Drawing.new("Circle")
-VRFOVCircle.Visible = false
-VRFOVCircle.Radius = SilentAimSettings.FOV
-VRFOVCircle.Thickness = SilentAimSettings.FOVThickness
-VRFOVCircle.Color = SilentAimSettings.FOVColor
-VRFOVCircle.Transparency = SilentAimSettings.FOVTransparency
-VRFOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-VRFOVCircle.NumSides = SilentAimSettings.FOVNumSides
-
--- Team-based player filtering
-local function GetTeamFilteredPlayers()
-    local players = {}
-    local localTeam = LocalPlayer.Team and LocalPlayer.Team.Name or ""
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName then
-            local playerTeam = player.Team and player.Team.Name or ""
-            local exclude = false
-            if localTeam == "Police" or localTeam == "Heroes" then
-                exclude = playerTeam == "Police" or playerTeam == "Heroes"
-            elseif localTeam == "Prisoners" or localTeam == "Criminals" or localTeam == "Villains" then
-                exclude = playerTeam == "Prisoners" or playerTeam == "Criminals" or playerTeam == "Villains"
-            end
-            if not exclude then
-                table.insert(players, {Name = player.Name})
-            end
-        end
-    end
-    return players
-end
-
-local function UpdateVIPDropdown()
-    local players = GetTeamFilteredPlayers()
-    local values = {}
-    for _, p in ipairs(players) do
-        table.insert(values, p.Name)
-    end
-    Options.VIPPlayerDropdown:SetValues(values)
-    if #values > 0 and not table.find(values, VIPSettings.SelectedPlayer) then
-        Options.VIPPlayerDropdown:SetValue(values[1])
-    elseif #values == 0 then
-        Options.VIPPlayerDropdown:SetValue(nil)
-    end
-end
-
-local function ShouldExpandHitbox(player)
-    if not player or player == LocalPlayer or player.Name == IgnoredPlayerName then
-        return false
-    end
-    local playerTeam = player.Team and player.Team.Name or ""
-    local localTeam = LocalPlayer.Team and LocalPlayer.Team.Name or ""
-    if localTeam == "Prisoners" or localTeam == "Criminals" or localTeam == "Villains" then
-        return playerTeam == "Police" or playerTeam == "Heroes"
-    elseif localTeam == "Police" or localTeam == "Heroes" then
-        return playerTeam == "Prisoners" or playerTeam == "Criminals" or playerTeam == "Villains"
-    end
-    return true
-end
-
-local function IsPlayerVisible(player, part)
-    if not part or not player or not player.Character then
-        return true
-    end
-    local ignoreList = {LocalPlayer.Character, Camera}
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    raycastParams.FilterDescendantsInstances = ignoreList
-    raycastParams.IgnoreWater = true
-    local origin = Camera.CFrame.Position
-    local direction = (part.Position - origin).Unit * math.min(AimbotSettings.MaxDistance, SilentAimSettings.MaxDistance)
-    local result = Workspace:Raycast(origin, direction, raycastParams)
-    return result and result.Instance and result.Instance:IsDescendantOf(player.Character)
-end
-
-local function IsPlayerBehindWall(player, part)
-    if not part or not player or not player.Character then
-        return false
-    end
-    local ignoreList = {LocalPlayer.Character, Camera}
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    raycastParams.FilterDescendantsInstances = ignoreList
-    raycastParams.IgnoreWater = true
-    local origin = Camera.CFrame.Position
-    local direction = (part.Position - origin).Unit * math.min(AimbotSettings.MaxDistance, SilentAimSettings.MaxDistance)
-    local result = Workspace:Raycast(origin, direction, raycastParams)
-    return not (result and result.Instance and result.Instance:IsDescendantOf(player.Character))
-end
-
-local function IsWithinFOV(part, fov)
-    if not part then
-        return false
-    end
-    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-    if not onScreen then
-        return false
-    end
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local distance = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-    return distance <= fov
-end
-
-local function IsInView(player, distanceLimit)
-    if not player or not player.Character then return false end
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-    local part = player.Character:FindFirstChild("Head") -- Use Head for visibility check
-    if not humanoid or humanoid.Health <= 0 or not part then return false end
-    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-    if not onScreen then return false end
-    local distance = (part.Position - Camera.CFrame.Position).Magnitude
-    if distance > (distanceLimit or math.huge) then return false end
-    return true
-end
-
-local function GetClosestPlayer()
-    if AimbotSettings.TargetAimbot and AimbotSettings.TargetPlayer then
-        local player = Players:FindFirstChild(AimbotSettings.TargetPlayer)
-        if player and player.Character and player.Character:IsDescendantOf(Workspace) then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            local part = player.Character:FindFirstChild(AimbotSettings.AimbotBodyPart)
-            if humanoid and humanoid.Health > 0 and part and part:IsA("BasePart") then
-                if (not AimbotSettings.TeamCheck or ShouldExpandHitbox(player)) and
-                   IsWithinFOV(part, AimbotSettings.FOV) and
-                   (not AimbotSettings.WallCheck or not IsPlayerBehindWall(player, part)) and
-                   (not AimbotSettings.VisibleCheck or IsPlayerVisible(player, part)) then
-                    return player, part
-                end
-            end
-        end
-        return nil, nil
-    end
-
-    local closestPlayer, closestPart, closestDistance = nil, nil, math.huge
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName and player.Character and player.Character:IsDescendantOf(Workspace) then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            local part = player.Character:FindFirstChild(AimbotSettings.AimbotBodyPart)
-            if humanoid and humanoid.Health > 0 and part and part:IsA("BasePart") then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen then
-                    local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                    local worldDist = (Camera.CFrame.Position - part.Position).Magnitude
-                    if worldDist <= AimbotSettings.MaxDistance and screenDist < closestDistance and
-                       (not AimbotSettings.TeamCheck or ShouldExpandHitbox(player)) and
-                       IsWithinFOV(part, AimbotSettings.FOV) and
-                       (not AimbotSettings.WallCheck or not IsPlayerBehindWall(player, part)) and
-                       (not AimbotSettings.VisibleCheck or IsPlayerVisible(player, part)) then
-                        closestPlayer, closestPart, closestDistance = player, part, screenDist
-                    end
-                end
-            end
-        end
-    end
-    return closestPlayer, closestPart
-end
-
-local function ApplyHitbox(player)
-    if not HitboxSettings.Enabled or not ShouldExpandHitbox(player) or not player then
-        return
-    end
-    local character = player.Character
-    if not character or not character:IsDescendantOf(Workspace) then
-        return
-    end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then
-        return
-    end
-    local part = character:FindFirstChild(HitboxSettings.BodyPart)
-    if part and part:IsA("BasePart") and not ActiveHitboxes[player] then
-        ActiveHitboxes[player] = {
-            part = part,
-            originalSize = part.Size,
-            originalMassless = part.Massless,
-            originalTransparency = part.Transparency,
-            originalCanCollide = part.CanCollide
-        }
-        part.Size = Vector3.new(HitboxSettings.Size, HitboxSettings.Size, HitboxSettings.Size)
-        part.Transparency = HitboxSettings.Transparency
-        part.CanCollide = false
-        part.Massless = true
-        CollectionService:AddTag(part, HitboxTag)
-    end
-end
-
-local function RestoreHitbox(player)
-    if ActiveHitboxes[player] then
-        local data = ActiveHitboxes[player]
-        local part = data.part
-        if part and part:IsA("BasePart") and part:IsDescendantOf(Workspace) then
-            part.Size = data.originalSize
-            part.Transparency = data.originalTransparency
-            part.CanCollide = data.originalCanCollide
-            part.Massless = data.originalMassless
-            CollectionService:RemoveTag(part, HitboxTag)
-        end
-        ActiveHitboxes[player] = nil
-    end
-end
-
-local function UpdateAllHitboxes()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName then
-            RestoreHitbox(player)
-            if HitboxSettings.Enabled and ShouldExpandHitbox(player) then
-                task.defer(ApplyHitbox, player)
-            end
-        end
-    end
-end
-
-local function UpdateVisibleHitboxes()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName then
-            if HitboxSettings.Enabled and ShouldExpandHitbox(player) and IsInView(player, AimbotSettings.MaxDistance) then
-                task.defer(ApplyHitbox, player)
-            else
-                RestoreHitbox(player)
-            end
-        end
-    end
-end
-
-local function ToggleOptimized(value)
-    HitboxSettings.Optimized = value
-    if value then
-        if OptimizedConn then OptimizedConn:Disconnect() end
-        OptimizedConn = RunService.Heartbeat:Connect(UpdateVisibleHitboxes)
-        Library:Notify("Optimized Hitbox Modu Etkinleştirildi", 3)
+local function SafeTween(object, tweenInfo, properties)
+    local success, tween = pcall(function()
+        return TweenService:Create(object, tweenInfo, properties)
+    end)
+    if success then
+        tween:Play()
+        return tween
     else
-        if OptimizedConn then
-            OptimizedConn:Disconnect()
-            OptimizedConn = nil
-        end
-        UpdateAllHitboxes()
-        Library:Notify("Optimized Hitbox Modu Devre Dışı Bırakıldı", 3)
+        warn("Tween oluşturma hatası: " .. tostring(tween))
+        return nil
     end
 end
 
-local function ApplyVRHitbox(player)
-    if not SilentAimSettings.HitboxEnabled or not ShouldExpandHitbox(player) or not player then
-        return
-    end
-    local character = player.Character
-    if not character or not character:IsDescendantOf(Workspace) then
-        return
-    end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then
-        return
-    end
-    if not ActiveVRHitboxes[player] then
-        ActiveVRHitboxes[player] = {}
-    end
-    for _, part in ipairs(character:GetChildren()) do
-        if part:IsA("BasePart") and not ActiveVRHitboxes[player][part.Name] then
-            -- Limit size for Head to avoid bugs
-            local size = (part.Name == "Head") and math.min(SilentAimSettings.HitboxSize, 20) or SilentAimSettings.HitboxSize
-            ActiveVRHitboxes[player][part.Name] = {
-                part = part,
-                originalSize = part.Size,
-                originalMassless = part.Massless,
-                originalTransparency = part.Transparency,
-                originalCanCollide = part.CanCollide
-            }
-            part.Size = Vector3.new(size, size, size)
-            part.Transparency = SilentAimSettings.HitboxTransparency
-            part.CanCollide = false
-            part.Massless = true
-            CollectionService:AddTag(part, VRHitboxTag)
-        end
-    end
-end
+local function CreateModernLoader()
+    local success, result = pcall(function()
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "ModernLoaderGui"
+        ScreenGui.IgnoreGuiInset = true
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui", 10)
 
-local function RestoreVRHitbox(player)
-    if ActiveVRHitboxes[player] then
-        for _, data in pairs(ActiveVRHitboxes[player]) do
-            local part = data.part
-            if part and part:IsA("BasePart") and part:IsDescendantOf(Workspace) then
-                part.Size = data.originalSize
-                part.Transparency = data.originalTransparency
-                part.CanCollide = data.originalCanCollide
-                part.Massless = data.originalMassless
-                CollectionService:RemoveTag(part, VRHitboxTag)
-            end
-        end
-        ActiveVRHitboxes[player] = nil
-    end
-end
-
-local function UpdateAllVRHitboxes()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName then
-            RestoreVRHitbox(player)
-            if SilentAimSettings.HitboxEnabled and ShouldExpandHitbox(player) then
-                task.defer(ApplyVRHitbox, player)
-            end
-        end
-    end
-end
-
-local function SendVR(player, part)
-    if not player or not part then return end
-    pcall(function()
-        local args = { [1] = "VR", [2] = part }
-        ReplicatedStorage:WaitForChild("Event"):FireServer(unpack(args))
-    end)
-end
-
-local function SilentAimLoop(input)
-    if not SilentAimSettings.Enabled or SilentAimDebounce then return end
-    SilentAimDebounce = true
-    task.spawn(function()
-        local targets = {}
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName and player.Character and player.Character:IsDescendantOf(Workspace) then
-                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                local part = player.Character:FindFirstChild(SilentAimSettings.BodyPart)
-                if humanoid and humanoid.Health > 0 and part and (not SilentAimSettings.TeamCheck or ShouldExpandHitbox(player)) then
-                    local distance = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                    local inRange = true
-                    if SilentAimSettings.Mode == "Nearby" then
-                        inRange = distance <= SilentAimSettings.Distance
-                    elseif SilentAimSettings.Mode == "FOV" then
-                        inRange = IsWithinFOV(part, SilentAimSettings.FOV)
-                    elseif SilentAimSettings.Mode == "All" then
-                        inRange = distance <= SilentAimSettings.MaxDistance
-                    end
-                    if inRange then
-                        table.insert(targets, {player = player, part = part})
-                    end
-                end
-            end
-        end
-        for _, target in ipairs(targets) do
-            SendVR(target.player, target.part)
-        end
-        SilentAimDebounce = false
-    end)
-end
-
-local function SendPunch(player)
-    if not player or not player.Character or not player.Character:IsDescendantOf(Workspace) then return end
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-    if humanoid and humanoid.Health > 0 then
-        for _ = 1, 10 do
-            pcall(function()
-                local args = { [1] = "Punch", [2] = humanoid }
-                ReplicatedStorage:WaitForChild("Event"):FireServer(unpack(args))
-            end)
-            task.wait(0.01)
-        end
-    end
-end
-
-local function SendMelee(player)
-    if not player or not player.Character or not player.Character:IsDescendantOf(Workspace) then return end
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-    if humanoid and humanoid.Health > 0 then
-        for _ = 1, 10 do
-            pcall(function()
-                local args = { [1] = "Melee", [2] = humanoid }
-                ReplicatedStorage:WaitForChild("Event"):FireServer(unpack(args))
-            end)
-            task.wait(0.01)
-        end
-    end
-end
-
-local function KillAuraLoop()
-    if not (VIPSettings.PunchKillAura or VIPSettings.MeleeKillAura) or KillAuraDebounce then return end
-    KillAuraDebounce = true
-    task.spawn(function()
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName and player.Character and player.Character:IsDescendantOf(Workspace) then
-                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.Health > 0 and ShouldExpandHitbox(player) then
-                    local distance = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                    if distance <= 10 then
-                        if VIPSettings.PunchKillAura then
-                            task.defer(SendPunch, player)
-                        end
-                        if VIPSettings.MeleeKillAura then
-                            task.defer(SendMelee, player)
-                        end
-                    end
-                end
-            end
-        end
-        KillAuraDebounce = false
-    end)
-end
-
-local function ThrowGrenade(targetPos)
-    pcall(function()
-        local args = { [1] = "ThrowGrenade", [2] = targetPos }
-        ReplicatedStorage:WaitForChild("Event"):FireServer(unpack(args))
-    end)
-end
-
-local function SendShotty(target)
-    pcall(function()
-        local args = { [1] = "SHOTTY", [2] = target }
-        ReplicatedStorage:WaitForChild("Event"):FireServer(unpack(args))
-    end)
-end
-
-local function GetVehicleTarget(player, wheel)
-    if not player or not player.Character or not player.Character:IsDescendantOf(Workspace) then return nil end
-    local vehicle = Workspace:FindFirstChild("ObjectSelection"):FindFirstChild(player.Name .. "'s Vehicle")
-    if not vehicle then return nil end
-    if wheel == "Random" then
-        local wheels = {"FrontLeftWheel", "FrontRightWheel", "BackLeftWheel", "BackRightWheel"}
-        wheel = wheels[math.random(1, #wheels)]
-    end
-    local target = vehicle:FindFirstChild(wheel) or vehicle:FindFirstChild("Body"):FindFirstChild("Body") or vehicle:FindFirstChild("Body"):FindFirstChild("Bottom")
-    return target
-end
-
-local function SilentShottyLoop()
-    if not VIPSettings.ShottySilentAim or ShottyDebounce then return end
-    ShottyDebounce = true
-    task.spawn(function()
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName and player.Character and player.Character:IsDescendantOf(Workspace) then
-                local distance = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                if distance <= VIPSettings.ShottyDistance and ShouldExpandHitbox(player) then
-                    local target = GetVehicleTarget(player, VIPSettings.SelectedWheel)
-                    if target then
-                        SendShotty(target)
-                    end
-                end
-            end
-        end
-        ShottyDebounce = false
-    end)
-end
-
-local function SetupPlayer(player)
-    if not player or player == LocalPlayer or player.Name == IgnoredPlayerName then return end
-    Connections[player] = Connections[player] or {}
-
-    local charAddedConn = player.CharacterAdded:Connect(function(character)
-        task.spawn(function()
-            local timeout = tick() + 2
-            while not character:IsDescendantOf(Workspace) or not character:FindFirstChild("HumanoidRootPart") or not character:FindFirstChildOfClass("Humanoid") do
-                if tick() > timeout then return end
-                task.wait()
-            end
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                if HitboxSettings.Enabled and ShouldExpandHitbox(player) and (not HitboxSettings.Optimized or IsInView(player, AimbotSettings.MaxDistance)) then
-                    ApplyHitbox(player)
-                end
-                if SilentAimSettings.HitboxEnabled and ShouldExpandHitbox(player) then
-                    ApplyVRHitbox(player)
-                end
-            end
-        end)
-    end)
-    table.insert(Connections[player], charAddedConn)
-
-    if player.Character then
-        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            local healthConn = humanoid.HealthChanged:Connect(function(health)
-                if health > 0 then
-                    if HitboxSettings.Enabled and ShouldExpandHitbox(player) and (not HitboxSettings.Optimized or IsInView(player, AimbotSettings.MaxDistance)) then
-                        task.defer(ApplyHitbox, player)
-                    end
-                    if SilentAimSettings.HitboxEnabled and ShouldExpandHitbox(player) then
-                        task.defer(ApplyVRHitbox, player)
-                    end
-                else
-                    RestoreHitbox(player)
-                    RestoreVRHitbox(player)
-                end
-            end)
-            table.insert(Connections[player], healthConn)
-
-            local diedConn = humanoid.Died:Connect(function()
-                RestoreHitbox(player)
-                RestoreVRHitbox(player)
-            end)
-            table.insert(Connections[player], diedConn)
-
-            local stateConn = humanoid.StateChanged:Connect(function(_, newState)
-                if newState == Enum.HumanoidStateType.Running then
-                    if HitboxSettings.Enabled and ShouldExpandHitbox(player) and (not HitboxSettings.Optimized or IsInView(player, AimbotSettings.MaxDistance)) then
-                        task.defer(ApplyHitbox, player)
-                    end
-                    if SilentAimSettings.HitboxEnabled and ShouldExpandHitbox(player) then
-                        task.defer(ApplyVRHitbox, player)
-                    end
-                end
-            end)
-            table.insert(Connections[player], stateConn)
-        end
-
-        local ancestryConn = player.Character.AncestryChanged:Connect(function()
-            if player.Character and player.Character:IsDescendantOf(Workspace) then
-                if HitboxSettings.Enabled and ShouldExpandHitbox(player) and (not HitboxSettings.Optimized or IsInView(player, AimbotSettings.MaxDistance)) then
-                    task.defer(ApplyHitbox, player)
-                end
-                if SilentAimSettings.HitboxEnabled and ShouldExpandHitbox(player) then
-                    task.defer(ApplyVRHitbox, player)
-                end
-            end
-        end)
-        table.insert(Connections[player], ancestryConn)
-    end
-
-    if player.Character and player.Character:IsDescendantOf(Workspace) then
-        if HitboxSettings.Enabled and ShouldExpandHitbox(player) and (not HitboxSettings.Optimized or IsInView(player, AimbotSettings.MaxDistance)) then
-            ApplyHitbox(player)
-        end
-        if SilentAimSettings.HitboxEnabled and ShouldExpandHitbox(player) then
-            ApplyVRHitbox(player)
-        end
-    end
-
-    local watchdogConn = RunService.Heartbeat:Connect(function()
-        if not player:IsDescendantOf(game) then return end
-        local character = player.Character
-        if character and character:IsDescendantOf(Workspace) and character:FindFirstChildOfClass("Humanoid") then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                if HitboxSettings.Enabled and ShouldExpandHitbox(player) and not ActiveHitboxes[player] and (not HitboxSettings.Optimized or IsInView(player, AimbotSettings.MaxDistance)) then
-                    task.defer(ApplyHitbox, player)
-                end
-                if SilentAimSettings.HitboxEnabled and ShouldExpandHitbox(player) and not ActiveVRHitboxes[player] then
-                    task.defer(ApplyVRHitbox, player)
-                end
-            end
-        end
-    end)
-    table.insert(Connections[player], watchdogConn)
-end
-
-Players.PlayerAdded:Connect(function(player)
-    SetupPlayer(player)
-    UpdateVIPDropdown()
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    RestoreHitbox(player)
-    RestoreVRHitbox(player)
-    if Connections[player] then
-        for _, conn in ipairs(Connections[player]) do
-            conn:Disconnect()
-        end
-        Connections[player] = nil
-    end
-    if AimbotSettings.TargetPlayer == player.Name then
-        AimbotSettings.TargetPlayer = nil
-        AimbotLocked = false
-        AimbotTarget = nil
-        FixedTargetPart = nil
-    end
-    UpdateVIPDropdown()
-end)
-
-Workspace.ChildAdded:Connect(function(child)
-    if child:IsA("Model") and child:FindFirstChildOfClass("Humanoid") then
-        local player = Players:GetPlayerFromCharacter(child)
-        if player and player ~= LocalPlayer and player.Name ~= IgnoredPlayerName then
-            if HitboxSettings.Enabled and ShouldExpandHitbox(player) and (not HitboxSettings.Optimized or IsInView(player, AimbotSettings.MaxDistance)) then
-                task.defer(ApplyHitbox, player)
-            end
-            if SilentAimSettings.HitboxEnabled and ShouldExpandHitbox(player) then
-                task.defer(ApplyVRHitbox, player)
-            end
-        end
-    end
-end)
-
-Workspace.ChildRemoved:Connect(function(child)
-    if child:IsA("Model") then
-        local player = Players:GetPlayerFromCharacter(child)
-        if player then
-            RestoreHitbox(player)
-            RestoreVRHitbox(player)
-        end
-    end
-end)
-
-local teamConn = LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
-    task.defer(function()
-        if HitboxSettings.Optimized then
-            UpdateVisibleHitboxes()
-        else
-            UpdateAllHitboxes()
-        end
-        UpdateAllVRHitboxes()
-        UpdateVIPDropdown()
-        Library:Notify("Takım değiştirildi, hitbox'lar güncellendi!", 3)
-    end)
-end)
-table.insert(Connections, teamConn)
-
-local aimbotConn = RunService.Heartbeat:Connect(function()
-    if not AimbotSettings.Enabled then
-        AimbotTarget = nil
-        FixedTargetPart = nil
-        FOVCircle.Visible = false
-        return
-    end
-
-    FOVCircle.Radius = AimbotSettings.FOV
-    FOVCircle.Transparency = AimbotSettings.FOVTransparency
-    FOVCircle.Color = AimbotSettings.FOVColor
-    FOVCircle.Thickness = AimbotSettings.FOVThickness
-    FOVCircle.NumSides = AimbotSettings.FOVNumSides
-    FOVCircle.Visible = AimbotSettings.FOVVisible
-    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    if not AimbotLocked then
-        AimbotTarget = nil
-        FixedTargetPart = nil
-        return
-    end
-
-    if AimbotSettings.Mode == "Toggle" then
-        if not FixedTargetPart or not FixedTargetPart.Parent or not FixedTargetPart:IsDescendantOf(Workspace) then
-            local _, part = GetClosestPlayer()
-            FixedTargetPart = part
-        end
-        AimbotTarget = FixedTargetPart
-    else
-        local _, part = GetClosestPlayer()
-        AimbotTarget = part
-    end
-
-    if AimbotTarget then
-        local player = Players:GetPlayerFromCharacter(AimbotTarget.Parent)
-        local humanoid = AimbotTarget.Parent:FindFirstChildOfClass("Humanoid")
-        if not player or not humanoid or humanoid.Health <= 0 or not IsWithinFOV(AimbotTarget, AimbotSettings.FOV) or (AimbotSettings.WallCheck and IsPlayerBehindWall(player, AimbotTarget)) or (AimbotSettings.VisibleCheck and not IsPlayerVisible(player, AimbotTarget)) then
-            AimbotLocked = false
-            FixedTargetPart = nil
-            AimbotTarget = nil
-            Library:Notify("Hedef geçersiz, aimbot kilidi açıldı!", 3)
+        if not ScreenGui.Parent then
+            warn("PlayerGui bulunamadı, loader iptal ediliyor.")
             return
         end
-    else
-        return
-    end
 
-    if AimbotTarget then
-        local targetPos = AimbotTarget.Position
-        local currentPos = Camera.CFrame.Position
-        local newCFrame = CFrame.new(currentPos, targetPos)
-        Camera.CFrame = newCFrame
-    end
+        local BlurEffect = Instance.new("BlurEffect")
+        BlurEffect.Size = 0
+        BlurEffect.Parent = Lighting
 
-    if AimbotSettings.Triggerbot and not TriggerbotDebounce then
-        TriggerbotDebounce = true
-        task.spawn(function()
-            local mousePos = UserInputService:GetMouseLocation()
-            local ray = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-            raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-            local result = Workspace:Raycast(ray.Origin, ray.Direction * AimbotSettings.MaxDistance, raycastParams)
-            if result and result.Instance and CollectionService:HasTag(result.Instance, HitboxTag) then
-                local player = Players:GetPlayerFromCharacter(result.Instance.Parent)
-                if player and (not AimbotSettings.TriggerbotTeamCheck or ShouldExpandHitbox(player)) and
-                   (not AimbotSettings.TriggerbotWallCheck or not IsPlayerBehindWall(player, result.Instance)) and
-                   (not AimbotSettings.TriggerbotVisibleCheck or IsPlayerVisible(player, result.Instance)) then
-                    if mouse1press and mouse1release then
-                        mouse1press()
-                        task.wait(0.01)
-                        mouse1release()
-                    else
-                        Library:Notify("Triggerbot desteklenmiyor!", 3)
-                    end
-                end
-            end
-            TriggerbotDebounce = false
-        end)
-    end
-end)
-table.insert(Connections, aimbotConn)
+        local Overlay = Instance.new("Frame")
+        Overlay.Name = "Overlay"
+        Overlay.Size = UDim2.new(1, 0, 1, 0)
+        Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        Overlay.BackgroundTransparency = 1
+        Overlay.Parent = ScreenGui
 
-local silentAimConn = RunService.Heartbeat:Connect(function()
-    if not SilentAimSettings.Enabled then
-        VRFOVCircle.Visible = false
-        return
-    end
+        local UIGradientOverlay = Instance.new("UIGradient")
+        UIGradientOverlay.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 60)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 10, 30)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 20))
+        }
+        UIGradientOverlay.Rotation = 135
+        UIGradientOverlay.Parent = Overlay
 
-    VRFOVCircle.Radius = SilentAimSettings.FOV
-    VRFOVCircle.Transparency = SilentAimSettings.FOVTransparency
-    VRFOVCircle.Color = SilentAimSettings.FOVColor
-    VRFOVCircle.Thickness = SilentAimSettings.FOVThickness
-    VRFOVCircle.NumSides = SilentAimSettings.FOVNumSides
-    VRFOVCircle.Visible = (SilentAimSettings.Mode == "FOV") and SilentAimSettings.FOVVisible
-    VRFOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-end)
-table.insert(Connections, silentAimConn)
+        local LoaderFrame = Instance.new("Frame")
+        LoaderFrame.Name = "LoaderFrame"
+        LoaderFrame.Size = UDim2.new(0.5, 0, 0.35, 0)
+        LoaderFrame.Position = UDim2.new(0.25, 0, 0.325, 0)
+        LoaderFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 50)
+        LoaderFrame.BackgroundTransparency = 1
+        LoaderFrame.Parent = Overlay
 
-local killAuraConn = RunService.Heartbeat:Connect(function()
-    KillAuraLoop()
-    SilentShottyLoop()
-end)
-table.insert(Connections, killAuraConn)
+        local UICornerFrame = Instance.new("UICorner")
+        UICornerFrame.CornerRadius = UDim.new(0, 25)
+        UICornerFrame.Parent = LoaderFrame
 
-local inputConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    local isAimbotKey = (input.UserInputType == AimbotSettings.Keybind) or (input.KeyCode == AimbotSettings.Keybind)
-    local isGrenadeKey = (input.KeyCode == VIPSettings.GrenadeKeybind)
-    local isMouse1 = (input.UserInputType == Enum.UserInputType.MouseButton1)
+        local UIStrokeFrame = Instance.new("UIStroke")
+        UIStrokeFrame.Thickness = 2.5
+        UIStrokeFrame.Color = Color3.fromRGB(80, 80, 255)
+        UIStrokeFrame.Transparency = 0.6
+        UIStrokeFrame.Parent = LoaderFrame
 
-    if isAimbotKey then
-        if AimbotSettings.Mode == "Hold" then
-            AimbotLocked = true
-        elseif AimbotSettings.Mode == "Toggle" then
-            AimbotLocked = not AimbotLocked
-            if AimbotLocked then
-                local _, part = GetClosestPlayer()
-                FixedTargetPart = part
-            else
-                FixedTargetPart = nil
-            end
-            Library:Notify("Aimbot " .. (AimbotLocked and "Kilitlendi" or "Kilidi Açıldı"), 3)
-        end
-    elseif isGrenadeKey then
-        task.spawn(function()
-            if VIPSettings.SelectedPlayer then
-                local player = Players:FindFirstChild(VIPSettings.SelectedPlayer)
-                if player and player.Character and player.Character.HumanoidRootPart then
-                    ThrowGrenade(player.Character.HumanoidRootPart.Position)
-                end
-            else
-                local mousePos = UserInputService:GetMouseLocation()
-                local ray = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
-                local result = Workspace:Raycast(ray.Origin, ray.Direction * 1000)
-                if result then
-                    ThrowGrenade(result.Position)
-                end
-            end
-        end)
-    elseif isMouse1 then
-        if VIPSettings.SelectedPlayer and VIPSettings.ShottySilentAim then
-            task.spawn(function()
-                local player = Players:FindFirstChild(VIPSettings.SelectedPlayer)
-                if player then
-                    local target = GetVehicleTarget(player, VIPSettings.SelectedWheel)
-                    if target then
-                        SendShotty(target)
-                    end
+        local Shadow = Instance.new("ImageLabel")
+        Shadow.Name = "Shadow"
+        Shadow.Size = UDim2.new(1, 20, 1, 20)
+        Shadow.Position = UDim2.new(0, -10, 0, -10)
+        Shadow.BackgroundTransparency = 1
+        Shadow.Image = "rbxasset://textures/ui/DropShadow.png"
+        Shadow.ImageTransparency = 0.8
+        Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+        Shadow.ZIndex = -1
+        Shadow.Parent = LoaderFrame
+
+        local Title = Instance.new("TextLabel")
+        Title.Name = "Title"
+        Title.Size = UDim2.new(1, 0, 0.35, 0)
+        Title.BackgroundTransparency = 1
+        Title.Text = "Sistem Yükleniyor"
+        Title.TextColor3 = Color3.fromRGB(220, 220, 255)
+        Title.TextSize = 48
+        Title.Font = Enum.Font.GothamBlack
+        Title.TextTransparency = 1
+        Title.TextStrokeTransparency = 0.8
+        Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        Title.Parent = LoaderFrame
+
+        local Status = Instance.new("TextLabel")
+        Status.Name = "Status"
+        Status.Size = UDim2.new(1, 0, 0.2, 0)
+        Status.Position = UDim2.new(0, 0, 0.75, 0)
+        Status.BackgroundTransparency = 1
+        Status.Text = "Başlatılıyor..."
+        Status.TextColor3 = Color3.fromRGB(180, 180, 255)
+        Status.TextSize = 28
+        Status.Font = Enum.Font.Gotham
+        Status.TextTransparency = 1
+        Status.Parent = LoaderFrame
+
+        local ProgressContainer = Instance.new("Frame")
+        ProgressContainer.Name = "ProgressContainer"
+        ProgressContainer.Size = UDim2.new(0.85, 0, 0.1, 0)
+        ProgressContainer.Position = UDim2.new(0.075, 0, 0.55, 0)
+        ProgressContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 40)
+        ProgressContainer.BackgroundTransparency = 0.6
+        ProgressContainer.Parent = LoaderFrame
+
+        local UICornerProgress = Instance.new("UICorner")
+        UICornerProgress.CornerRadius = UDim.new(0, 15)
+        UICornerProgress.Parent = ProgressContainer
+
+        local UIStrokeProgress = Instance.new("UIStroke")
+        UIStrokeProgress.Thickness = 1.5
+        UIStrokeProgress.Color = Color3.fromRGB(60, 60, 200)
+        UIStrokeProgress.Transparency = 0.7
+        UIStrokeProgress.Parent = ProgressContainer
+
+        local ProgressBar = Instance.new("Frame")
+        ProgressBar.Name = "ProgressBar"
+        ProgressBar.Size = UDim2.new(0, 0, 1, 0)
+        ProgressBar.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+        ProgressBar.Parent = ProgressContainer
+
+        local UIGradientProgress = Instance.new("UIGradient")
+        UIGradientProgress.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 120, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 80, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 40, 200))
+        }
+        UIGradientProgress.Rotation = 45
+        UIGradientProgress.Parent = ProgressBar
+
+        local UICornerBar = Instance.new("UICorner")
+        UICornerBar.CornerRadius = UDim.new(0, 15)
+        UICornerBar.Parent = ProgressBar
+
+        local Glow = Instance.new("ImageLabel")
+        Glow.Name = "Glow"
+        Glow.Size = UDim2.new(0.2, 0, 1.5, 0)
+        Glow.Position = UDim2.new(1, -20, -0.25, 0)
+        Glow.BackgroundTransparency = 1
+        Glow.Image = "rbxasset://textures/ui/Glow.png"
+        Glow.ImageTransparency = 0.7
+        Glow.ImageColor3 = Color3.fromRGB(150, 150, 255)
+        Glow.Parent = ProgressBar
+
+        local LoadingSound = Instance.new("Sound")
+        LoadingSound.Name = "LoadingSound"
+        LoadingSound.SoundId = "rbxasset://sounds/uuhhh.mp3"
+        LoadingSound.Volume = 0.4
+        LoadingSound.Looped = true
+        LoadingSound.Parent = SoundService
+        LoadingSound:Play()
+
+        local CompletionSound = Instance.new("Sound")
+        CompletionSound.Name = "CompletionSound"
+        CompletionSound.SoundId = "rbxasset://sounds/swoosh.mp3"
+        CompletionSound.Volume = 0.6
+        CompletionSound.Parent = SoundService
+
+        local function AnimateLoader()
+            local fadeInInfo = TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+            SafeTween(Overlay, fadeInInfo, {BackgroundTransparency = 0.2})
+            SafeTween(LoaderFrame, fadeInInfo, {BackgroundTransparency = 0})
+            SafeTween(Title, fadeInInfo, {TextTransparency = 0})
+            SafeTween(Status, fadeInInfo, {TextTransparency = 0})
+            SafeTween(BlurEffect, fadeInInfo, {Size = 30})
+            SafeTween(Shadow, fadeInInfo, {ImageTransparency = 0.5})
+
+            local progressInfo = TweenInfo.new(LOADER_DURATION, Enum.EasingStyle.Linear)
+            local progressTween = SafeTween(ProgressBar, progressInfo, {Size = UDim2.new(1, 0, 1, 0)})
+
+            local glowInfo = TweenInfo.new(LOADER_DURATION / 2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+            SafeTween(Glow, glowInfo, {ImageTransparency = 0.4})
+
+            local statusMessages = {
+                "Başlatılıyor...",
+                "Veriler Yükleniyor...",
+                "Bağlantılar Kuruluyor...",
+                "Sistem Optimize Ediliyor...",
+                "Tamamlanıyor..."
+            }
+            local currentIndex = 1
+            local statusCoroutine = coroutine.create(function()
+                while LoaderFrame.Parent do
+                    Status.Text = statusMessages[currentIndex]
+                    currentIndex = (currentIndex % #statusMessages) + 1
+
+                    local bumpInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                    SafeTween(Status, bumpInfo, {TextSize = 30})
+                    task.wait(0.3)
+                    SafeTween(Status, bumpInfo, {TextSize = 28})
+
+                    task.wait(LOADER_DURATION / #statusMessages)
                 end
             end)
-        end
-        if SilentAimSettings.Enabled then
-            SilentAimLoop(input)
-        end
-    end
-end)
-table.insert(Connections, inputConn)
+            coroutine.resume(statusCoroutine)
 
-local inputEndConn = UserInputService.InputEnded:Connect(function(input)
-    if AimbotSettings.Mode == "Hold" then
-        local isKeybind = (input.UserInputType == AimbotSettings.Keybind) or (input.KeyCode == AimbotSettings.Keybind)
-        if isKeybind then
-            AimbotLocked = false
-            AimbotTarget = nil
-        end
-    end
-end)
-table.insert(Connections, inputEndConn)
+            local pulseInfo = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+            SafeTween(UIStrokeFrame, pulseInfo, {Transparency = 0.3})
 
-for _, player in ipairs(Players:GetPlayers()) do
-    SetupPlayer(player)
+            local colorInfo = TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+            SafeTween(UIStrokeFrame, colorInfo, {Color = Color3.fromRGB(120, 120, 255)})
+        end
+
+        AnimateLoader()
+
+        task.wait(LOADER_DURATION)
+
+        LoadingSound:Stop()
+        CompletionSound:Play()
+
+        local fadeOutInfo = TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.In)
+        SafeTween(Overlay, fadeOutInfo, {BackgroundTransparency = 1})
+        SafeTween(LoaderFrame, fadeOutInfo, {BackgroundTransparency = 1})
+        SafeTween(Title, fadeOutInfo, {TextTransparency = 1})
+        SafeTween(Status, fadeOutInfo, {TextTransparency = 1})
+        SafeTween(BlurEffect, fadeOutInfo, {Size = 0})
+        SafeTween(Shadow, fadeOutInfo, {ImageTransparency = 1})
+
+        task.wait(1)
+
+        ScreenGui:Destroy()
+        BlurEffect:Destroy()
+        LoadingSound:Destroy()
+        CompletionSound:Destroy()
+    end)
+
+    if not success then
+        warn("Loader sırasında hata oluştu: " .. tostring(result))
+    end
 end
 
--- UI Setup - Türkçe
-local HitboxGroupBox = Tabs.Hitbox:AddLeftGroupbox('Hitbox Kontrolleri')
-HitboxGroupBox:AddToggle('HitboxToggle', {
-    Text = 'Hitbox Genişletmeyi Etkinleştir',
-    Default = false,
-    Tooltip = 'Hitbox genişletmeyi aç/kapat',
-    Risky = true,
-    Callback = function(Value)
-        HitboxSettings.Enabled = Value
-        if Value then
-            if HitboxSettings.Optimized then
-                ToggleOptimized(true)
-            else
-                UpdateAllHitboxes()
+CreateModernLoader()
+
+local function LoadScript()
+    local success, scriptContent = pcall(function()
+        return game:HttpGet(SCRIPT_URL)
+    end)
+
+    if success then
+        local execSuccess, execFunc = pcall(loadstring, scriptContent)
+        if execSuccess then
+            local runSuccess, runResult = pcall(execFunc)
+            if not runSuccess then
+                warn("Script çalıştırma hatası: " .. tostring(runResult))
             end
         else
-            for player in pairs(ActiveHitboxes) do
-                RestoreHitbox(player)
-            end
+            warn("Script derleme hatası: " .. tostring(execFunc))
         end
-        Library:Notify("Hitbox Genişletme " .. (Value and "Etkin" or "Devre Dışı"), 3)
+    else
+        warn("Script indirme hatası: " .. tostring(scriptContent))
     end
-})
+end
 
-HitboxGroupBox:AddToggle('OptimizedHitboxToggle', {
-    Text = 'Optimized Mod',
-    Default = false,
-    Tooltip = 'Sadece görünür oyunculara uygula (FPS iyileştirme)',
-    Callback = function(Value)
-        ToggleOptimized(Value)
-    end
-})
-
-HitboxGroupBox:AddDropdown('BodyPartDropdown', {
-    Values = {'Head', 'HumanoidRootPart', 'UpperTorso', 'LowerTorso'},
-    Default = 'Head',
-    Text = 'Vücut Parçası',
-    Tooltip = 'Genişletilecek parça',
-    Callback = function(Value)
-        for player in pairs(ActiveHitboxes) do
-            RestoreHitbox(player)
-        end
-        HitboxSettings.BodyPart = Value
-        if HitboxSettings.Enabled then
-            if HitboxSettings.Optimized then
-                UpdateVisibleHitboxes()
-            else
-                UpdateAllHitboxes()
-            end
-        end
-        Library:Notify("Vücut Parçası: " .. Value, 3)
-    end
-})
-
-HitboxGroupBox:AddSlider('HitboxSizeSlider', {
-    Text = 'Boyut',
-    Default = 8,
-    Min = 5,
-    Max = 20, -- Limit to avoid bugs
-    Rounding = 1,
-    Tooltip = 'Hitbox boyutu',
-    Callback = function(Value)
-        HitboxSettings.Size = Value
-        if HitboxSettings.Enabled then
-            if HitboxSettings.Optimized then
-                UpdateVisibleHitboxes()
-            else
-                UpdateAllHitboxes()
-            end
-        end
-        Library:Notify("Boyut: " .. Value, 3)
-    end
-})
-
-HitboxGroupBox:AddSlider('HitboxTransparencySlider', {
-    Text = 'Şeffaflık',
-    Default = 0.7,
-    Min = 0,
-    Max = 1,
-    Rounding = 2,
-    Tooltip = 'Hitbox şeffaflığı',
-    Callback = function(Value)
-        HitboxSettings.Transparency = Value
-        if HitboxSettings.Enabled then
-            if HitboxSettings.Optimized then
-                UpdateVisibleHitboxes()
-            else
-                UpdateAllHitboxes()
-            end
-        end
-        Library:Notify("Şeffaflık: " .. Value, 3)
-    end
-})
-
-local AimbotGroupBox = Tabs.Aimbot:AddLeftGroupbox('Aimbot Kontrolleri')
-AimbotGroupBox:AddToggle('AimbotToggle', {
-    Text = 'Aimbot Etkinleştir',
-    Default = false,
-    Tooltip = 'Aimbot aç/kapat',
-    Risky = true,
-    Callback = function(Value)
-        AimbotSettings.Enabled = Value
-        AimbotLocked = false
-        AimbotTarget = nil
-        FixedTargetPart = nil
-        Library:Notify("Aimbot " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-AimbotGroupBox:AddDropdown('AimbotMode', {
-    Values = {'Hold', 'Toggle'},
-    Default = 'Hold',
-    Text = 'Mod',
-    Tooltip = 'Aimbot modu',
-    Callback = function(Value)
-        AimbotSettings.Mode = Value
-        AimbotLocked = false
-        AimbotTarget = nil
-        FixedTargetPart = nil
-        Library:Notify("Mod: " .. Value, 3)
-    end
-})
-
-AimbotGroupBox:AddLabel('Tuş'):AddKeyPicker('AimbotKeybind', {
-    Default = 'MouseButton2',
-    Mode = 'Toggle',
-    Text = 'Aimbot Tuşu',
-    Tooltip = 'Kilit tuşu',
-    ChangedCallback = function(New)
-        AimbotSettings.Keybind = New
-        Library:Notify("Tuş: " .. tostring(New), 3)
-    end
-})
-
-AimbotGroupBox:AddToggle('FOVToggle', {
-    Text = 'FOV Göster',
-    Default = true,
-    Tooltip = 'FOV çemberi göster',
-    Callback = function(Value)
-        AimbotSettings.FOVVisible = Value
-        Library:Notify("FOV " .. (Value and "Gösteriliyor" or "Gizli"), 3)
-    end
-})
-
-AimbotGroupBox:AddSlider('FOVSlider', {
-    Text = 'FOV Boyutu',
-    Default = 100,
-    Min = 10,
-    Max = 500,
-    Rounding = 0,
-    Tooltip = 'FOV boyutu',
-    Callback = function(Value)
-        AimbotSettings.FOV = Value
-        Library:Notify("FOV Boyutu: " .. Value, 3)
-    end
-})
-
-AimbotGroupBox:AddSlider('FOVTransparencySlider', {
-    Text = 'FOV Şeffaflık',
-    Default = 0.5,
-    Min = 0.1,
-    Max = 1,
-    Rounding = 2,
-    Tooltip = 'FOV şeffaflığı',
-    Callback = function(Value)
-        AimbotSettings.FOVTransparency = Value
-        Library:Notify("FOV Şeffaflık: " .. Value, 3)
-    end
-})
-
-AimbotGroupBox:AddLabel('FOV Rengi'):AddColorPicker('FOVColorPicker', {
-    Default = Color3.fromRGB(255, 255, 255),
-    Title = 'FOV Rengi',
-    Callback = function(Value)
-        AimbotSettings.FOVColor = Value
-        Library:Notify("FOV Rengi Değişti", 3)
-    end
-})
-
-AimbotGroupBox:AddSlider('FOVThicknessSlider', {
-    Text = 'FOV Kalınlık',
-    Default = 1,
-    Min = 1,
-    Max = 5,
-    Rounding = 0,
-    Tooltip = 'FOV kalınlığı',
-    Callback = function(Value)
-        AimbotSettings.FOVThickness = Value
-        Library:Notify("FOV Kalınlık: " .. Value, 3)
-    end
-})
-
-AimbotGroupBox:AddSlider('FOVNumSidesSlider', {
-    Text = 'FOV Kenar Sayısı',
-    Default = 64,
-    Min = 12,
-    Max = 128,
-    Rounding = 0,
-    Tooltip = 'FOV yumuşaklığı',
-    Callback = function(Value)
-        AimbotSettings.FOVNumSides = Value
-        Library:Notify("FOV Kenar: " .. Value, 3)
-    end
-})
-
-AimbotGroupBox:AddSlider('MaxDistanceSlider', {
-    Text = 'Max Mesafe',
-    Default = 1000,
-    Min = 100,
-    Max = 5000,
-    Rounding = 0,
-    Tooltip = 'Max aim mesafesi',
-    Callback = function(Value)
-        AimbotSettings.MaxDistance = Value
-        Library:Notify("Max Mesafe: " .. Value, 3)
-    end
-})
-
-AimbotGroupBox:AddToggle('WallCheckToggle', {
-    Text = 'Duvar Kontrol',
-    Default = true,
-    Tooltip = 'Duvar arkası kontrol',
-    Callback = function(Value)
-        AimbotSettings.WallCheck = Value
-        Library:Notify("Duvar Kontrol " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-AimbotGroupBox:AddToggle('VisibleCheckToggle', {
-    Text = 'Görünürlük Kontrol',
-    Default = true,
-    Tooltip = 'Görünür kontrol',
-    Callback = function(Value)
-        AimbotSettings.VisibleCheck = Value
-        Library:Notify("Görünürlük " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-AimbotGroupBox:AddToggle('TeamCheckToggle', {
-    Text = 'Takım Kontrol',
-    Default = true,
-    Tooltip = 'Takım arkadaşı kontrol',
-    Callback = function(Value)
-        AimbotSettings.TeamCheck = Value
-        Library:Notify("Takım Kontrol " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-AimbotGroupBox:AddToggle('TargetAimbotToggle', {
-    Text = 'Hedef Aimbot',
-    Default = false,
-    Tooltip = 'Belirli oyuncu aim',
-    Callback = function(Value)
-        AimbotSettings.TargetAimbot = Value
-        if not Value then
-            AimbotSettings.TargetPlayer = nil
-        end
-        Library:Notify("Hedef Aimbot " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-AimbotGroupBox:AddDropdown('TargetPlayerDropdown', {
-    SpecialType = 'Player',
-    ExcludeLocalPlayer = true,
-    Text = 'Hedef Oyuncu',
-    Tooltip = 'Hedef seç',
-    Callback = function(Value)
-        AimbotSettings.TargetPlayer = Value
-        Library:Notify("Hedef: " .. Value, 3)
-    end
-})
-
-AimbotGroupBox:AddToggle('TriggerbotToggle', {
-    Text = 'Triggerbot Etkinleştir',
-    Default = false,
-    Tooltip = 'Otomatik tıkla',
-    Risky = true,
-    Callback = function(Value)
-        AimbotSettings.Triggerbot = Value
-        Library:Notify("Triggerbot " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-AimbotGroupBox:AddToggle('TriggerbotWallCheckToggle', {
-    Text = 'Triggerbot Duvar Kontrol',
-    Default = true,
-    Tooltip = 'Triggerbot duvar kontrol',
-    Callback = function(Value)
-        AimbotSettings.TriggerbotWallCheck = Value
-        Library:Notify("Triggerbot Duvar " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-AimbotGroupBox:AddToggle('TriggerbotVisibleCheckToggle', {
-    Text = 'Triggerbot Görünürlük',
-    Default = true,
-    Tooltip = 'Triggerbot görünür kontrol',
-    Callback = function(Value)
-        AimbotSettings.TriggerbotVisibleCheck = Value
-        Library:Notify("Triggerbot Görünürlük " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-AimbotGroupBox:AddToggle('TriggerbotTeamCheckToggle', {
-    Text = 'Triggerbot Takım Kontrol',
-    Default = true,
-    Tooltip = 'Triggerbot takım kontrol',
-    Callback = function(Value)
-        AimbotSettings.TriggerbotTeamCheck = Value
-        Library:Notify("Triggerbot Takım " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-AimbotGroupBox:AddDropdown('AimbotBodyPartDropdown', {
-    Values = {'Head', 'HumanoidRootPart', 'UpperTorso', 'LowerTorso'},
-    Default = 'Head',
-    Text = 'Hedef Parça',
-    Tooltip = 'Aimbot hedef parçası',
-    Callback = function(Value)
-        AimbotSettings.AimbotBodyPart = Value
-        Library:Notify("Hedef Parça: " .. Value, 3)
-    end
-})
-
-local VIPGroupBox = Tabs.VIP:AddLeftGroupbox('VIP Kontrolleri')
-VIPGroupBox:AddToggle('PunchKillAuraToggle', {
-    Text = 'Yumruk Aura',
-    Default = false,
-    Tooltip = 'Yakın oyunculara yumruk',
-    Risky = true,
-    Callback = function(Value)
-        VIPSettings.PunchKillAura = Value
-        Library:Notify("Yumruk Aura " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-VIPGroupBox:AddToggle('MeleeKillAuraToggle', {
-    Text = 'Melee Aura',
-    Default = false,
-    Tooltip = 'Yakın oyunculara melee',
-    Risky = true,
-    Callback = function(Value)
-        VIPSettings.MeleeKillAura = Value
-        Library:Notify("Melee Aura " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-VIPGroupBox:AddLabel('Bomba Tuşu'):AddKeyPicker('GrenadeKeybind', {
-    Default = 'G',
-    Mode = 'Press',
-    Text = 'Bomba Tuşu',
-    Tooltip = 'Bomba at',
-    ChangedCallback = function(New)
-        VIPSettings.GrenadeKeybind = New
-        Library:Notify("Bomba Tuşu: " .. tostring(New), 3)
-    end
-})
-
-VIPGroupBox:AddDropdown('VIPPlayerDropdown', {
-    Values = {},
-    Text = 'Hedef Oyuncu',
-    Tooltip = 'Hedef seç',
-    Callback = function(Value)
-        VIPSettings.SelectedPlayer = Value
-        Library:Notify("Hedef: " .. Value, 3)
-    end
-})
-
-VIPGroupBox:AddDropdown('WheelDropdown', {
-    Values = {'Random', 'FrontLeftWheel', 'FrontRightWheel', 'BackLeftWheel', 'BackRightWheel', 'Body'},
-    Default = 'Random',
-    Text = 'Araç Parçası',
-    Tooltip = 'Shotty parçası',
-    Callback = function(Value)
-        VIPSettings.SelectedWheel = Value
-        Library:Notify("Parça: " .. Value, 3)
-    end
-})
-
-VIPGroupBox:AddToggle('ShottySilentAimToggle', {
-    Text = 'Shotty Silent Aim',
-    Default = false,
-    Tooltip = 'Yakın araçlara shotty',
-    Risky = true,
-    Callback = function(Value)
-        VIPSettings.ShottySilentAim = Value
-        Library:Notify("Shotty Silent Aim " .. (Value and "Etkin" or "Devre Dışı"), 3)
-    end
-})
-
-VIPGroupBox:AddSlider('ShottyDistanceSlider', {
-    Text = 'Shotty Mesafe',
-    Default = 30,
-    Min = 10,
-    Max = 100,
-    Rounding = 0,
-    Tooltip = 'Shotty max mesafe',
-    Callback = function(Value)
-        VIPSettings.ShottyDistance = Value
-        Library:Notify("Shotty Mesafe: " .. Value, 3)
-    end
-})
-
-VIPGroupBox:AddButton({
-    Text = 'Polis Ol',
-    Func = function()
-        pcall(function()
-            local args = { [1] = "SetTeam", [2] = "Police" }
-            ReplicatedStorage:WaitForChild("RemoteFunction"):InvokeServer(unpack(args))
-            Library:Notify("Polis oldun!", 3)
-        end)
-    end,
-    Tooltip = 'Polis takımına geç'
-})
-
-VIPGroupBox:AddButton({
-    Text = 'Mahkum Ol',
-    Func = function()
-        pcall(function()
-            local args = { [1] = "SetTeam", [2] = "Prisoners" }
-            ReplicatedStorage:WaitForChild("RemoteFunction"):InvokeServer(unpack(args))
-            Library:Notify("Mahkum oldun!", 3)
-        end)
-    end,
-    Tooltip = 'Mahkum takımına geç'
-})
-
-VIPGroupBox:AddButton({
-    Text = 'Kahraman Ol',
-    Func = function()
-        pcall(function()
-            local args = { [1] = "SetTeam", [2] = "Heroes" }
-            ReplicatedStorage:WaitForChild("RemoteFunction"):InvokeServer(unpack(args))
-            Library:Notify("Kahraman oldun!", 3)
-        end)
-    end,
-    Tooltip = 'Kahraman takımına geç'
-})
-
-local MenuGroup = Tabs['UI Ayarları']:AddLeftGroupbox('Menü')
-MenuGroup:AddToggle("KeybindMenuOpen", {
-    Default = Library.KeybindFrame.Visible,
-    Text = "Tuş Menüsü Aç",
-    Callback = function(value) Library.KeybindFrame.Visible = value end
-})
-MenuGroup:AddToggle("ShowCustomCursor", {
-    Text = "Özel İmleç",
-    Default = true,
-    Callback = function(Value) Library.ShowCustomCursor = Value end
-})
-MenuGroup:AddDivider()
-MenuGroup:AddLabel("Menü Tuşu"):AddKeyPicker("MenuKeybind", {
-    Default = "RightShift",
-    NoUI = true,
-    Text = "Menü tuşu"
-})
-MenuGroup:AddButton("Kapat", function() Library:Unload() end)
-
-Library.ToggleKeybind = Options.MenuKeybind
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
-ThemeManager:SetFolder('MyScriptHub')
-SaveManager:SetFolder('MyScriptHub/specific-game')
-SaveManager:BuildConfigSection(Tabs['UI Ayarları'])
-ThemeManager:ApplyToTab(Tabs['UI Ayarları'])
-SaveManager:LoadAutoloadConfig()
-
-Library:OnUnload(function()
-    for player in pairs(ActiveHitboxes) do
-        RestoreHitbox(player)
-    end
-    for player in pairs(ActiveVRHitboxes) do
-        RestoreVRHitbox(player)
-    end
-    if OptimizedConn then OptimizedConn:Disconnect() end
-    for _, conns in pairs(Connections) do
-        if typeof(conns) == "table" then
-            for _, conn in ipairs(conns) do
-                conn:Disconnect()
-            end
-        else
-            conns:Disconnect()
-        end
-    end
-    Connections = {}
-    FOVCircle:Remove()
-    VRFOVCircle:Remove()
-    print('Kapatıldı!')
-    Library.Unloaded = true
-end)
-
-UpdateVIPDropdown()
-Library:Notify("Script Güncellendi! Silent Aim eklendi, UI Türkçe, buglar düzeltildi.", 5)
+LoadScript()
