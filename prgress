@@ -327,10 +327,13 @@ local function loaderEntrance()
     InnerGlow.Transparency = initialTrans
     MainFrame.Size = UDim2.new(0, 0, 0, 0)
     
-    local expandTween = TweenService:Create(MainFrame, TweenInfoLoader, {Size = UDim2.new(0, 600, 0, 500), BackgroundTransparency = 0})
-    expandTween:Play()
+    pcall(function()
+        local expandTween = TweenService:Create(MainFrame, TweenInfoLoader, {Size = UDim2.new(0, 600, 0, 500), BackgroundTransparency = 0})
+        expandTween:Play()
+    end)
     
-    expandTween.Completed:Connect(function()
+    task.wait(1.8)
+    pcall(function()
         local titleTween = TweenService:Create(Title, TweenInfoShort, {TextTransparency = 0})
         titleTween:Play()
         
@@ -340,70 +343,68 @@ local function loaderEntrance()
         local outerGlowTween = TweenService:Create(TitleOuterGlow, TweenInfoUltraShort, {Transparency = 0.8})
         outerGlowTween:Play()
         
-        titleTween.Completed:Connect(function()
-            local subtitleTween = TweenService:Create(Subtitle, TweenInfoShort, {TextTransparency = 0})
-            subtitleTween:Play()
-            
-            subtitleTween.Completed:Connect(function()
-                local versionTween = TweenService:Create(Version, TweenInfoShort, {TextTransparency = 0})
-                versionTween:Play()
+        task.wait(0.5)
+        local subtitleTween = TweenService:Create(Subtitle, TweenInfoShort, {TextTransparency = 0})
+        subtitleTween:Play()
+        
+        task.wait(0.5)
+        local versionTween = TweenService:Create(Version, TweenInfoShort, {TextTransparency = 0})
+        versionTween:Play()
+        
+        task.wait(0.5)
+        local beams = ScanMatrix:GetChildren()
+        for i, beam in ipairs(beams) do
+            if beam:IsA("Frame") and beam.Name:find("HoloBeam") then
+                local delayTime = (i - 1) * 0.15
+                task.wait(delayTime)
+                local delayedScanInfo = TweenInfo.new(TweenInfoScanBase.Time, TweenInfoScanBase.EasingStyle, TweenInfoScanBase.EasingDirection, TweenInfoScanBase.RepeatCount, TweenInfoScanBase.Reverses)
+                local beamTween = TweenService:Create(beam, delayedScanInfo, {Position = UDim2.new(0, 0, 1, -120), BackgroundTransparency = 0.5})
+                beamTween:Play()
                 
-                versionTween.Completed:Connect(function()
-                    local beams = ScanMatrix:GetChildren()
-                    for i, beam in ipairs(beams) do
-                        if beam:IsA("Frame") and beam.Name:find("HoloBeam") then
-                            local delayTime = (i - 1) * 0.15
-                            local delayedScanInfo = TweenInfo.new(TweenInfoScanBase.Time, TweenInfoScanBase.EasingStyle, TweenInfoScanBase.EasingDirection, TweenInfoScanBase.RepeatCount, TweenInfoScanBase.Reverses, delayTime)
-                            local beamTween = TweenService:Create(beam, delayedScanInfo, {Position = UDim2.new(0, 0, 1, -120), BackgroundTransparency = 0.5})
-                            beamTween:Play()
-                            
-                            local particles = beam:FindFirstChild("Particles" .. (tonumber(beam.Name:match("%d+") or 0)))
-                            if particles then
-                                local particleTween = TweenService:Create(particles, TweenInfoShimmerLoop, {Position = UDim2.new(1.3, 0, 0, 0), BackgroundTransparency = 0.8})
-                                particleTween:Play()
-                                
-                                local glowTween = TweenService:Create(particles:FindFirstChild("UIStroke"), TweenInfoShimmerLoop, {Transparency = 0.3})
-                                glowTween:Play()
-                            end
-                        end
-                    end
+                local particles = beam:FindFirstChild("Particles" .. (tonumber(beam.Name:match("%d+") or 0)))
+                if particles then
+                    local particleTween = TweenService:Create(particles, TweenInfoShimmerLoop, {Position = UDim2.new(1.3, 0, 0, 0), BackgroundTransparency = 0.8})
+                    particleTween:Play()
                     
-                    wait(1.2)
-                    local coreTween = TweenService:Create(ProgressCore, TweenInfoShort, {BackgroundTransparency = 0})
-                    coreTween:Play()
-                    
-                    local coreStrokeTween = TweenService:Create(ProgressCoreStroke, TweenInfoShort, {Transparency = 0.5})
-                    coreStrokeTween:Play()
-                    
-                    local labelTween = TweenService:Create(ProgressLabel, TweenInfoShort, {TextTransparency = 0})
-                    labelTween:Play()
-                    
-                    local statusTween = TweenService:Create(StatusCore, TweenInfoShort, {TextTransparency = 0})
-                    statusTween:Play()
-                    
-                    local shimmerTween = TweenService:Create(ProgressShimmerCore, TweenInfoShimmerLoop, {Position = UDim2.new(1.7, 0, 0, 0)})
-                    shimmerTween:Play()
-                    
-                    local shadow1Tween = TweenService:Create(ShadowLayer1, TweenInfoMedium, {BackgroundTransparency = 0.3})
-                    shadow1Tween:Play()
-                    
-                    local shadow2Tween = TweenService:Create(ShadowLayer2, TweenInfoMedium, {BackgroundTransparency = 0.5})
-                    shadow2Tween:Play()
-                    
-                    local shadow3Tween = TweenService:Create(ShadowLayer3, TweenInfoMedium, {BackgroundTransparency = 0.7})
-                    shadow3Tween:Play()
-                    
-                    local strokeTween = TweenService:Create(MainStroke, TweenInfoShort, {Transparency = 0.2})
-                    strokeTween:Play()
-                    
-                    local outerTween = TweenService:Create(OuterGlow, TweenInfoShort, {Transparency = 0.7})
-                    outerTween:Play()
-                    
-                    local innerTween = TweenService:Create(InnerGlow, TweenInfoShort, {Transparency = 0.4})
-                    innerTween:Play()
-                end)
-            end)
-        end)
+                    local glowTween = TweenService:Create(particles:FindFirstChild("UIStroke"), TweenInfoShimmerLoop, {Transparency = 0.3})
+                    glowTween:Play()
+                end
+            end
+        end
+        
+        task.wait(1.2)
+        local coreTween = TweenService:Create(ProgressCore, TweenInfoShort, {BackgroundTransparency = 0})
+        coreTween:Play()
+        
+        local coreStrokeTween = TweenService:Create(ProgressCoreStroke, TweenInfoShort, {Transparency = 0.5})
+        coreStrokeTween:Play()
+        
+        local labelTween = TweenService:Create(ProgressLabel, TweenInfoShort, {TextTransparency = 0})
+        labelTween:Play()
+        
+        local statusTween = TweenService:Create(StatusCore, TweenInfoShort, {TextTransparency = 0})
+        statusTween:Play()
+        
+        local shimmerTween = TweenService:Create(ProgressShimmerCore, TweenInfoShimmerLoop, {Position = UDim2.new(1.7, 0, 0, 0)})
+        shimmerTween:Play()
+        
+        local shadow1Tween = TweenService:Create(ShadowLayer1, TweenInfoMedium, {BackgroundTransparency = 0.3})
+        shadow1Tween:Play()
+        
+        local shadow2Tween = TweenService:Create(ShadowLayer2, TweenInfoMedium, {BackgroundTransparency = 0.5})
+        shadow2Tween:Play()
+        
+        local shadow3Tween = TweenService:Create(ShadowLayer3, TweenInfoMedium, {BackgroundTransparency = 0.7})
+        shadow3Tween:Play()
+        
+        local strokeTween = TweenService:Create(MainStroke, TweenInfoShort, {Transparency = 0.2})
+        strokeTween:Play()
+        
+        local outerTween = TweenService:Create(OuterGlow, TweenInfoShort, {Transparency = 0.7})
+        outerTween:Play()
+        
+        local innerTween = TweenService:Create(InnerGlow, TweenInfoShort, {Transparency = 0.4})
+        innerTween:Play()
     end)
 end
 
@@ -434,7 +435,7 @@ local loaderStart = 0
 local loaderDuration = 10
 local function loaderAutoProcess()
     loaderStart = tick()
-    spawn(function()
+    task.spawn(function()
         local phases = {
             {time = 1.2, text = "Veriler Yükleniyor...", status = "Kaynak Entegrasyonu Aktif...", color = Color3.fromRGB(255, 220, 100)},
             {time = 2.5, text = "Güvenlik Tarama...", status = "Şifreleme Doğrulanıyor...", color = Color3.fromRGB(100, 255, 200)},
@@ -448,57 +449,68 @@ local function loaderAutoProcess()
         while tick() - loaderStart < loaderDuration do
             local elapsed = tick() - loaderStart
             local progress = math.min((elapsed / loaderDuration) * 100, 100)
-            local fillTween = TweenService:Create(ProgressFill, TweenInfoMedium, {Size = UDim2.new(progress / 100, 0, 1, 0)})
-            fillTween:Play()
+            pcall(function()
+                local fillTween = TweenService:Create(ProgressFill, TweenInfoMedium, {Size = UDim2.new(progress / 100, 0, 1, 0)})
+                fillTween:Play()
+            end)
             
             if phaseIndex <= #phases and elapsed >= phases[phaseIndex].time then
-                local textTween = TweenService:Create(ProgressLabel, TweenInfoShort, {TextTransparency = 1})
-                textTween:Play()
-                textTween.Completed:Connect(function()
-                    ProgressLabel.Text = phases[phaseIndex].text
-                    local revealTween = TweenService:Create(ProgressLabel, TweenInfoShort, {TextTransparency = 0})
-                    revealTween:Play()
+                pcall(function()
+                    local textTween = TweenService:Create(ProgressLabel, TweenInfoShort, {TextTransparency = 1})
+                    textTween:Play()
+                    textTween.Completed:Connect(function()
+                        ProgressLabel.Text = phases[phaseIndex].text
+                        local revealTween = TweenService:Create(ProgressLabel, TweenInfoShort, {TextTransparency = 0})
+                        revealTween:Play()
+                    end)
                 end)
                 
-                local statusTween = TweenService:Create(StatusCore, TweenInfoShort, {TextTransparency = 1})
-                statusTween:Play()
-                statusTween.Completed:Connect(function()
-                    StatusCore.Text = phases[phaseIndex].status
-                    StatusCore.TextColor3 = phases[phaseIndex].color
-                    local statusReveal = TweenService:Create(StatusCore, TweenInfoShort, {TextTransparency = 0})
-                    statusReveal:Play()
+                pcall(function()
+                    local statusTween = TweenService:Create(StatusCore, TweenInfoShort, {TextTransparency = 1})
+                    statusTween:Play()
+                    statusTween.Completed:Connect(function()
+                        StatusCore.Text = phases[phaseIndex].status
+                        StatusCore.TextColor3 = phases[phaseIndex].color
+                        local statusReveal = TweenService:Create(StatusCore, TweenInfoShort, {TextTransparency = 0})
+                        statusReveal:Play()
+                    end)
                 end)
                 phaseIndex = phaseIndex + 1
             end
-            RunService.Heartbeat:Wait()
+            task.wait(0.016)
         end
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt"))()
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/prgress"))()
+        end)
         closeLoader()
     end)
 end
 
 local function closeLoader()
-    local closeTweenInfo = TweenInfo.new(2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
-    local fadeTween = TweenService:Create(MainFrame, closeTweenInfo, {BackgroundTransparency = 1})
-    fadeTween:Play()
-    
-    local scaleTween = TweenService:Create(MainFrame, closeTweenInfo, {Size = UDim2.new(0, 0, 0, 0)})
-    scaleTween:Play()
-    
-    local rotateTween = TweenService:Create(MainGradient, closeTweenInfo, {Rotation = MainGradient.Rotation + 180})
-    rotateTween:Play()
-    
-    for _, descendant in pairs(MainFrame:GetDescendants()) do
-        if descendant:IsA("TextLabel") then
-            TweenService:Create(descendant, closeTweenInfo, {TextTransparency = 1}):Play()
-        elseif descendant:IsA("Frame") and descendant.BackgroundColor3 ~= Color3.fromRGB(0, 0, 0) then
-            TweenService:Create(descendant, closeTweenInfo, {BackgroundTransparency = 1}):Play()
+    pcall(function()
+        local closeTweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+        local fadeTween = TweenService:Create(MainFrame, closeTweenInfo, {BackgroundTransparency = 1})
+        fadeTween:Play()
+        
+        local scaleTween = TweenService:Create(MainFrame, closeTweenInfo, {Size = UDim2.new(0, 0, 0, 0)})
+        scaleTween:Play()
+        
+        local rotateTween = TweenService:Create(MainGradient, closeTweenInfo, {Rotation = MainGradient.Rotation + 180})
+        rotateTween:Play()
+        
+        for _, descendant in pairs(MainFrame:GetDescendants()) do
+            if descendant:IsA("TextLabel") then
+                TweenService:Create(descendant, closeTweenInfo, {TextTransparency = 1}):Play()
+            elseif descendant:IsA("Frame") and descendant.BackgroundColor3 ~= Color3.fromRGB(0, 0, 0) then
+                TweenService:Create(descendant, closeTweenInfo, {BackgroundTransparency = 1}):Play()
+            end
         end
-    end
-    
-    fadeTween.Completed:Wait()
+        
+        fadeTween.Completed:Wait()
+    end)
     if loaderConnection then loaderConnection:Disconnect() end
     ScreenGui:Destroy()
+    script:Destroy()
 end
 
 local dragActive = false
@@ -536,7 +548,7 @@ end)
 
 pcall(loaderEntrance)
 pcall(initiateLoaderEffects)
-wait(3)
+task.wait(3)
 pcall(loaderAutoProcess)
 
 Players.PlayerRemoving:Connect(function(plr)
