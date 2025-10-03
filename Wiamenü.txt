@@ -10,8 +10,7 @@ local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Camera = Workspace.CurrentCamera
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Event = ReplicatedStorage:WaitForChild("Event")
+local UIS = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local Options = Library.Options
@@ -37,7 +36,7 @@ local Window = Library:CreateWindow({
 local Tabs = {
     Hitbox = Window:AddTab('Hitbox'),
     Aimbot = Window:AddTab('Aimbot'),
-    Combat = Window:AddTab('Visual🎨'),
+    Combat = Window:AddTab('⚔️ Combat'),
     ['Silent Aim'] = Window:AddTab('Silent Aim'),
     Vehicles = Window:AddTab('🚗 Araç'),
     ['UI Ayarları'] = Window:AddTab('UI Ayarları'),
@@ -885,7 +884,7 @@ MenuGroup:AddToggle("KeybindMenuOpen", {
 })
 MenuGroup:AddToggle("ShowCustomCursor", {
     Text = "Özel İmleç",
-    Default = false,
+    Default = true,
     Callback = function(Value) Library.ShowCustomCursor = Value end
 })
 MenuGroup:AddDivider()
@@ -908,54 +907,1053 @@ SaveManager:BuildConfigSection(Tabs['UI Ayarları'])
 ThemeManager:ApplyToTab(Tabs['UI Ayarları'])
 SaveManager:LoadAutoloadConfig()
 
-local CombatGroup = Tabs.Combat:AddLeftGroupbox('ESP Araçları')
-
-local function setNameTagForPlayer(player, alwaysOnTop, maxDistance)
-    local function apply(char)
-        local nt = char:FindFirstChild("NameTag")
-        if nt then
-            nt.AlwaysOnTop = alwaysOnTop
-            nt.MaxDistance = maxDistance
+Library:OnUnload(function()
+    for player, _ in pairs(ActiveHitboxes) do
+        RestoreHitbox(player)
+    end
+    if OptimizedConn then OptimizedConn:Disconnect() end
+    for _, conns in pairs(Connections) do
+        if typeof(conns) == "table" then
+            for _, conn in ipairs(conns) do
+                conn:Disconnect()
+            end
+        else
+            conns:Disconnect()
         end
     end
+    Connections = {}
+    FOVCircle:Remove()
+    CollectionService:RemoveTag(Workspace, HitboxTag)
+    print('Kapatıldı!')
+    Library.Unloaded = true
+end)
 
-    if player.Character then
-        apply(player.Character)
+Library:Notify("Ultimate Hitbox Genişletici & Aimbot Başlatıldı! Tüm sorunlar düzeltildi.", 3)
+
+local uiConn = RunService:BindToRenderStep("UIUpdate", Enum.RenderPriority.Camera.Value + 1, function()
+    if Library.Unloaded then
+        RunService:UnbindFromRenderStep("UIUpdate")
     end
+end)
+table.insert(Connections, uiConn)
 
-    player.CharacterAdded:Connect(function(char)
-        char:WaitForChild("NameTag", 10)
-        apply(char)
-        local nt = char:FindFirstChild("NameTag")
-        if nt then
-            nt:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
-                nt.AlwaysOnTop = alwaysOnTop
+local Event = game:GetService("ReplicatedStorage"):WaitForChild("Event")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Sol ve sağ kutular
+local VehicleSpawnBox = Tabs.Vehicles:AddLeftGroupbox('🚗 Araç Spawn')
+local VehicleModBox   = Tabs.Vehicles:AddRightGroupbox('🛠️ Araç Modifiye')
+
+-- Seçilen araç, SaveManager ile yükle/kaydet
+local selectedVehicle = SaveManager:Load("AraçListesi") or "Nero"
+VehicleSpawnBox:AddDropdown('AraçListesi', {
+    Text    = 'Araç Seç',
+    Values  = { "Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Fury" },
+    Default = table.find({"Nero","Rhino","Nighthawk","Light Bike","Thunderbird","Warhawk","Buzzard","Fury"}, selectedVehicle) or 1,
+    Callback = function(v)
+        selectedVehicle = v
+        SaveManager:Save("AraçListesi", v)
+    end
+})
+
+VehicleSpawnBox:AddButton({
+    Text = '🚘 Spawnla',
+    Func = function()
+        if selectedVehicle ~= "" then
+            Event:FireServer("SpawnVehicle", selectedVehicle)
+        end
+    end
+})
+
+-- Ortak fonksiyon: her çağrıldığında güncel gc tablolarında çalışır
+local function applyProperties(props)
+    for _, obj in pairs(getgc(true)) do
+        if type(obj) == "table" then
+            for k, v in pairs(props) do
+                if rawget(obj, k) ~= nil then
+                    obj[k] = v
+                end
+            end
+        end
+    end
+end
+
+-- Varsayılan property setleri
+local defaults = {
+    carProps   = { Sway=60, Torque=10, BrakeForce=4, MaxSpeed=400, TurnSpeed=1.7, DriftVelLerp=0.45, DriftRotLerp=0.12 },
+    heliProps  = { Acceleration=3, Deceleration=1, SpeedDecay=0.95, BrakeForce=15, DescentSpeed=2, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=14, ResponseSpeed=1, MaxSideTilt=20, MinHeightAboveGround=5, MissileCooldown=2, MissileLock=0 },
+    ufoProps   = { Acceleration=10, Deceleration=1, MaxSpeed=340, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=2, DescentSpeed=3, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=14, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40 },
+    boatProps  = { Height=1, TurnSpeed=7.5, Torque=5, MaxSpeed=160, BrakeForce=1, SpeedDecay=0.5 },
+    planeProps = { Bombs=true, Acceleration=0.6, DampeningAcceleration=0.8, MaxVerticalTilt=10, VerticalTiltUpSpeed=1, VerticalTiltDownSpeed=1, VerticalTiltDampening=0.95, VerticalSpeedLimit=30, HorizontalTiltSpeed=15.2, MaxSideTilt=25, SideTiltSpeed=1.5, SideTiltDampening=0.95, MissileTargetRange=540, MissileCooldown=2, MissileLock=0 },
+    ArchProps   = { Acceleration=10,MaxSpeed=270, Deceleration=1, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=3, DescentSpeed=3, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=20, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40 },
+}
+
+-- Modifiye butonları
+VehicleModBox:AddButton({
+    Text = '🚀 Araba Modifiye Et',
+    Func = function()
+        -- Önce genel araç ayarlarını uygula
+        applyProperties(defaults.carProps)
+
+        -- Araç modelini bekle
+        local objectSelection = workspace:WaitForChild("ObjectSelection", 5)
+        if not objectSelection then return end
+
+        local vehicleName = LocalPlayer.Name .. "'s Vehicle"
+        local playerVehicle = objectSelection:WaitForChild(vehicleName, 5)
+        if not playerVehicle then return end
+
+        -- CarChassis'i bekle
+        local carChassis = playerVehicle:WaitForChild("CarChassis", 5)
+        if not carChassis then return end
+
+        -- Boost nesnesini bul veya oluştur
+        local boost = carChassis:FindFirstChild("Boost")
+        if not boost then
+            boost = Instance.new("NumberValue")
+            boost.Name = "Boost"
+            boost.Parent = carChassis
+        end
+
+        -- Değeri ayarla
+        boost.Value = 20
+    end
+})
+
+VehicleModBox:AddButton({ Text='🚁 Helikopter Modifiye Et', Func=function()
+    applyProperties(defaults.heliProps)
+end})
+
+VehicleModBox:AddButton({ Text='🛸 UFO Modifiye Et', Func=function()
+    applyProperties(defaults.ufoProps)
+end})
+
+VehicleModBox:AddButton({ Text='🛸 ArchAngel Modifiye Et', Func=function()
+    applyProperties(defaults.ArchProps)
+end})
+
+VehicleModBox:AddButton({ Text='🚤 Tekne Modifiye Et', Func=function()
+    applyProperties(defaults.boatProps)
+end})
+
+VehicleModBox:AddButton({ Text='✈️ Uçak Modifiye Et', Func=function()
+    applyProperties(defaults.planeProps)
+end})
+
+-- Reset düğmesi
+VehicleModBox:AddButton({ Text='🔄 Modları Sıfırla', Func=function()
+    applyProperties(defaults.carProps)
+end})
+
+local bombLoopStarted = false
+
+VehicleSpawnBox:AddButton({
+    Text = '💣 Sonsuz Bombalama',
+    Func = function()
+        if bombLoopStarted then return end -- Tekrar çalıştırma
+        bombLoopStarted = true
+
+        local Remote = game.ReplicatedStorage:WaitForChild("Event")
+        local UserInputService = game:GetService("UserInputService")
+
+        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+                Remote:FireServer("DropBomb")
+            end
+        end)
+    end
+})
+
+local VehicleSpawnBox = Tabs.Vehicles:AddLeftGroupbox('🚗 Araç Spawn')
+local VehicleModBox = Tabs.Vehicles:AddRightGroupbox('🛠️ Araç Modifiye')
+
+VehicleSpawnBox:AddToggle('GlobalUnlockToggle', {
+    Text = 'Tüm Oyuncuların Araç Kilidini Kapalı Yap',
+    Default = false,
+    Tooltip = 'Açıkken Tüm Kilitler Açılır',
+    Callback = function(value)
+        if value then
+            Connections.GlobalUnlockLoop = RunService.Stepped:Connect(function()
+                pcall(function()
+                    local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                    if objectSelection then
+                        for _, pl in ipairs(Players:GetPlayers()) do
+                            local veh = objectSelection:FindFirstChild(pl.Name .. "'s Vehicle")
+                            if veh then
+                                local lock = veh:FindFirstChild("VehicleLock")
+                                if lock and lock:IsA("StringValue") then
+                                    lock.Value = "OFF"
+                                end
+                            end
+                        end
+                    end
+                end)
             end)
+            Library:Notify("Tüm Araç Kilidi OFF Aktif (Global Stabil Loop)", 2)
+        else
+            if Connections.GlobalUnlockLoop then
+                Connections.GlobalUnlockLoop:Disconnect()
+                Connections.GlobalUnlockLoop = nil
+            end
+            Library:Notify("Tüm Araç Kilidi OFF Kapandı (Global)", 2)
+        end
+    end
+})
+
+local selectedTargets = {}
+VehicleSpawnBox:AddDropdown('TargetPlayersDropdown', {
+    Text = 'Hedef Oyuncular (Multi-Select)',
+    Values = {},
+    Default = 1,
+    Multi = true,
+    Searchable = true,
+    Callback = function(value)
+        selectedTargets = {}
+        for key, val in pairs(value) do
+            if val then
+                selectedTargets[key] = true
+            end
+        end
+        Library:Notify("Hedef Oyuncular Güncellendi (" .. #selectedTargets .. " seçili)", 2)
+    end
+})
+
+local function updatePlayerList()
+    local values = {}
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer then
+            table.insert(values, pl.Name)
+        end
+    end
+    Options.TargetPlayersDropdown:SetValues(values)
+end
+updatePlayerList()
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+
+VehicleSpawnBox:AddToggle('TargetUnlockToggle', {
+    Text = '🎯 Seçili Oyuncuların Araç Kilidini OFF Yap',
+    Default = false,
+    Tooltip = 'Toggle açıkken seçili hedeflerin VehicleLock\'ları sürekli OFF kalır (İleri Seviye Stabil)',
+    Callback = function(value)
+        if value then
+            Connections.TargetUnlockLoop = RunService.Stepped:Connect(function()
+                pcall(function()
+                    local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                    if objectSelection then
+                        for targetName in pairs(selectedTargets) do
+                            local veh = objectSelection:FindFirstChild(targetName .. "'s Vehicle")
+                            if veh then
+                                local lock = veh:FindFirstChild("VehicleLock")
+                                if lock and lock:IsA("StringValue") then
+                                    lock.Value = "OFF"
+                                end
+                            end
+                        end
+                    end
+                end)
+            end)
+            Library:Notify("Hedef Araç Kilidi OFF Aktif (" .. #selectedTargets .. " hedef)", 2)
+        else
+            if Connections.TargetUnlockLoop then
+                Connections.TargetUnlockLoop:Disconnect()
+                Connections.TargetUnlockLoop = nil
+            end
+            Library:Notify("Hedef Araç Kilidi OFF Kapandı", 2)
+        end
+    end
+})
+
+Library:OnUnload(function()
+    if Connections.GlobalUnlockLoop then Connections.GlobalUnlockLoop:Disconnect() end
+    if Connections.TargetUnlockLoop then Connections.TargetUnlockLoop:Disconnect() end
+end)
+
+VehicleModBox:AddToggle('HoverModeToggle', {
+    Text = 'Hover Mode (Local Vehicle)',
+    Default = false,
+    Tooltip = 'LocalPlayer\'ın aracının HoverMode\'unu aç/kapat (Ultra Stabil & Async)',
+    Callback = function(value)
+        task.spawn(function()
+            local success, err = pcall(function()
+                local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                if not objectSelection then
+                    Library:Notify("ObjectSelection bulunamadı (Hover Mode)", 2)
+                    return
+                end
+                local vehicleName = LocalPlayer.Name .. "'s Vehicle"
+                local vehicle = objectSelection:FindFirstChild(vehicleName)
+                if not vehicle or not vehicle.Parent then
+                    Library:Notify("Araç bulunamadı (Hover Mode: " .. vehicleName .. ")", 2)
+                    return
+                end
+                local chassis = vehicle:FindFirstChild("CarChassis")
+                if not chassis or not chassis.Parent then
+                    Library:Notify("CarChassis bulunamadı (Hover Mode)", 2)
+                    return
+                end
+                local hoverMode = chassis:FindFirstChild("HoverMode")
+                if not hoverMode or not hoverMode:IsA("BoolValue") then
+                    Library:Notify("HoverMode BoolValue bulunamadı", 2)
+                    return
+                end
+                hoverMode.Value = value
+                Library:Notify("Hover Mode " .. (value and "Açıldı" or "Kapandı") .. " (" .. LocalPlayer.Name .. "'s Vehicle)", 1)
+            end)
+            if not success then
+                Library:Notify("Hover Mode Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+VehicleModBox:AddSlider('SuspensionSlider', {
+    Text = 'Suspension (Local Vehicle)',
+    Default = 0,
+    Min = 0,
+    Max = 1000,
+    Rounding = 0,
+    Tooltip = 'LocalPlayer\'ın aracının Suspension değerini ayarla (0-1000, Ultra Stabil)',
+    Callback = function(value)
+        task.spawn(function()
+            local success, err = pcall(function()
+                local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                if not objectSelection then
+                    Library:Notify("ObjectSelection bulunamadı (Suspension)", 2)
+                    return
+                end
+                local vehicleName = LocalPlayer.Name .. "'s Vehicle"
+                local vehicle = objectSelection:FindFirstChild(vehicleName)
+                if not vehicle or not vehicle.Parent then
+                    Library:Notify("Araç bulunamadı (Suspension: " .. vehicleName .. ")", 2)
+                    return
+                end
+                local chassis = vehicle:FindFirstChild("CarChassis")
+                if not chassis or not chassis.Parent then
+                    Library:Notify("CarChassis bulunamadı (Suspension)", 2)
+                    return
+                end
+                local suspension = chassis:FindFirstChild("Suspension")
+                if not suspension or not suspension:IsA("NumberValue") then
+                    Library:Notify("Suspension NumberValue bulunamadı", 2)
+                    return
+                end
+                suspension.Value = value
+                Library:Notify("Suspension: " .. value .. " (" .. LocalPlayer.Name .. "'s Vehicle)", 1)
+            end)
+            if not success then
+                Library:Notify("Suspension Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+VehicleModBox:AddButton({
+    Text = 'Suspension Sıfırla',
+    Func = function()
+        Options.SuspensionSlider:SetValue(0)
+        task.spawn(function()
+            local success, err = pcall(function()
+                local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                if not objectSelection then
+                    Library:Notify("ObjectSelection bulunamadı (Sıfırlama)", 2)
+                    return
+                end
+                local vehicleName = LocalPlayer.Name .. "'s Vehicle"
+                local vehicle = objectSelection:FindFirstChild(vehicleName)
+                if not vehicle or not vehicle.Parent then
+                    Library:Notify("Araç bulunamadı (Sıfırlama: " .. vehicleName .. ")", 2)
+                    return
+                end
+                local chassis = vehicle:FindFirstChild("CarChassis")
+                if not chassis or not chassis.Parent then
+                    Library:Notify("CarChassis bulunamadı (Sıfırlama)", 2)
+                    return
+                end
+                local suspension = chassis:FindFirstChild("Suspension")
+                if not suspension or not suspension:IsA("NumberValue") then
+                    Library:Notify("Suspension NumberValue bulunamadı (Sıfırlama)", 2)
+                    return
+                end
+                suspension.Value = 0
+                Library:Notify("Suspension Sıfırlandı (Varsayılan: " .. LocalPlayer.Name .. "'s Vehicle)", 1)
+            end)
+            if not success then
+                Library:Notify("Sıfırlama Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+local CombatGroup = Tabs.Combat:AddLeftGroupbox('ESP Araçları')
+
+local ESPSettings = {
+    Enabled = false,
+    MaxDistance = 200,
+}
+
+local ConnectionsESP = {}
+
+local function forceApplyNameTag(player, alwaysOnTop, maxDistance)
+    task.spawn(function()
+        pcall(function()
+            if player.Character then
+                local nt = player.Character:FindFirstChild("NameTag")
+                if nt then
+                    nt.AlwaysOnTop = alwaysOnTop
+                    nt.MaxDistance = maxDistance
+                end
+            end
+        end)
+    end)
+end
+
+local function setNameTagForPlayer(player, alwaysOnTop, maxDistance)
+    task.spawn(function()
+        local function apply(char)
+            task.spawn(function()
+                pcall(function()
+                    local nt = char:FindFirstChild("NameTag")
+                    if nt then
+                        nt.AlwaysOnTop = alwaysOnTop
+                        nt.MaxDistance = maxDistance
+                    end
+                end)
+            end)
+        end
+
+        if player.Character then
+            apply(player.Character)
+        end
+
+        local charAddedConn = player.CharacterAdded:Connect(function(char)
+            task.spawn(function()
+                pcall(function()
+                    char:WaitForChild("NameTag", 1)
+                    apply(char)
+                    local nt = char:FindFirstChild("NameTag")
+                    if nt then
+                        local alwaysListener = nt:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
+                            nt.AlwaysOnTop = alwaysOnTop
+                        end)
+                        table.insert(ConnectionsESP, alwaysListener)
+                        local distListener = nt:GetPropertyChangedSignal("MaxDistance"):Connect(function()
+                            nt.MaxDistance = maxDistance
+                        end)
+                        table.insert(ConnectionsESP, distListener)
+                    end
+                end)
+            end)
+        end)
+        table.insert(ConnectionsESP, charAddedConn)
+
+        local ancestryConn = player:GetPropertyChangedSignal("Character"):Connect(function()
+            if player.Character then
+                forceApplyNameTag(player, alwaysOnTop, maxDistance)
+            end
+        end)
+        table.insert(ConnectionsESP, ancestryConn)
+    end)
+end
+
+local espLoop
+local function toggleESP(value)
+    ESPSettings.Enabled = value
+    local targetDistance = value and 10000 or 200
+    ESPSettings.MaxDistance = targetDistance
+    Options.ESPMaxDistanceSlider:SetValue(targetDistance)
+    if value then
+        local lastUpdate = 0
+        espLoop = RunService.Stepped:Connect(function()
+            if tick() - lastUpdate < 0.03 then return end
+            lastUpdate = tick()
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+            task.spawn(function()
+                pcall(function()
+                    for _, pl in ipairs(Players:GetPlayers()) do
+                        if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("NameTag") and pl.Character:FindFirstChild("HumanoidRootPart") then
+                            local distance = (pl.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                            if distance <= targetDistance then
+                                pl.Character.NameTag.AlwaysOnTop = true
+                                pl.Character.NameTag.MaxDistance = targetDistance
+                            end
+                        end
+                    end
+                end)
+            end)
+        end)
+        for _, pl in ipairs(Players:GetPlayers()) do
+            setNameTagForPlayer(pl, true, targetDistance)
+        end
+        local playerAddedConn = Players.PlayerAdded:Connect(function(pl)
+            setNameTagForPlayer(pl, true, targetDistance)
+        end)
+        table.insert(ConnectionsESP, playerAddedConn)
+        Library:Notify("ESP Aktif (Max Mesafe Auto: " .. targetDistance .. ", No Crash)", 2)
+    else
+        if espLoop then
+            espLoop:Disconnect()
+            espLoop = nil
+        end
+        for _, pl in ipairs(Players:GetPlayers()) do
+            setNameTagForPlayer(pl, false, targetDistance)
+        end
+        local playerAddedConn = Players.PlayerAdded:Connect(function(pl)
+            setNameTagForPlayer(pl, false, targetDistance)
+        end)
+        table.insert(ConnectionsESP, playerAddedConn)
+        Library:Notify("ESP Kapandı (Mesafe Auto: " .. targetDistance .. ")", 2)
+    end
+end
+
+CombatGroup:AddToggle('ESPToggle', {
+    Text = 'ESP Etkinleştir',
+    Default = false,
+    Tooltip = 'ESP aç/kapat (Auto Mesafe: 10000 On / 200 Off, No FPS/Ping Impact)',
+    Callback = function(value)
+        toggleESP(value)
+    end
+})
+
+CombatGroup:AddSlider('ESPMaxDistanceSlider', {
+    Text = 'ESP Max Mesafe (Toggle Sync)',
+    Default = 10000,
+    Min = 50,
+    Max = 10000,
+    Rounding = 0,
+    Tooltip = 'Mesafe ayarla (Force Refresh, No Crash)',
+    Callback = function(value)
+        ESPSettings.MaxDistance = value
+        if ESPSettings.Enabled then
+            for _, pl in ipairs(Players:GetPlayers()) do
+                forceApplyNameTag(pl, true, value)
+                setNameTagForPlayer(pl, true, value)
+            end
+            Library:Notify("ESP Mesafe Force: " .. value .. " (Anında, Stabil)", 2)
+        end
+    end
+})
+
+local BMGroup = Tabs.Combat:AddRightGroupbox('💣 Auto Kill')
+
+local BMSettings = {
+    Police = false,
+    Criminals = false,
+    Prisoners = false,
+    Villains = false,
+    Heroes = false,
+    Targets = {},
+    TargetEnabled = false,
+    MaxBMDistance = 15000,
+}
+
+local BMConnections = {}
+local cachedPlayers = {}
+local cachedPositions = {}
+
+local function fireBM(targetPart)
+    if not targetPart or not targetPart.Parent then return end
+    task.defer(function()
+        pcall(function()
+            local args = {
+                [1] = "BM",
+                [2] = targetPart.Position
+            }
+            Event:FireServer(unpack(args))
+        end)
+    end)
+end
+
+local function startTeamBMLoop(teamName)
+    if BMConnections[teamName] then return end
+    local lastUpdate = 0
+    BMConnections[teamName] = RunService.Heartbeat:Connect(function()
+        if tick() - lastUpdate < 0.0005 then return end
+        lastUpdate = tick()
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+        task.spawn(function()
+            pcall(function()
+                local batchTargets = {}
+                for _, pl in ipairs(cachedPlayers) do
+                    if pl.Team and pl.Team.Name == teamName and pl.Character and pl.Character:FindFirstChildOfClass("Humanoid") and pl.Character.Humanoid.Health > 0 and pl.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (pl.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                        if dist <= BMSettings.MaxBMDistance then
+                            local pos = cachedPositions[pl.Name]
+                            if pos and (pl.Character.HumanoidRootPart.Position - pos).Magnitude > 0.1 then
+                                table.insert(batchTargets, pl.Character.HumanoidRootPart)
+                                cachedPositions[pl.Name] = pl.Character.HumanoidRootPart.Position
+                            end
+                        end
+                    end
+                end
+                for _, part in ipairs(batchTargets) do
+                    fireBM(part)
+                end
+            end)
+        end)
+    end)
+end
+
+local function stopTeamBMLoop(teamName)
+    if BMConnections[teamName] then
+        BMConnections[teamName]:Disconnect()
+        BMConnections[teamName] = nil
+    end
+end
+
+local function toggleTeamBM(teamName, value)
+    if value then
+        startTeamBMLoop(teamName)
+        Library:Notify(teamName .. " BM Aktif (0.0005s Ultra Hızlı, Client > Server, No FPS/Ping)", 1)
+    else
+        stopTeamBMLoop(teamName)
+        Library:Notify(teamName .. " BM Kapandı", 1)
+    end
+end
+
+local function startTargetBMLoop()
+    if BMConnections.TargetLoop then return end
+    local lastUpdate = 0
+    BMConnections.TargetLoop = RunService.Heartbeat:Connect(function()
+        if tick() - lastUpdate < 0.0005 then return end
+        lastUpdate = tick()
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+        task.spawn(function()
+            pcall(function()
+                local batchTargets = {}
+                for targetName in pairs(BMSettings.Targets) do
+                    local pl = Players:FindFirstChild(targetName)
+                    if pl and pl.Character and pl.Character:FindFirstChildOfClass("Humanoid") and pl.Character.Humanoid.Health > 0 and pl.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (pl.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                        if dist <= BMSettings.MaxBMDistance then
+                            local pos = cachedPositions[targetName]
+                            if pos and (pl.Character.HumanoidRootPart.Position - pos).Magnitude > 0.1 then
+                                table.insert(batchTargets, pl.Character.HumanoidRootPart)
+                                cachedPositions[targetName] = pl.Character.HumanoidRootPart.Position
+                            end
+                        end
+                    end
+                end
+                for _, part in ipairs(batchTargets) do
+                    fireBM(part)
+                end
+            end)
+        end)
+    end)
+end
+
+local function stopTargetBMLoop()
+    if BMConnections.TargetLoop then
+        BMConnections.TargetLoop:Disconnect()
+        BMConnections.TargetLoop = nil
+    end
+end
+
+task.spawn(function()
+    while true do
+        cachedPlayers = Players:GetPlayers()
+        for _, pl in ipairs(cachedPlayers) do
+            if pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+                cachedPositions[pl.Name] = pl.Character.HumanoidRootPart.Position
+            end
+        end
+        task.wait(0.5)
+    end
+end)
+
+BMGroup:AddToggle('PoliceBM', {
+    Text = 'Police',
+    Default = false,
+    Callback = function(value) toggleTeamBM("Police", value) end
+})
+
+BMGroup:AddToggle('CriminalsBM', {
+    Text = 'Criminals',
+    Default = false,
+    Callback = function(value) toggleTeamBM("Criminals", value) end
+})
+
+BMGroup:AddToggle('PrisonersBM', {
+    Text = 'Prisoners',
+    Default = false,
+    Callback = function(value) toggleTeamBM("Prisoners", value) end
+})
+
+BMGroup:AddToggle('VillainsBM', {
+    Text = 'Villains',
+    Default = false,
+    Callback = function(value) toggleTeamBM("Villains", value) end
+})
+
+BMGroup:AddToggle('HeroesBM', {
+    Text = 'Heroes',
+    Default = false,
+    Callback = function(value) toggleTeamBM("Heroes", value) end
+})
+
+local selectedTargets = {}
+BMGroup:AddDropdown('TargetBMDropdown', {
+    Text = 'Hedef Oyuncular BM (Multi)',
+    Values = {},
+    Default = 1,
+    Multi = true,
+    Searchable = true,
+    Callback = function(value)
+        selectedTargets = {}
+        for key, val in pairs(value) do
+            if val then
+                selectedTargets[key] = true
+            end
+        end
+        BMSettings.Targets = selectedTargets
+        Library:Notify("BM Hedefler Güncellendi (" .. #selectedTargets .. ")", 1)
+    end
+})
+
+local function updateBMPlayerList()
+    local values = {}
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer then
+            table.insert(values, pl.Name)
+        end
+    end
+    if Options.TargetBMDropdown then
+        Options.TargetBMDropdown:SetValues(values)
+    end
+end
+updateBMPlayerList()
+Players.PlayerAdded:Connect(updateBMPlayerList)
+Players.PlayerRemoving:Connect(updateBMPlayerList)
+
+BMGroup:AddToggle('TargetBMToggle', {
+    Text = 'Hedef oyunculara Kill ',
+    Default = false,
+    Tooltip = 'Seçili hedeflere anlık BM (task.defer Cache Batch 0.0005s, Garanti No FPS/Ping/Crash)',
+    Callback = function(value)
+        BMSettings.TargetEnabled = value
+        if value then
+            startTargetBMLoop()
+            Library:Notify("Hedef BM Aktif (" .. #selectedTargets .. " hedef, Client Ultra Hızlı)", 1)
+        else
+            stopTargetBMLoop()
+            Library:Notify("Hedef BM Kapandı", 1)
+        end
+    end
+})
+
+Library:OnUnload(function()
+    if espLoop then espLoop:Disconnect() end
+    for _, conn in ipairs(ConnectionsESP) do
+        if conn then conn:Disconnect() end
+    end
+    for teamName, conn in pairs(BMConnections) do
+        if conn then conn:Disconnect() end
+    end
+    cachedPlayers = {}
+    cachedPositions = {}
+end)
+
+local propertyValues = {
+    MaxAltitude = 2050,
+    MaxSpeed = 1500,
+    Acceleration = 10,
+    HorizontalTiltSpeed = 10.5,
+    Missiles = true,
+    Bombs = true,
+    Stealth = true,
+    MissileCooldown = 0,
+    MissileLock = 0,
+}
+
+VehicleModBox:AddButton({
+    Text = 'SuperFly',
+    Func = function()
+        task.spawn(function()
+            pcall(function()
+                for i, v in pairs(getgc(true)) do
+                    if type(v) == "table" then
+                        for property, value in pairs(propertyValues) do
+                            if rawget(v, property) ~= nil then
+                                v[property] = value
+                            end
+                        end
+                    end
+                end
+            end)
+        end)
+        Library:Notify("SuperFly Uygulandı (Ultra Stabil)", 2)
+    end
+})
+
+local CombatGroup = Tabs.Combat:AddLeftGroupbox('Takım Değiştirme')
+
+local RemoteFunction = game:GetService("ReplicatedStorage"):WaitForChild("RemoteFunction")
+
+local function changeTeam(teamName)
+    task.spawn(function()
+        local success, err = pcall(function()
+            local args = {
+                [1] = "SetTeam",
+                [2] = teamName
+            }
+            RemoteFunction:InvokeServer(unpack(args))
+        end)
+        if success then
+            Library:Notify("Takım Değiştirildi: " .. teamName .. " (Stabil)", 2)
+        else
+            Library:Notify("Takım Değiştirme Hatası: " .. tostring(err), 3)
         end
     end)
 end
 
-CombatGroup:AddButton('ESP Aç', function()
-    local Players = game:GetService("Players")
-    for _, pl in ipairs(Players:GetPlayers()) do
-        setNameTagForPlayer(pl, true, 10000)
-    end
-    Players.PlayerAdded:Connect(function(pl)
-        setNameTagForPlayer(pl, true, 10000)
-    end)
-end)
+CombatGroup:AddButton({
+    Text = 'Police Takımı',
+    Func = function() changeTeam("Police") end
+})
 
-CombatGroup:AddButton('ESP Kapat', function()
-    local Players = game:GetService("Players")
-    for _, pl in ipairs(Players:GetPlayers()) do
-        setNameTagForPlayer(pl, false, 200)
-    end
-    Players.PlayerAdded:Connect(function(pl)
-        setNameTagForPlayer(pl, false, 200)
-    end)
-end)
+CombatGroup:AddButton({
+    Text = 'Prisoners Takımı',
+    Func = function() changeTeam("Prisoners") end
+})
 
--- Silent Aim Tab
+CombatGroup:AddButton({
+    Text = 'Heroes Takımı',
+    Func = function() changeTeam("Heroes") end
+})
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Event = ReplicatedStorage:WaitForChild("Event")
+
+local CombatGroup = Tabs.Combat:AddLeftGroupbox('Keycard Exploit')
+
+CombatGroup:AddButton({
+    Text = 'Keycard',
+    Func = function()
+        task.spawn(function()
+            local success, err = pcall(function()
+                for i = 1, 50 do
+                    for _, v in pairs(Players:GetChildren()) do
+                        if v and v:IsA("Player") then
+                            local args = {
+                                [1] = "Pickpocket",
+                                [2] = v
+                            }
+                            Event:FireServer(unpack(args))
+                        end
+                    end
+                end
+            end)
+            if success then
+                Library:Notify("Keycard Tamamlandı (50x All Players, Stabil)", 3)
+            else
+                Library:Notify("Keycard Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+local CombatGroup = Tabs.Combat:AddLeftGroupbox('SuperPower Controls')
+
+local SuperPowerMappings = {
+    Frostbite = "Chill",
+    Archer = "Archer",
+    Hotrod = "TheFlash",
+    Voltron = "Tesla",
+    Vanta = "Shadow",
+    Proton = "LaserPower"
+}
+
+getgenv().SuperPower = getgenv().SuperPower or "Voltron"
+
+CombatGroup:AddDropdown('SuperPowerDropdown', {
+    Text = 'SuperPower Seç',
+    Values = {"Frostbite", "Archer", "Hotrod", "Voltron", "Vanta", "Proton"},
+    Default = "Voltron",
+    Multi = false,
+    Searchable = true,
+    Callback = function(value)
+        task.spawn(function()
+            local success, err = pcall(function()
+                getgenv().SuperPower = value
+                local mappedValue = SuperPowerMappings[value]
+                if not mappedValue then
+                    error("Geçersiz SuperPower mapping!")
+                end
+                if not LocalPlayer.Character then
+                    LocalPlayer.CharacterAdded:Wait()
+                end
+                local newvar = Instance.new("StringValue")
+                newvar.Name = "SuperPower"
+                newvar.Value = mappedValue
+                newvar.Parent = LocalPlayer.Character
+                Library:Notify("SuperPower Değiştirildi: " .. value .. " → " .. mappedValue .. " (Stabil)", 2)
+            end)
+            if not success then
+                Library:Notify("SuperPower Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+CombatGroup:AddButton({
+    Text = 'SuperPower Uygula (Mevcut)',
+    Func = function()
+        task.spawn(function()
+            local success, err = pcall(function()
+                local currentPower = getgenv().SuperPower
+                local mappedValue = SuperPowerMappings[currentPower]
+                if not mappedValue then
+                    error("Geçersiz mevcut SuperPower!")
+                end
+                if not LocalPlayer.Character then
+                    LocalPlayer.CharacterAdded:Wait()
+                end
+                local existingVar = LocalPlayer.Character:FindFirstChild("SuperPower")
+                if existingVar then
+                    existingVar:Destroy()
+                end
+                local newvar = Instance.new("StringValue")
+                newvar.Name = "SuperPower"
+                newvar.Value = mappedValue
+                newvar.Parent = LocalPlayer.Character
+                Library:Notify("Mevcut SuperPower Uygulandı: " .. currentPower .. " → " .. mappedValue .. " (Hızlı Stabil)", 2)
+            end)
+            if not success then
+                Library:Notify("Uygulama Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+local TestTab = Window:AddTab('Test')
+
+local TestGroup = TestTab:AddLeftGroupbox('Test Tools')
+
+TestGroup:AddButton({
+    Text = 'Rejoin',
+    Func = function()
+        task.spawn(function()
+            local success, err = pcall(function()
+                local TeleportService = game:GetService("TeleportService")
+                local StarterGui = game:GetService("StarterGui")
+                local placeId = game.PlaceId
+                local jobId = game.JobId
+                local plr = Players.LocalPlayer
+                local maxRetries = 3
+                local retryCount = 0
+                local retryDelay = 0.2
+
+                local function notify(msg)
+                    pcall(function()
+                        StarterGui:SetCore("SendNotification", {
+                            Title = "Rejoin Script",
+                            Text = msg,
+                            Duration = 3
+                        })
+                    end)
+                end
+
+                local function rejoin()
+                    if retryCount >= maxRetries then
+                        notify("Maksimum rejoin denemesi yapıldı")
+                        return
+                    end
+                    retryCount = retryCount + 1
+                    local success, err = pcall(function()
+                        TeleportService:TeleportToPlaceInstance(placeId, jobId, plr)
+                    end)
+                    if not success then
+                        local errMsg = tostring(err):lower()
+                        if errMsg:find("server is full") or errMsg:find("full") then
+                            notify("Sunucu dolu, rejoin yapılamıyor")
+                            return
+                        elseif errMsg:find("failed") or errMsg:find("error") then
+                            notify("Rejoin başarısız, tekrar deneniyor")
+                            task.delay(retryDelay, rejoin)
+                            return
+                        else
+                            notify("Bilinmeyen hata: " .. tostring(err))
+                            return
+                        end
+                    end
+                end
+
+                rejoin()
+            end)
+            if success then
+                Library:Notify("Rejoin Başlatıldı (Stabil Retry)", 3)
+            else
+                Library:Notify("Rejoin Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+TestGroup:AddButton({
+    Text = 'Anti-AFK',
+    Func = function()
+        task.spawn(function()
+            local success, err = pcall(function()
+                local RunService = game:GetService("RunService")
+                local idled = LocalPlayer.Idled
+                local getconnections = getconnections or get_signal_cons or nil
+                if not getconnections then
+                    error("getconnections bulunamadı!")
+                end
+                for _, conn in pairs(getconnections(idled)) do
+                    if conn and conn.Disable then
+                        conn:Disable()
+                    end
+                end
+                local lastDisable = 0
+                local antiAFKConn = RunService.Heartbeat:Connect(function()
+                    if tick() - lastDisable > 60 then
+                        if getconnections then
+                            for _, conn in pairs(getconnections(idled)) do
+                                if conn and conn.Disable then
+                                    conn:Disable()
+                                end
+                            end
+                        end
+                        lastDisable = tick()
+                    end
+                end)
+                table.insert(Connections, antiAFKConn)
+            end)
+            if success then
+                Library:Notify("Anti-AFK Aktif (Stabil Loop, No Kick)", 3)
+            else
+                Library:Notify("Anti-AFK Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+TestGroup:AddButton({
+    Text = 'E Tuşu Süresini Hızlandır',
+    Func = function()
+        task.spawn(function()
+            local success, err = pcall(function()
+                for i,v in next, getgc(true) do
+                    if type(v) == "table" and rawget(v, "ID") and rawget(v, "Seconds") then
+                        if typeof(v.Seconds) == "number" then
+                            rawset(v, "Seconds", 0.001)
+                        end
+                    end
+                end
+            end)
+            if success then
+                Library:Notify("Timer Hack Uygulandı (Stabil, 0.001s Seconds)", 3)
+            else
+                Library:Notify("Timer Hack Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
 local SilentAimSettings = {
     Enabled = false,
     TargetMode = false,
@@ -2232,9 +3230,229 @@ SilentAimLeftGroup:AddToggle('AutoWallCheck', {
     end
 })
 
--- Save
-local ignoreList = SaveManager:GetIgnoreIndexes() or {}
-for _, key in ipairs({'TargetPlayerAuto', 'SilentAimAuto', 'TargetSilentAimAuto', 'RandomBodyPart', 'AutoWallCheck'}) do
-    if not table.find(ignoreList, key) then table.insert(ignoreList, key) end
+local CombatDamageGroup = Tabs.Combat:AddRightGroupbox('Silah Damage Multiplier')
+
+local GunMappings = {
+    ["AK47"] = "RifleScript",
+    ["Deagle"] = "PistolScript",
+    ["Sniper"] = "RifleScript",
+    ["Shotgun"] = "ShotgunScript",
+    ["SPAS"] = "ShotgunScript",
+    ["TEC9"] = "PistolScript",
+    ["Pistol"] = "PistolScript",
+    ["Famas"] = "RifleScript",
+    ["MP5"] = "RifleScript",
+    ["Laser Beam"] = "PowerScript",
+    ["AWP"] = "RifleScript",
+    ["SCAR"] = "RifleScript",
+    ["M4A1"] = "RifleScript"
+}
+
+local PersistentDamageEnabled = false
+local PersistentConnections = {}
+
+local function applyDamageMultiplier(gun)
+    if not gun or not gun:IsA("Tool") then return end
+    local scriptName = GunMappings[gun.Name]
+    if not scriptName then return end
+    local ss = gun:FindFirstChild(scriptName)
+    if not ss then return end
+    for i = 1, 10 do
+        ss:Clone().Parent = gun
+    end
 end
-SaveManager:SetIgnoreIndexes(ignoreList)
+
+local function setupPersistentDamage()
+    if PersistentDamageEnabled then return end
+    PersistentDamageEnabled = true
+
+    local backpackConn = LocalPlayer.Backpack.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            applyDamageMultiplier(child)
+        end
+    end)
+
+    local characterConn
+    if LocalPlayer.Character then
+        characterConn = LocalPlayer.Character.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") then
+                applyDamageMultiplier(child)
+            end
+        end)
+    end
+
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        if characterConn then
+            characterConn:Disconnect()
+        end
+        characterConn = character.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") then
+                applyDamageMultiplier(child)
+            end
+        end)
+        for _, tool in pairs(character:GetChildren()) do
+            if tool:IsA("Tool") then
+                applyDamageMultiplier(tool)
+            end
+        end
+    end)
+
+    for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            applyDamageMultiplier(tool)
+        end
+    end
+
+    table.insert(PersistentConnections, backpackConn)
+    if characterConn then
+        table.insert(PersistentConnections, characterConn)
+    end
+
+    Library:Notify("Persistent 10x Damage Aktif (Ölene/Siline Kadar, FPS Opt)", 2)
+end
+
+local function disablePersistentDamage()
+    PersistentDamageEnabled = false
+    for _, conn in pairs(PersistentConnections) do
+        if conn then
+            conn:Disconnect()
+        end
+    end
+    PersistentConnections = {}
+    Library:Notify("Persistent 10x Damage Kapandı", 2)
+end
+
+CombatDamageGroup:AddToggle('PersistentDamageToggle', {
+    Text = 'Persistent 10x Damage (Ölene Kadar)',
+    Default = false,
+    Tooltip = '10x damage ölene veya silene kadar kalır (Ultra Opt, No FPS Drop)',
+    Callback = function(value)
+        if value then
+            setupPersistentDamage()
+        else
+            disablePersistentDamage()
+        end
+    end
+})
+
+local selectedGun = nil
+
+CombatDamageGroup:AddDropdown('GunDropdown', {
+    Text = 'Tek Seferlik Silah Seç',
+    Values = {"AK47", "Deagle", "Sniper", "Shotgun", "SPAS", "TEC9", "Pistol", "Famas", "MP5", "Laser Beam", "AWP", "SCAR", "M4A1"},
+    Default = 1,
+    Multi = false,
+    Searchable = true,
+    Callback = function(value)
+        selectedGun = value
+        Library:Notify("Silah Seçildi: " .. value .. " (Stabil)", 2)
+    end
+})
+
+CombatDamageGroup:AddButton({
+    Text = '10x Damage (Tek Seferlik)',
+    Func = function()
+        if not selectedGun then
+            Library:Notify("Önce silah seç!", 3)
+            return
+        end
+        task.spawn(function()
+            local success, err = pcall(function()
+                local backpack = LocalPlayer.Backpack
+                local character = LocalPlayer.Character
+                local gun = backpack:FindFirstChild(selectedGun) or character:FindFirstChild(selectedGun)
+                if not gun then
+                    error("Silah bulunamadı: " .. selectedGun)
+                end
+                local scriptName = GunMappings[selectedGun]
+                if not scriptName then
+                    error("Script mapping bulunamadı!")
+                end
+                local ss = gun:FindFirstChild(scriptName)
+                if not ss then
+                    error("Script bulunamadı: " .. scriptName)
+                end
+                for i = 1, 10 do
+                    ss:Clone().Parent = gun
+                end
+            end)
+            if success then
+                Library:Notify(selectedGun .. " 10x Damage (Tek Seferlik Stabil)", 2)
+            else
+                Library:Notify("Damage Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+local InfiniteAmmoConn
+CombatDamageGroup:AddToggle('InfiniteAmmoToggle', {
+    Text = 'Sınırsız Mermi',
+    Default = false,
+    Tooltip = 'Sonsuz mermi (Optimize Listener, No FPS Drop)',
+    Callback = function(value)
+        if value then
+            InfiniteAmmoConn = LocalPlayer.ChildAdded:Connect(function(child)
+                if child:IsA("Tool") then
+                    child.ChildAdded:Connect(function(scriptChild)
+                        if scriptChild.Name == "RifleScript" or scriptChild.Name == "ShotgunScript" or scriptChild.Name == "PistolScript" or scriptChild.Name == "TazerScript" or scriptChild.Name == "PowerScript" then
+                            task.spawn(function()
+                                pcall(function()
+                                    local a = getsenv(scriptChild)
+                                    if a and debug.getupvalues(a.Reload) then
+                                        debug.setupvalue(a.Reload, 2, math.huge)
+                                    end
+                                end)
+                            end)
+                        end
+                    end)
+                end
+            end)
+            for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    for _, script in pairs(tool:GetChildren()) do
+                        if script.Name == "RifleScript" or script.Name == "ShotgunScript" or script.Name == "PistolScript" or script.Name == "TazerScript" or script.Name == "PowerScript" then
+                            task.spawn(function()
+                                pcall(function()
+                                    local a = getsenv(script)
+                                    if a and debug.getupvalues(a.Reload) then
+                                        debug.setupvalue(a.Reload, 2, math.huge)
+                                    end
+                                end)
+                            end)
+                        end
+                    end
+                end
+            end
+            if LocalPlayer.Character then
+                for _, tool in pairs(LocalPlayer.Character:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        for _, script in pairs(tool:GetChildren()) do
+                            if script.Name == "RifleScript" or script.Name == "ShotgunScript" or script.Name == "PistolScript" or script.Name == "TazerScript" or script.Name == "PowerScript" then
+                                task.spawn(function()
+                                    pcall(function()
+                                        local a = getsenv(script)
+                                        if a and debug.getupvalues(a.Reload) then
+                                            debug.setupvalue(a.Reload, 2, math.huge)
+                                        end
+                                    end)
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+            Library:Notify("Infinite Ammo Aktif (No FPS Drop)", 2)
+        else
+            if InfiniteAmmoConn then
+                InfiniteAmmoConn:Disconnect()
+                InfiniteAmmoConn = nil
+            end
+            Library:Notify("Infinite Ammo Kapandı", 2)
+        end
+    end
+})
+
+Library:OnUnload(function()
+    if InfiniteAmmoConn then InfiniteAmmoConn:Disconnect() end
+end)
