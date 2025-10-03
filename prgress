@@ -1,1 +1,1 @@
-https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt
+loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/Wiamen%C3%BC.txt", true))()
