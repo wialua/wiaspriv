@@ -987,8 +987,8 @@ local defaults = {
     heliProps  = { Acceleration=3, Deceleration=1, SpeedDecay=0.95, BrakeForce=15, DescentSpeed=2, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=14, ResponseSpeed=1, MaxSideTilt=20, MinHeightAboveGround=5, MissileCooldown=2, MissileLock=0 },
     ufoProps   = { Acceleration=10, Deceleration=1, MaxSpeed=340, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=2, DescentSpeed=3, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=14, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40 },
     boatProps  = { Height=1, TurnSpeed=7.5, Torque=5, MaxSpeed=160, BrakeForce=1, SpeedDecay=0.5 },
-    planeProps = { Bombs=true, Acceleration=0.6, DampeningAcceleration=0.8, MaxVerticalTilt=10, VerticalTiltUpSpeed=1, VerticalTiltDownSpeed=1, VerticalTiltDampening=0.95, VerticalSpeedLimit=30, HorizontalTiltSpeed=15.2, MaxSideTilt=25, SideTiltSpeed=1.5, SideTiltDampening=0.95, MissileTargetRange=540, MissileCooldown=2, MissileLock=0 },
-    ArchProps   = { Acceleration=10,MaxSpeed=270, Deceleration=1, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=3, DescentSpeed=3, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=20, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40 },
+    planeProps = { Bombs=true, Acceleration=0.6, DampeningAcceleration=0.8, MaxVerticalTilt=10, VerticalTiltUpSpeed=1, VerticalTiltDownSpeed=1, VerticalTiltDampening=0.95, VerticalSpeedLimit=30, HorizontalTiltSpeed=7.2, MaxSideTilt=25, SideTiltSpeed=1.5, SideTiltDampening=0.95, MissileTargetRange=540, MissileCooldown=0, MissileLock=0 },
+    ArchProps   = { Acceleration=10,MaxSpeed=270, Deceleration=1, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=3, DescentSpeed=3, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=10, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40 },
 }
 
 -- Modifiye butonları
@@ -3456,3 +3456,4 @@ CombatDamageGroup:AddToggle('InfiniteAmmoToggle', {
 Library:OnUnload(function()
     if InfiniteAmmoConn then InfiniteAmmoConn:Disconnect() end
 end)
+
