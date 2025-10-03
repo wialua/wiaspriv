@@ -133,48 +133,4 @@ local function closeLoader()
     TweenService:Create(Subtitle, closeInfo, {TextTransparency = 1}):Play()
     TweenService:Create(Version, closeInfo, {TextTransparency = 1}):Play()
     TweenService:Create(ProgressBar, closeInfo, {BackgroundTransparency = 1}):Play()
-    TweenService:Create(ProgressFill, closeInfo, {BackgroundTransparency = 1}):Play()
-    TweenService:Create(StatusLabel, closeInfo, {TextTransparency = 1}):Play()
-    task.wait(0.3)
-    ScreenGui:Destroy()
-end
-
-local dragActive = false
-local dragStartPos = nil
-local frameStartPos = nil
-
-local function updateDrag(input)
-    local delta = input.Position - dragStartPos
-    MainFrame.Position = UDim2.new(frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X, frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y)
-end
-
-Title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragActive = true
-        dragStartPos = input.Position
-        frameStartPos = MainFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragActive = false
-            end
-        end)
-    end
-end)
-
-Title.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement and dragActive then
-        updateDrag(input)
-    end
-end)
-
-loaderEntrance()
-initiateLoaderEffects()
-loaderAutoProcess()
-
-Players.PlayerRemoving:Connect(function(plr)
-    if plr == Player then
-        if connection then connection:Disconnect() end
-        ScreenGui:Destroy()
-    end
-end)
+    TweenService:Create(ProgressFill, closeInfo
