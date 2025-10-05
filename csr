@@ -233,4 +233,4 @@ if Library and Library.OnUnload then
 end
 
 ultraCleanupShotguns()
-notify("Ultra Anti-Crash Aktif!", "Anlık Shotgun yok etme + Event blokajı devrede! FPS sıfır kayıp.", 5)
+notify("Anti-Crash Aktif!" ", 5)
