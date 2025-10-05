@@ -1,0 +1,236 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Event = ReplicatedStorage:FindFirstChild("Event") or ReplicatedStorage:WaitForChild("Event", 5)
+
+local Library = rawget(_G, "Library") or {
+    Notify = function(title, text, duration)
+        pcall(function()
+            game.StarterGui:SetCore("SendNotification", {
+                Title = title,
+                Text = text,
+                Duration = duration or 3
+            })
+        end)
+    end
+}
+
+local notifyDebounce = {}
+local function notify(title, text, duration)
+    local key = title .. text
+    local now = tick()
+    if notifyDebounce[key] and now - notifyDebounce[key] < 1 then return end
+    notifyDebounce[key] = now
+    Library.Notify(title, text, duration or 3)
+end
+
+local eventHistory = {}
+local MAX_EVENTS_PER_SECOND = 1
+local function checkRateLimit()
+    local now = tick()
+    for i = #eventHistory, 1, -1 do
+        if now - eventHistory[i] > 1 then
+            table.remove(eventHistory, i)
+        end
+    end
+    table.insert(eventHistory, now)
+    return #eventHistory <= MAX_EVENTS_PER_SECOND
+end
+
+local function isOwnShotgun(obj)
+    if not obj or not obj.Parent then return false end
+    local root = obj
+    while root do
+        if root == LocalPlayer.Backpack or (LocalPlayer.Character and root == LocalPlayer.Character) then
+            return true
+        end
+        root = root.Parent
+    end
+    return false
+end
+
+local function instantDestroy(obj)
+    if obj and obj.Parent then
+        pcall(function() obj:Destroy() end)
+    end
+end
+
+local function ultraCleanupShotguns()
+    task.spawn(function()
+        for _, pl in pairs(Players:GetPlayers()) do
+            if pl ~= LocalPlayer and pl.Backpack then
+                for _, child in pairs(pl.Backpack:GetChildren()) do
+                    if child.Name == "Shotgun" then
+                        instantDestroy(child)
+                    end
+                end
+            end
+        end
+        for _, obj in pairs(Workspace:GetChildren()) do
+            if obj.Name == "Shotgun" and not isOwnShotgun(obj) then
+                instantDestroy(obj)
+            elseif obj.Name == "ObjectSelection" then
+                for _, inner in pairs(obj:GetChildren()) do
+                    if inner.Name == "Shotgun" and not isOwnShotgun(inner) then
+                        instantDestroy(inner)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local oldNamecall
+oldNamecall = hookmetamethod(Event, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    if (method == "Fire" or method == "OnClientEvent") and args[1] == "ShootShotgun" then
+        if not checkRateLimit() then return end
+        local sender = args[2] or args[1] or args[3]
+        if typeof(sender) == "Instance" and (not sender.Parent or sender.Parent ~= Workspace or sender.Name ~= LocalPlayer.Name) then
+            return
+        end
+    end
+    return oldNamecall(self, ...)
+end)
+
+local oldFireServer
+oldFireServer = hookfunction(Event.FireServer, function(self, eventType, ...)
+    if eventType == "ShootShotgun" then
+        local args = {...}
+        local sender = args[1] or args[2] or args[3]
+        if typeof(sender) == "Instance" and (not sender.Parent or sender.Parent ~= Workspace or sender.Name ~= LocalPlayer.Name) then
+            return
+        end
+        if not checkRateLimit() then return end
+    end
+    return oldFireServer(self, eventType, ...)
+end)
+
+local connections = {}
+
+connections.workspaceChildAdded = Workspace.ChildAdded:Connect(function(child)
+    task.spawn(function()
+        if child.Name == "Shotgun" and not isOwnShotgun(child) then
+            instantDestroy(child)
+        elseif child.Name == "ObjectSelection" then
+            local innerConn
+            innerConn = child.ChildAdded:Connect(function(inner)
+                if inner.Name == "Shotgun" and not isOwnShotgun(inner) then
+                    instantDestroy(inner)
+                end
+            end)
+            connections["objSel_" .. tostring(child)] = innerConn
+            ultraCleanupShotguns()
+        end
+    end)
+end)
+
+local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+if objectSelection then
+    connections.objectSelectionChildAdded = objectSelection.ChildAdded:Connect(function(child)
+        if child.Name == "Shotgun" and not isOwnShotgun(child) then
+            instantDestroy(child)
+        end
+    end)
+end
+
+local playerMonitors = {}
+local function setupPlayerMonitoring(pl)
+    if pl == LocalPlayer then return end
+    playerMonitors[pl] = true
+    
+    local backpackConn = pl.Backpack.ChildAdded:Connect(function(child)
+        if child.Name == "Shotgun" then
+            instantDestroy(child)
+        end
+    end)
+    connections["backpack_" .. pl.Name] = backpackConn
+    
+    local charConn = pl.CharacterAdded:Connect(function(char)
+        local charChildConn = char.ChildAdded:Connect(function(child)
+            if child.Name == "Shotgun" then
+                instantDestroy(child)
+            end
+        end)
+        connections["charChild_" .. pl.Name .. "_" .. tick()] = charChildConn
+        ultraCleanupShotguns()
+    end)
+    connections["charAdded_" .. pl.Name] = charConn
+    
+    if pl.Character then
+        local existingCharChildConn = pl.Character.ChildAdded:Connect(function(child)
+            if child.Name == "Shotgun" then
+                instantDestroy(child)
+            end
+        end)
+        connections["existingChar_" .. pl.Name] = existingCharChildConn
+    end
+end
+
+connections.playerAdded = Players.PlayerAdded:Connect(function(pl)
+    task.spawn(function() setupPlayerMonitoring(pl) end)
+end)
+
+for _, pl in pairs(Players:GetPlayers()) do
+    if pl ~= LocalPlayer then
+        task.spawn(function() setupPlayerMonitoring(pl) end)
+    end
+end
+
+connections.workspaceDescendantRemoving = Workspace.DescendantRemoving:Connect(function(desc)
+    if desc.Name == "Shotgun" then
+        task.spawn(ultraCleanupShotguns)
+    end
+end)
+
+local lastScan = 0
+local SCAN_INTERVAL = 0.033
+connections.heartbeat = RunService.Heartbeat:Connect(function()
+    local now = tick()
+    if now - lastScan >= SCAN_INTERVAL then
+        lastScan = now
+        ultraCleanupShotguns()
+    end
+end)
+
+connections.playerRemoving = Players.PlayerRemoving:Connect(function(pl)
+    playerMonitors[pl] = nil
+    for key, conn in pairs(connections) do
+        if string.find(key, pl.Name, 1, true) then
+            if typeof(conn) == "RBXScriptConnection" then
+                pcall(conn.Disconnect, conn)
+            end
+            connections[key] = nil
+        end
+    end
+end)
+
+local function ultraUnload()
+    for _, conn in pairs(connections) do
+        if typeof(conn) == "RBXScriptConnection" then
+            pcall(conn.Disconnect, conn)
+        end
+    end
+    connections = {}
+    
+    if oldNamecall then
+        hookmetamethod(Event, "__namecall", oldNamecall)
+    end
+    if oldFireServer then
+        hookfunction(Event.FireServer, oldFireServer)
+    end
+    
+    ultraCleanupShotguns()
+    
+    notify("Ultra Anti-Crash", "Koruma devre dışı!", 4)
+end
+
+if Library and Library.OnUnload then
+    Library.OnUnload:Connect(ultraUnload)
+end
+
+ultraCleanupShotguns()
+notify("Ultra Anti-Crash Aktif!", "Anlık Shotgun yok etme + Event blokajı devrede! FPS sıfır kayıp.", 5)
