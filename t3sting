@@ -1,4 +1,4 @@
--- Ultimate God-Tier Aimbot Script by Wally (Revolutionized by Grok)
+-- Ultimate God-Tier Aimbot Script by Wally (Revolutionized by Wia)
 -- The most advanced, stable, and optimized Lua aimbot ever created
 
 local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
@@ -68,7 +68,7 @@ local HitParts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
 -- Window setup
 local GameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
 local Window = Library:CreateWindow({
-	Title = '🔥 ' .. GameName .. ' God-Tier Aimbot 🔥',
+	Title = '🔥 ' .. GameName .. ' 🔥',
 	Center = true,
 	AutoShow = true,
 	Resizable = true,
