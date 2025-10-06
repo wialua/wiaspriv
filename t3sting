@@ -1,0 +1,447 @@
+-- New example script written by wally
+-- You can suggest changes with a pull request or something
+
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = true
+Library.NotifySide = "Left"
+
+local GameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+local Window = Library:CreateWindow({
+	Title = '🔥 ' .. GameName .. ' 🔥',
+	Center = true,
+	AutoShow = true,
+	Resizable = true,
+	ShowCustomCursor = true,
+	UnlockMouseWhileOpen = true,
+	NotifySide = "Left",
+	TabPadding = 8,
+	MenuFadeTime = 0.2
+})
+
+local Tabs = {
+	Aimbot = Window:AddTab('Aimbot'),
+	['UI Settings'] = Window:AddTab('UI Ayarları'),
+}
+
+local AimbotGroup = Tabs.Aimbot:AddLeftGroupbox('Aimbot Ayarları')
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+
+local AimbotEnabled = false
+local WallCheck = false
+local TeamCheck = false
+local FOVCircleEnabled = false
+local FOVCircleMode = "Sabit"
+local AimbotMode = "Hold"
+local AimbotKey = Enum.UserInputType.MouseButton2
+local HitPart = "Head"
+local MaxDistance = 1000
+local TargetOnlySelected = false
+local FullAimlock = false
+local CameraMode = "Normal"
+local SelectedTargets = {}
+local CurrentTarget = nil
+local IsAiming = false
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Thickness = 1
+FOVCircle.Color = Color3.fromRGB(255, 0, 0)
+FOVCircle.Radius = 150
+FOVCircle.NumSides = 64 -- Optimize edilmiş kenar sayısı
+
+local FOVRadiusSlider
+local Connections = {}
+local RaycastCache = {} -- Raycast sonuçlarını önbelleğe almak için
+local LastRaycastUpdate = 0
+local RaycastUpdateInterval = 0.1 -- 100ms'de bir güncelle, FPS dostu
+
+local function GetPlayersList()
+	local playerList = {}
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			table.insert(playerList, player.Name)
+		end
+	end
+	return playerList
+end
+
+local TargetPlayersDropdown
+TargetPlayersDropdown = AimbotGroup:AddDropdown('TargetPlayers', {
+	Values = GetPlayersList(),
+	Default = nil,
+	Multi = true,
+	AllowNull = true,
+	Text = 'Hedef Oyuncular (Çoklu Seçim)',
+	Tooltip = 'Aimbot için hedef oyuncuları seçin, otomatik güncellenir',
+	Callback = function(Value)
+		SelectedTargets = Value
+	end
+})
+
+local function UpdatePlayerList()
+	local newValues = GetPlayersList()
+	TargetPlayersDropdown.Values = newValues
+	local updatedSelected = {}
+	for target in pairs(SelectedTargets) do
+		if table.find(newValues, target) then
+			updatedSelected[target] = true
+		end
+	end
+	SelectedTargets = updatedSelected
+	TargetPlayersDropdown:SetValue(SelectedTargets)
+end
+
+Players.PlayerAdded:Connect(UpdatePlayerList)
+Players.PlayerRemoving:Connect(UpdatePlayerList)
+UpdatePlayerList()
+
+AimbotGroup:AddToggle('AimbotEnable', {
+	Text = 'Aimbot Etkin',
+	Default = false,
+	Tooltip = 'Aimbotu açar/kapatır',
+	Callback = function(Value)
+		AimbotEnabled = Value
+		if not Value then
+			IsAiming = false
+			CurrentTarget = nil
+			RaycastCache = {} -- Önbelleği sıfırla
+		end
+	end
+})
+
+AimbotGroup:AddToggle('WallCheck', {
+	Text = 'Duvar Kontrolü',
+	Default = false,
+	Tooltip = 'Duvar arkasındaki hedeflere kitlenmeyi engeller',
+	Callback = function(Value)
+		WallCheck = Value
+		RaycastCache = {} -- Önbelleği sıfırla
+	end
+})
+
+AimbotGroup:AddToggle('TeamCheck', {
+	Text = 'Takım Kontrolü',
+	Default = false,
+	Tooltip = 'Aynı veya müttefik takımdaki oyunculara kitlenmeyi engeller',
+	Callback = function(Value)
+		TeamCheck = Value
+	end
+})
+
+AimbotGroup:AddToggle('TargetOnly', {
+	Text = 'Sadece Seçili Hedefler',
+	Default = false,
+	Tooltip = 'Yalnızca dropdown’dan seçilen oyunculara kilitlenir',
+	Callback = function(Value)
+		TargetOnlySelected = Value
+	end
+})
+
+AimbotGroup:AddToggle('FullAimlock', {
+	Text = 'Tam Kilit',
+	Default = false,
+	Tooltip = 'Oyun kamerasının dönüşünü engeller',
+	Callback = function(Value)
+		FullAimlock = Value
+	end
+})
+
+AimbotGroup:AddToggle('FOVCircle', {
+	Text = 'FOV Çemberi',
+	Default = false,
+	Tooltip = 'Hedefleme için FOV çemberini gösterir',
+	Callback = function(Value)
+		FOVCircleEnabled = Value
+		FOVCircle.Visible = Value
+	end
+})
+
+FOVRadiusSlider = AimbotGroup:AddSlider('FOVRadius', {
+	Text = 'FOV Yarıçapı',
+	Default = 150,
+	Min = 10,
+	Max = 500,
+	Rounding = 0,
+	Tooltip = 'FOV çemberinin boyutunu ayarlar',
+	Callback = function(Value)
+		FOVCircle.Radius = Value
+	end
+})
+
+AimbotGroup:AddSlider('MaxDistance', {
+	Text = 'Maksimum Mesafe',
+	Default = 1000,
+	Min = 10,
+	Max = 5000,
+	Rounding = 0,
+	Tooltip = 'Aimbotun kilitleneceği maksimum mesafe',
+	Callback = function(Value)
+		MaxDistance = Value
+	end
+})
+
+AimbotGroup:AddDropdown('AimbotMode', {
+	Values = { 'Hold', 'Toggle' },
+	Default = 1,
+	Multi = false,
+	Text = 'Aimbot Modu',
+	Tooltip = 'Hold: Basılı tut, Toggle: Aç/Kapat',
+	Callback = function(Value)
+		AimbotMode = Value
+		if AimbotMode == "Hold" then
+			IsAiming = false
+			CurrentTarget = nil
+		end
+	end
+})
+
+AimbotGroup:AddDropdown('HitPart', {
+	Values = { 'Head', 'HumanoidRootPart', 'UpperTorso', 'LowerTorso' },
+	Default = 1,
+	Multi = false,
+	Text = 'Hedef Vücut Parçası',
+	Tooltip = 'Kilitlenilecek vücut parçası',
+	Callback = function(Value)
+		HitPart = Value
+		RaycastCache = {} -- Önbelleği sıfırla
+	end
+})
+
+AimbotGroup:AddDropdown('FOVMode', {
+	Values = { 'Sabit', 'Fare Takip' },
+	Default = 1,
+	Multi = false,
+	Text = 'FOV Çember Modu',
+	Tooltip = 'Sabit: Ekran ortası, Fare Takip: Fareye göre hareket',
+	Callback = function(Value)
+		FOVCircleMode = Value
+	end
+})
+
+AimbotGroup:AddDropdown('CameraMode', {
+	Values = { 'Normal', 'Birinci Şahıs', 'Üçüncü Şahıs' },
+	Default = 1,
+	Multi = false,
+	Text = 'Kamera Modu',
+	Tooltip = 'Kamera kitlenme yöntemini seçer',
+	Callback = function(Value)
+		CameraMode = Value
+	end
+})
+
+AimbotGroup:AddLabel('Aimbot Tuşu'):AddKeyPicker('AimbotKey', {
+	Default = 'MouseButton2',
+	Mode = 'Always',
+	NoUI = false,
+	Text = 'Aimbot Aktivasyon Tuşu',
+	Tooltip = 'Aimbotun çalışması için kullanılacak tuş',
+	Callback = function(Value)
+		-- Modlara göre yönetilir
+	end,
+	ChangedCallback = function(New)
+		AimbotKey = New
+	end
+})
+
+local function IsTeamIgnored(player)
+	if not TeamCheck then return false end
+	local localTeam = LocalPlayer.Team and LocalPlayer.Team.Name or ""
+	local targetTeam = player.Team and player.Team.Name or ""
+	
+	if localTeam == "Prisoners" then
+		return targetTeam == "Prisoners" or targetTeam == "Criminals" or targetTeam == "Villains"
+	elseif localTeam == "Police" then
+		return targetTeam == "Police" or targetTeam == "Heroes"
+	end
+	return false
+end
+
+LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+	if IsAiming then
+		CurrentTarget = GetClosestTarget()
+	end
+end)
+
+local function IsVisible(targetPart)
+	if not WallCheck then return true end
+	local cacheKey = tostring(targetPart) .. "-" .. tostring(tick() // RaycastUpdateInterval)
+	if RaycastCache[cacheKey] ~= nil then
+		return RaycastCache[cacheKey]
+	end
+
+	local origin = Camera.CFrame.Position
+	local direction = (targetPart.Position - origin)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = {LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()}
+	params.IgnoreWater = true
+
+	-- Çoklu raycast ile daha kesin kontrol
+	local points = {
+		targetPart.Position,
+		targetPart.Position + Vector3.new(0, 0.5, 0), -- Üst
+		targetPart.Position + Vector3.new(0, -0.5, 0), -- Alt
+	}
+	local visible = false
+	for _, point in ipairs(points) do
+		local result = Workspace:Raycast(origin, (point - origin), params)
+		if not result or result.Instance:IsDescendantOf(targetPart.Parent) then
+			visible = true
+			break
+		end
+	end
+
+	RaycastCache[cacheKey] = visible
+	return visible
+end
+
+local function GetClosestTarget()
+	local closest = nil
+	local minDist = math.huge
+	local center = FOVCircleMode == "Sabit" and Camera.ViewportSize / 2 or UserInputService:GetMouseLocation()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+			if IsTeamIgnored(player) then continue end
+			local part = player.Character:FindFirstChild(HitPart)
+			if not part then
+				-- Fallback'ler: Headless veya eksik parça durumları için
+				part = player.Character:FindFirstChild("Head") or
+					player.Character:FindFirstChild("HumanoidRootPart") or
+					player.Character:FindFirstChild("UpperTorso") or
+					player.Character:FindFirstChild("LowerTorso")
+			end
+			if part then
+				local dist = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and
+					(LocalPlayer.Character.HumanoidRootPart.Position - part.Position).Magnitude) or math.huge
+				if dist <= MaxDistance then
+					if TargetOnlySelected and not SelectedTargets[player.Name] then continue end
+					local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+					if onScreen then
+						local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+						if (not FOVCircleEnabled or screenDist <= FOVCircle.Radius) and screenDist < minDist and IsVisible(part) then
+							minDist = screenDist
+							closest = part
+						end
+					end
+				end
+			end
+		end
+	end
+	return closest
+end
+
+local function UpdateFOVCircle()
+	if not FOVCircleEnabled then return end
+	if FOVCircleMode == "Sabit" then
+		FOVCircle.Position = Camera.ViewportSize / 2
+	elseif FOVCircleMode == "Fare Takip" then
+		FOVCircle.Position = UserInputService:GetMouseLocation()
+	end
+end
+
+local function LockCamera(target)
+	if not target then return end
+	local camPos = Camera.CFrame.Position
+	local lookAt = target.Position
+	if CameraMode == "Birinci Şahıs" and LocalPlayer.CameraMode ~= Enum.CameraMode.LockFirstPerson then
+		Library:Notify("Birinci şahıs modunda değilsiniz!", 3)
+		return
+	elseif CameraMode == "Üçüncü Şahıs" and LocalPlayer.CameraMode ~= Enum.CameraMode.Classic then
+		Library:Notify("Üçüncü şahıs modunda değilsiniz!", 3)
+		return
+	end
+	if FullAimlock then
+		Camera.CFrame = CFrame.new(camPos, lookAt)
+	end
+end
+
+Connections.Render = RunService.RenderStepped:Connect(function()
+	if AimbotEnabled and IsAiming then
+		if not CurrentTarget or not CurrentTarget.Parent or not CurrentTarget.Parent:FindFirstChild("Humanoid") or CurrentTarget.Parent.Humanoid.Health <= 0 then
+			CurrentTarget = GetClosestTarget()
+		end
+		if CurrentTarget then
+			LockCamera(CurrentTarget)
+		end
+	end
+	UpdateFOVCircle()
+	-- Önbellek temizliği
+	if tick() - LastRaycastUpdate >= RaycastUpdateInterval then
+		RaycastCache = {}
+		LastRaycastUpdate = tick()
+	end
+end)
+
+local function HandleInput(input, gameProcessed)
+	if gameProcessed then return end
+	if input.UserInputType == AimbotKey or input.KeyCode == AimbotKey then
+		if AimbotMode == "Hold" then
+			if input.UserInputState == Enum.UserInputState.Begin then
+				IsAiming = true
+				CurrentTarget = GetClosestTarget()
+			elseif input.UserInputState == Enum.UserInputState.End then
+				IsAiming = false
+				CurrentTarget = nil
+			end
+		elseif AimbotMode == "Toggle" then
+			if input.UserInputState == Enum.UserInputState.Begin then
+				IsAiming = not IsAiming
+				if IsAiming then
+					CurrentTarget = GetClosestTarget()
+				else
+					CurrentTarget = nil
+				end
+			end
+		end
+	end
+end
+
+Connections.InputBegan = UserInputService.InputBegan:Connect(HandleInput)
+Connections.InputEnded = UserInputService.InputEnded:Connect(HandleInput)
+
+Library:OnUnload(function()
+	for _, conn in pairs(Connections) do
+		conn:Disconnect()
+	end
+	FOVCircle:Remove()
+	RaycastCache = {}
+	print('Unloaded!')
+	Library.Unloaded = true
+end)
+
+-- UI Settings
+local MenuGroup = Tabs['UI Ayarları']:AddLeftGroupbox('Menü')
+
+MenuGroup:AddToggle("KeybindMenuOpen", { Default = Library.KeybindFrame.Visible, Text = "Keybind Menüsünü Aç", Tooltip = "Keybind menüsünü göster/gizle", Callback = function(value) Library.KeybindFrame.Visible = value end})
+MenuGroup:AddToggle("ShowCustomCursor", {Text = "Özel İmleç", Default = true, Tooltip = "Özel imleci aç/kapat", Callback = function(Value) Library.ShowCustomCursor = Value end})
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menü Tuşu"):AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menü tuşu", Tooltip = "UI’yi açıp kapatmak için tuş" })
+MenuGroup:AddButton("Kaldır", function() Library:Unload() end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+
+ThemeManager:SetFolder('MyScriptHub')
+SaveManager:SetFolder('MyScriptHub/specific-game')
+
+SaveManager:BuildConfigSection(Tabs['UI Ayarları'])
+ThemeManager:ApplyToTab(Tabs['UI Ayarları'])
+SaveManager:LoadAutoloadConfig()
