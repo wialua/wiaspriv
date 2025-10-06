@@ -11,7 +11,7 @@ local Toggles = Library.Toggles
 
 -- Global settings
 Library.ShowToggleFrameInKeybinds = true
-Library.ShowCustomCursor = true
+Library.ShowCustomCursor = false
 Library.NotifySide = "Left"
 
 -- Services
