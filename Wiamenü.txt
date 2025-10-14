@@ -3221,3 +3221,155 @@ PerfGroup:AddToggle("MaterialOptimization", {
         end)
     end
 })
+
+-- ==============================
+-- SECURITY TAB (ADVANCED THREAT DETECTION)
+-- ==============================
+
+local SecurityTab = Window:AddTab('Security')
+local SecurityGroup = SecurityTab:AddLeftGroupbox('Threat Protection')
+
+-- Varsayılan açık toggle
+SecurityGroup:AddToggle('EnableThreatDetection', {
+    Text = 'Enable Threat Detection',
+    Default = true,
+    Tooltip = 'Automatically monitors and removes known threats.',
+    Callback = function(state)
+        if state then
+            StartThreatDetection()
+        end
+    end
+})
+
+-- ==============================
+-- THREAT DETECTION SYSTEM (WiaKorumaV1)
+-- ==============================
+
+-- Tehlikeli kullanıcı listesi (UserId -> İsim)
+local Watchlist = {
+    [373061764] = "Laci2800",
+    [721771859] = "ZeroBlueHawk",
+    [83641955] = "Enphixo",
+    [146462043] = "DJPelta",
+    [966027914] = "CraftiCookie",
+    [958389997] = "ofetark",
+    [94467335] = "OmegaAnoobis",
+    [70556831] = "DarkAgeSky",
+    [430348004] = "nic10telf",
+    [16161864] = "Gemini_II",
+    [4610703127] = "MadCityUploader",
+    [62346773] = "PixelatedCandy",
+    [59967] = "taymaster",
+    [28995792] = "TacticalFrostyy",
+    [17897891] = "FamedChris",
+    [116481933] = "Rootie_DaHoodie",
+    [4426328480] = "AlreadyPrototype",
+    [127514028] = "GohMaxPro",
+    [1933300649] = "BornYeti",
+    [371367028] = "odavido123",
+    [33219560] = "peepguyx",
+    [50549672] = "cjchurcher",
+    [122673807] = "DatBrian",
+    [870905642] = "Sushy647",
+    [132717362] = "ZDMD",
+    [983056393] = "TheRealConlord",
+    [7750807951] = "LuiseNinja25",
+    [1316039944] = "Itsakile",
+    [9551275] = "ItsMeKlc",
+    [3461560666] = "VesuIka",
+    [3715956963] = "MadCityVigilante",
+    [28962045] = "JennyBeanRose",
+    [1647502388] = "M34T5",
+    [3183391648] = "TatendaOtobon",
+    [225259944] = "Dxmaqe",
+    [731501956] = "Blackfyro",
+    [146493490] = "JackSkywalker_JA",
+    [608027295] = "Kryfist",
+    [2678001507] = "SpyderSammy",
+    [35479046] = "theloudscream",
+    [211222858] = "atomikatz",
+    [58387889] = "ilyannna",
+    [191803941] = "BasicRobo",
+    [30944240] = "TheHyb",
+    [75151198] = "Lucid_Gemini",
+    [92812719] = "KristjanSyc",
+    [702252975] = "wilkkugod",
+    [1131551308] = "yeahhhaaron",
+    [153343142] = "MarioSonic2987",
+    [24883415] = "i5k",
+    [1805793503] = "Camjango",
+    [749064269] = "AbsoluteDays",
+    [1084171270] = "puggy_gaming123",
+    [1169232379] = "NoodleGamingTV",
+    [974223821] = "GHUZY",
+    [109225997] = "EndoExternal",
+    [74810618] = "1QueenOfAwesomeness",
+    [885920088] = "Daijon_03",
+    [68728334] = "Perhapz",
+    [13629636] = "PointlessDoovid",
+    [1216109201] = "Ender_III",
+    [72579861] = "DarkAssassin860",
+    [134262088] = "Drrakw",
+    [943911395] = "FrostyTheNewbie",
+    [157180286] = "sk3tchyt",
+    [18394351] = "endlessfun",
+}
+
+-- Grup ID'si (örnek olarak Mad City grubu)
+local GROUP_ID = 3642592
+
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- Grup rolünü güvenli şekilde al
+local function SafeGetGroupRole(player)
+    if not GROUP_ID then return "Bilinmiyor" end
+    local success, role = pcall(function()
+        return player:GetRoleInGroup(GROUP_ID)
+    end)
+    return (success and role ~= "") and role or "Bilinmiyor"
+end
+
+-- Tehdit kontrolü
+local function HandleThreat(player)
+    local role = SafeGetGroupRole(player)
+    local name = player.Name
+    local message = string.format("⚠️ Tehlike Tespit Edildi: %s (%s)", role, name)
+
+    -- Uyarı bildirimi
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "WiaKorumaV1",
+            Text = message,
+            Duration = 8
+        })
+    end)
+
+    -- Oyuncuyu at
+    LocalPlayer:Kick(message)
+end
+
+-- Ana sistem
+function StartThreatDetection()
+    -- Şimdiki oyuncuları kontrol et
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and Watchlist[player.UserId] then
+            HandleThreat(player)
+        end
+    end
+
+    -- Yeni gelenleri izle
+    Players.PlayerAdded:Connect(function(player)
+        if Watchlist[player.UserId] then
+            HandleThreat(player)
+        end
+    end)
+end
+
+-- UI açılır açılmaz aktif et (Varsayılan aktif toggle)
+task.defer(function()
+    if Toggles.EnableThreatDetection and Toggles.EnableThreatDetection.Value then
+        StartThreatDetection()
+    end
+end)
