@@ -3374,7 +3374,7 @@ task.defer(function()
     end
 end)
 
-local CombatTab = Window:AddTab('Combat')
+local CombatTab = Window:AddTab('Bypass')
 local CombatGroup = CombatTab:AddLeftGroupbox('Kamera Bypass')
 
 local Players = game:GetService("Players")
@@ -3425,4 +3425,5 @@ task.defer(function()
         StartCameraLock()
     end
 end)
+
 
