@@ -3373,3 +3373,55 @@ task.defer(function()
         StartThreatDetection()
     end
 end)
+
+local CombatTab = Window:AddTab('Combat')
+local CombatGroup = CombatTab:AddLeftGroupbox('Kamera Bypass')
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local cam = workspace.CurrentCamera
+local plr = Players.LocalPlayer
+
+local CameraLoopConnection = nil -- Döngü bağlantısı
+
+-- Kamera karaktere kilitli kalsın fonksiyonu
+local function StartCameraLock()
+    -- Önce eski bağlantıyı temizle
+    if CameraLoopConnection then
+        CameraLoopConnection:Disconnect()
+        CameraLoopConnection = nil
+    end
+
+    -- Yeni bağlantı başlat
+    CameraLoopConnection = RunService.RenderStepped:Connect(function()
+        local char = plr.Character
+        if not char then return end
+
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid and cam.CameraSubject ~= humanoid then
+            cam.CameraSubject = humanoid
+        end
+    end)
+end
+
+-- Toggle ekle
+CombatGroup:AddToggle('LockCameraToCharacter', {
+    Text = 'Kamera karaktere kilitli kalsın',
+    Default = true,
+    Tooltip = 'Kameranın karakterinizde sabit kalmasını sağlar.',
+    Callback = function(state)
+        if state then
+            StartCameraLock()
+        elseif CameraLoopConnection then
+            CameraLoopConnection:Disconnect()
+            CameraLoopConnection = nil
+        end
+    end
+})
+
+-- UI açıldığında toggle aktifse otomatik başlat
+task.defer(function()
+    if Toggles.LockCameraToCharacter and Toggles.LockCameraToCharacter.Value then
+        StartCameraLock()
+    end
+end)
