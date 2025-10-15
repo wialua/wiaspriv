@@ -3545,3 +3545,30 @@ PerfGroup:AddButton({
         end
     end
 })
+
+local CombatGroup = Tabs.Combat:AddLeftGroupbox("Combat Settings")
+
+CombatGroup:AddButton({
+    Text = "AntiSallanma",
+    Tooltip = "Kamera sallanmasını devre dışı bırakır.",
+    Func = function()
+        local success, err = pcall(function()
+            local get = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("CameraShaker"))
+            local returnnil = function() return nil end
+
+            get.StartShake = returnnil
+            get.ShakeOnce = returnnil
+            get.ShakeSustain = returnnil
+            get.CameraShakeInstance = returnnil
+            get.Shake = returnnil
+            get.Start = returnnil
+        end)
+
+        if success then
+            Library:Notify("✅ AntiSallanma aktif edildi!")
+        else
+            Library:Notify("❌ Modül bulunamadı veya hata oluştu.", 6)
+            warn("AntiSallanma Hatası:", err)
+        end
+    end
+})
