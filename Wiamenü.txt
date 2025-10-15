@@ -3426,4 +3426,122 @@ task.defer(function()
     end
 end)
 
+local PerfGroup = Tab:AddRightGroupbox("Optimization Settings")
 
+PerfGroup:AddButton({
+    Text = "Optimize Workspace (Silme)",
+    Tooltip = "FPS artırmak için belirli objeleri güvenli şekilde siler.",
+    Func = function()
+        local Workspace = game:GetService("Workspace")
+        local deletedObjects = {}
+        local failedToDelete = {}
+
+        -- Güvenli silinebilir yollar (sadece gerekli objeler)
+        local objectPaths = {
+            "Heists.JewelryStore.JewelryStore.Jewlery.Lasers",
+            "Heists.JewelryStore.JewelryStore.SlideLaser",
+            "Heists.JewelryStore.JewelryStore.SpinLaser",
+            "Heists.JewelryStore.JewelryStore.SpinLaser3",
+            "Heists.JewelryStore.JewelryStore.SpinLaser4",
+            "Heists.JewelryStore.JewelryStore.SpinLaser5",
+            "Heists.JewelryStore.EssentialParts.JewelryVent.Laser",
+            "Heists.Bank.EssentialParts.Lasers",
+            "Heists.Casino.EssentialParts.CasinoDoor.SpinLaser1",
+            "Heists.Casino.EssentialParts.CasinoDoor.SpinLaser3",
+            "Heists.Casino.Interior.Lasers",
+            "Heists.Mall.Lasers",
+            "CargoPlaneInterior.Parts.LaserLights",
+            "CargoPlaneInterior.Parts.SpinLaser",
+            "CargoPlaneInterior.Parts.SpinLaser2",
+            "CargoPlaneInterior.Parts.SpinLaser3",
+            "CargoPlaneInterior.Parts.Bomb",
+            "ComputerStore.Lasers",
+            "Ignore.WorldObjects.FireTrap",
+            "Ignore.WorldObjects.SpikeSwing",
+            "Ignore.WorldObjects.SpikeTrap",
+            "Ignore.WorldObjects.Walls",
+            "Ignore.WorldObjects.PrisonBarricade",
+            "Club.DeathLights",
+            "Destructibles.Folder",
+            "Destructibles.Beach Chairs",
+            "Destructibles.BeachLights",
+            "Destructibles.Benches",
+            "Destructibles.Boardwalk Lights",
+            "Destructibles.Cacti",
+            "Destructibles.Cones",
+            "Destructibles.FireHydrants",
+            "Destructibles.PalmTrees",
+            "Destructibles.Patios",
+            "Destructibles.StopSigns",
+            "Destructibles.Streetlights",
+            "Destructibles.mailboxes",
+            "City.Foliage",
+            "City.HouseRobbery",
+            "City.Structures.bus station quack",
+            "City.Waterfall",
+            "Extra Builds",
+            "Ignore.SurveillanceCamera",
+            "LightningSpawns",
+            "Light",
+            "Guard",
+            "GasStation.TreeWall",
+            "GasStation.Structures",
+            "GasStation.Pump",
+            "GasStation.Barriers",
+            "Furniture",
+            "Futuristic Building1",
+            "FoodSpawns",
+            "FloorLight",
+            "FerrisWheel.Rotate",
+            "FakeTrain",
+            "Dummy",
+            "DanceParts",
+            "CrimBaseIgnore",
+            "Cluckers2",
+            "Building Top Neon",
+            "Blimp",
+            "GlobalSounds",
+            "Schwifty Studios",
+            "Prison.Alarms"
+        }
+
+        local function destroyByPath(path)
+            local current = Workspace
+            for segment in string.gmatch(path, "[^%.]+") do
+                current = current and current:FindFirstChild(segment)
+                if not current then break end
+            end
+            if current and current:IsA("Instance") then
+                local success, err = pcall(function()
+                    current:Destroy()
+                end)
+                if success then
+                    table.insert(deletedObjects, path)
+                else
+                    table.insert(failedToDelete, path)
+                end
+            else
+                table.insert(failedToDelete, path)
+            end
+        end
+
+        for _, path in ipairs(objectPaths) do
+            destroyByPath(path)
+        end
+
+        Library:Notify(("✅ %d obje silindi. ⚠️ %d silinemedi."):format(#deletedObjects, #failedToDelete), 8)
+
+        -- İstersen konsola yaz
+        print("==✔️ Silinenler==")
+        for _, obj in ipairs(deletedObjects) do
+            print("✔️", obj)
+        end
+
+        if #failedToDelete > 0 then
+            warn("==❌ Silinemeyenler==")
+            for _, obj in ipairs(failedToDelete) do
+                warn("❌", obj)
+            end
+        end
+    end
+})
