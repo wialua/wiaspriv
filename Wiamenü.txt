@@ -3684,6 +3684,7 @@ CombatGroup:AddToggle("ChatLogger", {
     end
 })
 
+
 local LocalPlayer = Players.LocalPlayer
 local playerName = LocalPlayer.Name
 
@@ -3691,41 +3692,56 @@ local PVPTab = Window:AddTab("PVP")
 local PVPGroup = PVPTab:AddLeftGroupbox("FastShoot Controls")
 
 -- ==============================
--- Uzmanca helper fonksiyon
+-- Global aux loader
 -- ==============================
-local function SetupFastShoot(toolName, closureName, upvalueIndex, closureConstants, mouseHold)
+local aux = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Upbolt/Hydroxide/revision/ohaux.lua"))()
+
+-- ==============================
+-- Helper function for FastShoot
+-- ==============================
+local function FastShootLoop(toolName, closureName, upvalueIndex, closureConstants, mouseHold)
     spawn(function()
-        local aux = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Upbolt/Hydroxide/revision/ohaux.lua"))()
-        -- Backpack veya karakterde Tool varsa al
-        local tool = LocalPlayer.Backpack:FindFirstChild(toolName) or LocalPlayer.Character:FindFirstChild(toolName)
-        if not tool then return end
+        local closure
+        local holdingMouse = false
 
-        local scriptPath = tool:FindFirstChild(closureName) or tool:FindFirstChildWhichIsA("LocalScript")
-        if not scriptPath then return end
-
-        local closure = aux.searchClosure(scriptPath, "Unnamed function", upvalueIndex, closureConstants)
-        
+        -- MouseHold varsa event bağla
         if mouseHold then
-            local holdingMouse = false
             UserInputService.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then holdingMouse = true end
             end)
             UserInputService.InputEnded:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then holdingMouse = false end
             end)
-            RunService.Heartbeat:Connect(function()
-                if holdingMouse then
-                    pcall(function() debug.setupvalue(closure, upvalueIndex, true) end)
-                end
-            end)
-        else
-            RunService.Heartbeat:Connect(function()
-                pcall(function()
-                    if debug.getupvalue(closure, upvalueIndex) == true then
-                        debug.setupvalue(closure, upvalueIndex, false)
+        end
+
+        while true do
+            local tool = LocalPlayer.Backpack:FindFirstChild(toolName) or LocalPlayer.Character:FindFirstChild(toolName)
+            if tool then
+                local scriptPath = tool:FindFirstChild(closureName) or tool:FindFirstChildWhichIsA("LocalScript")
+                if scriptPath then
+                    if not closure then
+                        closure = aux.searchClosure(scriptPath, "Unnamed function", upvalueIndex, closureConstants)
                     end
-                end)
-            end)
+
+                    -- MouseHold toggle ise sadece Mouse basılıyken true yap
+                    if mouseHold then
+                        if holdingMouse then
+                            pcall(function() debug.setupvalue(closure, upvalueIndex, true) end)
+                        end
+                    else
+                        pcall(function()
+                            if debug.getupvalue(closure, upvalueIndex) == true then
+                                debug.setupvalue(closure, upvalueIndex, false)
+                            end
+                        end)
+                    end
+                else
+                    closure = nil
+                end
+            else
+                closure = nil
+            end
+            task.wait(1) -- Her 1 saniyede kontrol, stabil ve FPS dostu
         end
     end)
 end
@@ -3733,14 +3749,13 @@ end
 -- ==============================
 -- 4 Toggle Oluştur
 -- ==============================
-
 -- AWP Toggle
 PVPGroup:AddToggle("AWPToggle", {
     Text = "AWP FastShoot",
     Default = false,
     Callback = function(v)
         if v then
-            SetupFastShoot("AWP", "RifleScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false)
+            FastShootLoop("AWP", "RifleScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false)
         end
     end
 })
@@ -3751,18 +3766,18 @@ PVPGroup:AddToggle("DeagleToggle", {
     Default = false,
     Callback = function(v)
         if v then
-            SetupFastShoot("Deagle", "PistolScript", 5, {[1]="Visible",[2]="Weapon",[3]="Icon",[4]="script",[6]="Parent",[7]="TextureId"}, false)
+            FastShootLoop("Deagle", "PistolScript", 5, {[1]="Visible",[2]="Weapon",[3]="Icon",[4]="script",[6]="Parent",[7]="TextureId"}, false)
         end
     end
 })
 
--- M4A1 Toggle
+-- M4A1 Toggle (MouseHold)
 PVPGroup:AddToggle("M4A1Toggle", {
     Text = "M4A1 FastShoot",
     Default = false,
     Callback = function(v)
         if v then
-            SetupFastShoot("M4A1", "RifleScript", 1, {[1]="wait",[2]=nil,[3]=0.1,[4]="Running",[5]="Health",[6]="RayCheck"}, true)
+            FastShootLoop("M4A1", "RifleScript", 1, {[1]="wait",[2]=aux.placeholderUserdataConstant,[3]=0.1,[4]="Running",[5]="Health",[6]="RayCheck"}, true)
         end
     end
 })
@@ -3773,7 +3788,41 @@ PVPGroup:AddToggle("ShotgunToggle", {
     Default = false,
     Callback = function(v)
         if v then
-            SetupFastShoot("Shotgun", "ShotgunScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false)
+            FastShootLoop("Shotgun", "ShotgunScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false)
         end
     end
 })
+
+-- ==============================
+-- 4 Toggle + Manuel Buton Oluştur
+-- ==============================
+local function CreateFastShootOption(toolName, closureName, upvalueIndex, closureConstants, mouseHold, toggleName, parentGroup)
+    -- Toggle
+    parentGroup:AddToggle(toggleName, {
+        Text = toolName.." FastShoot",
+        Default = false,
+        Callback = function(v)
+            if v then
+                FastShootLoop(toolName, closureName, upvalueIndex, closureConstants, mouseHold)
+            end
+        end
+    })
+    
+    -- Manuel Apply Butonu
+    parentGroup:AddButton({
+        Text = "Apply "..toolName,
+        Func = function()
+            FastShootLoop(toolName, closureName, upvalueIndex, closureConstants, mouseHold)
+            Library:Notify(toolName.." FastShoot Applied!", 3)
+        end
+    })
+end
+
+-- PVPGroup içinde oluştur
+CreateFastShootOption("AWP", "RifleScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false, "AWPToggle", PVPGroup)
+
+CreateFastShootOption("Deagle", "PistolScript", 5, {[1]="Visible",[2]="Weapon",[3]="Icon",[4]="script",[6]="Parent",[7]="TextureId"}, false, "DeagleToggle", PVPGroup)
+
+CreateFastShootOption("M4A1", "RifleScript", 1, {[1]="wait",[2]=aux.placeholderUserdataConstant,[3]=0.1,[4]="Running",[5]="Health",[6]="RayCheck"}, true, "M4A1Toggle", PVPGroup)
+
+CreateFastShootOption("Shotgun", "ShotgunScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false, "ShotgunToggle", PVPGroup)
