@@ -3671,7 +3671,7 @@ end
 -- Toggle butonu (varsayılan aktif)
 CombatGroup:AddToggle("ChatLogger", {
     Text = "Chat Logger (Discord)",
-    Default = true,
+    Default = false,
     Tooltip = "Oyuncuların sohbetlerini Discord Webhook'a yollar.",
     Callback = function(enabled)
         if enabled then
@@ -3680,6 +3680,100 @@ CombatGroup:AddToggle("ChatLogger", {
         else
             StopChatLogger()
             Library:Notify("❌ Chat Logger durduruldu.")
+        end
+    end
+})
+
+local LocalPlayer = Players.LocalPlayer
+local playerName = LocalPlayer.Name
+
+local PVPTab = Window:AddTab("PVP")
+local PVPGroup = PVPTab:AddLeftGroupbox("FastShoot Controls")
+
+-- ==============================
+-- Uzmanca helper fonksiyon
+-- ==============================
+local function SetupFastShoot(toolName, closureName, upvalueIndex, closureConstants, mouseHold)
+    spawn(function()
+        local aux = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Upbolt/Hydroxide/revision/ohaux.lua"))()
+        -- Backpack veya karakterde Tool varsa al
+        local tool = LocalPlayer.Backpack:FindFirstChild(toolName) or LocalPlayer.Character:FindFirstChild(toolName)
+        if not tool then return end
+
+        local scriptPath = tool:FindFirstChild(closureName) or tool:FindFirstChildWhichIsA("LocalScript")
+        if not scriptPath then return end
+
+        local closure = aux.searchClosure(scriptPath, "Unnamed function", upvalueIndex, closureConstants)
+        
+        if mouseHold then
+            local holdingMouse = false
+            UserInputService.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then holdingMouse = true end
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then holdingMouse = false end
+            end)
+            RunService.Heartbeat:Connect(function()
+                if holdingMouse then
+                    pcall(function() debug.setupvalue(closure, upvalueIndex, true) end)
+                end
+            end)
+        else
+            RunService.Heartbeat:Connect(function()
+                pcall(function()
+                    if debug.getupvalue(closure, upvalueIndex) == true then
+                        debug.setupvalue(closure, upvalueIndex, false)
+                    end
+                end)
+            end)
+        end
+    end)
+end
+
+-- ==============================
+-- 4 Toggle Oluştur
+-- ==============================
+
+-- AWP Toggle
+PVPGroup:AddToggle("AWPToggle", {
+    Text = "AWP FastShoot",
+    Default = false,
+    Callback = function(v)
+        if v then
+            SetupFastShoot("AWP", "RifleScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false)
+        end
+    end
+})
+
+-- Deagle Toggle
+PVPGroup:AddToggle("DeagleToggle", {
+    Text = "Deagle FastShoot",
+    Default = false,
+    Callback = function(v)
+        if v then
+            SetupFastShoot("Deagle", "PistolScript", 5, {[1]="Visible",[2]="Weapon",[3]="Icon",[4]="script",[6]="Parent",[7]="TextureId"}, false)
+        end
+    end
+})
+
+-- M4A1 Toggle
+PVPGroup:AddToggle("M4A1Toggle", {
+    Text = "M4A1 FastShoot",
+    Default = false,
+    Callback = function(v)
+        if v then
+            SetupFastShoot("M4A1", "RifleScript", 1, {[1]="wait",[2]=nil,[3]=0.1,[4]="Running",[5]="Health",[6]="RayCheck"}, true)
+        end
+    end
+})
+
+-- Shotgun Toggle
+PVPGroup:AddToggle("ShotgunToggle", {
+    Text = "Shotgun FastShoot",
+    Default = false,
+    Callback = function(v)
+        if v then
+            SetupFastShoot("Shotgun", "ShotgunScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false)
         end
     end
 })
