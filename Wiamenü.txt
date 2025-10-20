@@ -1342,6 +1342,7 @@ local function applyNameTagSettings(nt, isEnabled)
     if not nt then return end
     nt.AlwaysOnTop = isEnabled
     nt.MaxDistance = isEnabled and 10000 or 200
+    nt.Enabled = isEnabled
 end
 
 -- Oyuncu için ESP Bağlantı Kurulumu
@@ -1362,6 +1363,9 @@ local function setupPlayerESP(player, isEnabled)
             end))
             table.insert(conns, nt:GetPropertyChangedSignal("MaxDistance"):Connect(function()
                 nt.MaxDistance = isEnabled and 10000 or 200
+            end))
+            table.insert(conns, nt:GetPropertyChangedSignal("Enabled"):Connect(function()
+                nt.Enabled = isEnabled
             end))
         end
     end
@@ -1409,7 +1413,7 @@ local function toggleESP(enabled)
     end)
     table.insert(ESPConnections, addConn)
 
-    -- Döngü: sürekli kontrol
+    -- Döngü: sadece gerekli durumlarda çalışacak şekilde optimize edildi
     if enabled then
         espLoop = RunService.Heartbeat:Connect(function()
             local lpChar = LocalPlayer.Character
@@ -1428,7 +1432,7 @@ local function toggleESP(enabled)
                 end
             end
         end)
-        Library:Notify("ESP Aktif (10000 Max Mesafe, AlwaysOnTop Açık)", 2)
+        Library:Notify("ESP Aktif (10000 Max Mesafe, AlwaysOnTop ve Enabled Açık)", 2)
     else
         -- Tüm oyunculardan bağlantıları kaldır, değerleri sıfırla
         for _, plr in ipairs(Players:GetPlayers()) do
@@ -1440,19 +1444,20 @@ local function toggleESP(enabled)
             end
             cleanupPlayerListeners(plr)
         end
-        Library:Notify("ESP Kapatıldı (200 Mesafe, AlwaysOnTop Kapalı)", 2)
+        Library:Notify("ESP Kapatıldı (200 Mesafe, AlwaysOnTop ve Enabled Kapalı)", 2)
     end
 end
 
 -- UI Toggle
 CombatGroup:AddToggle('ESPToggle', {
-    Text = 'ESP Etkinleştir)',
+    Text = 'ESP Etkinleştir',
     Default = false,
-    Tooltip = 'ESP aç/kapat (AlwaysOnTop ve Mesafe otomatik ayarlanır)',
+    Tooltip = 'ESP aç/kapat (AlwaysOnTop, Enabled ve Mesafe otomatik ayarlanır)',
     Callback = function(value)
         toggleESP(value)
     end
 })
+
 -- AYARLAR
 local BMSettings = {
     MaxDistance = 20000,
@@ -3826,3 +3831,4 @@ CreateFastShootOption("Deagle", "PistolScript", 5, {[1]="Visible",[2]="Weapon",[
 CreateFastShootOption("M4A1", "RifleScript", 1, {[1]="wait",[2]=aux.placeholderUserdataConstant,[3]=0.1,[4]="Running",[5]="Health",[6]="RayCheck"}, true, "M4A1Toggle", PVPGroup)
 
 CreateFastShootOption("Shotgun", "ShotgunScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false, "ShotgunToggle", PVPGroup)
+
