@@ -1,0 +1,336 @@
+------------------------------------------------------------------------
+-- Advanced Freecam (Direct Mouse Rotation, No Smoothing)
+-- Press Shift+P to toggle freecam
+------------------------------------------------------------------------
+
+local pi = math.pi
+local clamp = math.clamp or function(x, min, max) return math.max(min, math.min(max, x)) end
+local rad = math.rad
+local sqrt = math.sqrt
+local tan = math.tan
+
+local ContextActionService = game:GetService("ContextActionService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Settings = UserSettings()
+local GameSettings = Settings.GameSettings
+
+local LocalPlayer = Players.LocalPlayer or Players:GetPropertyChangedSignal("LocalPlayer"):Wait() and Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    local newCamera = Workspace.CurrentCamera
+    if newCamera then Camera = newCamera end
+end)
+
+local FREECAM_ENABLED_ATTRIBUTE_NAME = "FreecamEnabled"
+local TOGGLE_INPUT_PRIORITY = Enum.ContextActionPriority.Low.Value
+local INPUT_PRIORITY = Enum.ContextActionPriority.High.Value
+local FREECAM_MACRO_KB = {Enum.KeyCode.LeftShift, Enum.KeyCode.P}
+
+local NAV_GAIN = Vector3.new(3, 3, 3) * 64
+local FOV_GAIN = 300
+local PITCH_LIMIT = rad(90)
+
+-- Velocity spring for smooth position movement
+local Spring = {}
+Spring.__index = Spring
+
+function Spring.new(freq, pos)
+    local self = setmetatable({}, Spring)
+    self.f = freq
+    self.p = pos
+    self.v = Vector3.new(0,0,0)
+    return self
+end
+
+function Spring:Update(dt, goal)
+    local f = self.f * 2 * pi
+    local p0 = self.p
+    local v0 = self.v
+
+    local offset = goal - p0
+    local decay = math.exp(-f * dt)
+
+    local p1 = goal + (v0 * dt - offset * (f * dt + 1)) * decay
+    local v1 = (f * dt * (offset * f - v0) + v0) * decay
+
+    self.p = p1
+    self.v = v1
+
+    return p1
+end
+
+function Spring:Reset(pos)
+    self.p = pos
+    self.v = Vector3.new(0,0,0)
+end
+
+local velSpring = Spring.new(1.5, Vector3.new())
+
+-- Camera state variables
+local cameraPos = Vector3.new()
+local cameraRot = Vector2.new()  -- pitch (X), yaw (Y)
+local cameraFov = 70
+
+-- Input state
+local keyboard = {
+    W = 0, A = 0, S = 0, D = 0, E = 0, Q = 0,
+    Up = 0, Down = 0,
+}
+local mouseDelta = Vector2.new()
+local mouseWheelDelta = 0
+
+local NAV_KEYBOARD_SPEED = Vector3.new(1, 1, 1)
+local NAV_SHIFT_MUL = 0.25
+local NAV_ADJ_SPEED = 0.75
+
+local navSpeed = 1
+
+-- Helper to update keyboard input states
+local function UpdateKeyboard(action, state, input)
+    local isDown = state == Enum.UserInputState.Begin and 1 or 0
+    if input.KeyCode == Enum.KeyCode.W then keyboard.W = isDown
+    elseif input.KeyCode == Enum.KeyCode.A then keyboard.A = isDown
+    elseif input.KeyCode == Enum.KeyCode.S then keyboard.S = isDown
+    elseif input.KeyCode == Enum.KeyCode.D then keyboard.D = isDown
+    elseif input.KeyCode == Enum.KeyCode.E then keyboard.E = isDown
+    elseif input.KeyCode == Enum.KeyCode.Q then keyboard.Q = isDown
+    elseif input.KeyCode == Enum.KeyCode.Up then keyboard.Up = isDown
+    elseif input.KeyCode == Enum.KeyCode.Down then keyboard.Down = isDown
+    end
+    return Enum.ContextActionResult.Sink
+end
+
+-- Mouse movement capture (accumulates delta)
+local function OnMouseMove(action, state, input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        mouseDelta = mouseDelta + Vector2.new(-input.Delta.Y, -input.Delta.X)
+    end
+    return Enum.ContextActionResult.Sink
+end
+
+local function OnMouseWheel(action, state, input)
+    if input.UserInputType == Enum.UserInputType.MouseWheel then
+        mouseWheelDelta = mouseWheelDelta - input.Position.Z
+    end
+    return Enum.ContextActionResult.Sink
+end
+
+-- Calculate velocity vector based on input keys
+local function GetVelocity(dt)
+    -- Adjust nav speed with Up/Down keys
+    navSpeed = clamp(navSpeed + dt * (keyboard.Up - keyboard.Down) * NAV_ADJ_SPEED, 0.01, 4)
+
+    local shiftPressed = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+    local speedMultiplier = navSpeed * (shiftPressed and NAV_SHIFT_MUL or 1)
+
+    local moveDir = Vector3.new(
+        (keyboard.D - keyboard.A),
+        (keyboard.E - keyboard.Q),
+        (keyboard.S - keyboard.W)
+    ) * NAV_KEYBOARD_SPEED * speedMultiplier
+
+    return moveDir
+end
+
+-- Main freecam update step
+local function StepFreecam(dt)
+    -- Update velocity smoothly with spring
+    local targetVel = GetVelocity(dt)
+    local vel = velSpring:Update(dt, targetVel)
+
+    -- Update camera rotation directly from mouseDelta (NO smoothing here!)
+    local sensitivity = 0.005  -- Adjust sensitivity as you want
+    cameraRot = cameraRot + mouseDelta * sensitivity
+    mouseDelta = Vector2.new(0, 0)
+
+    -- Clamp pitch so camera doesn't flip over
+    cameraRot = Vector2.new(clamp(cameraRot.X, -PITCH_LIMIT, PITCH_LIMIT), cameraRot.Y % (2 * pi))
+
+    -- Update FOV smoothly based on mouse wheel
+    cameraFov = clamp(cameraFov + mouseWheelDelta * 5, 1, 120)
+    mouseWheelDelta = 0
+
+    -- Calculate zoom factor for consistent speed
+    local zoomFactor = sqrt(tan(rad(70 / 2)) / tan(rad(cameraFov / 2)))
+
+    -- Move camera position based on velocity in local space
+    local cf = CFrame.new(cameraPos) * CFrame.fromOrientation(cameraRot.X, cameraRot.Y, 0)
+    cameraPos = (cf * CFrame.new(vel * NAV_GAIN * dt * zoomFactor)).Position
+
+    -- Update camera CFrame and FOV
+    Camera.CFrame = CFrame.new(cameraPos) * CFrame.fromOrientation(cameraRot.X, cameraRot.Y, 0)
+    Camera.Focus = Camera.CFrame
+    Camera.FieldOfView = cameraFov
+end
+
+-- Capture input bindings for freecam
+local function StartInputCapture()
+    ContextActionService:BindActionAtPriority("FreecamKeyboard", UpdateKeyboard, false, INPUT_PRIORITY,
+        Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
+        Enum.KeyCode.E, Enum.KeyCode.Q,
+        Enum.KeyCode.Up, Enum.KeyCode.Down
+    )
+    ContextActionService:BindActionAtPriority("FreecamMouseMove", OnMouseMove, false, INPUT_PRIORITY, Enum.UserInputType.MouseMovement)
+    ContextActionService:BindActionAtPriority("FreecamMouseWheel", OnMouseWheel, false, INPUT_PRIORITY, Enum.UserInputType.MouseWheel)
+end
+
+local function StopInputCapture()
+    navSpeed = 1
+    mouseDelta = Vector2.new()
+    mouseWheelDelta = 0
+
+    keyboard = {
+        W=0, A=0, S=0, D=0, E=0, Q=0, Up=0, Down=0
+    }
+
+    ContextActionService:UnbindAction("FreecamKeyboard")
+    ContextActionService:UnbindAction("FreecamMouseMove")
+    ContextActionService:UnbindAction("FreecamMouseWheel")
+end
+
+-- Player state save/restore to keep UI and camera consistent
+local PlayerState = {}
+do
+    local mouseBehavior, mouseIconEnabled
+    local cameraType, cameraFocus, cameraCFrame, cameraFieldOfView
+    local coreGuis = {
+        Backpack = true, Chat = true, Health = true, PlayerList = true
+    }
+    local screenGuis = {}
+    local setCores = {
+        BadgesNotificationsActive = true,
+        PointsNotificationsActive = true,
+    }
+
+    function PlayerState.Push()
+        for name in pairs(coreGuis) do
+            coreGuis[name] = StarterGui:GetCoreGuiEnabled(Enum.CoreGuiType[name])
+            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType[name], false)
+        end
+        for name in pairs(setCores) do
+            setCores[name] = StarterGui:GetCore(name)
+            StarterGui:SetCore(name, false)
+        end
+
+        local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if playerGui then
+            for _, gui in pairs(playerGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and gui.Enabled then
+                    table.insert(screenGuis, gui)
+                    gui.Enabled = false
+                end
+            end
+        end
+
+        cameraFieldOfView = Camera.FieldOfView
+        Camera.FieldOfView = 70
+
+        cameraType = Camera.CameraType
+        Camera.CameraType = Enum.CameraType.Custom
+
+        cameraCFrame = Camera.CFrame
+        cameraFocus = Camera.Focus
+
+        mouseIconEnabled = UserInputService.MouseIconEnabled
+        UserInputService.MouseIconEnabled = false
+
+        mouseBehavior = UserInputService.MouseBehavior
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
+
+    function PlayerState.Pop()
+        for name, enabled in pairs(coreGuis) do
+            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType[name], enabled)
+        end
+        for name, enabled in pairs(setCores) do
+            StarterGui:SetCore(name, enabled)
+        end
+        for _, gui in pairs(screenGuis) do
+            if gui.Parent then
+                gui.Enabled = true
+            end
+        end
+        screenGuis = {}
+
+        Camera.FieldOfView = cameraFieldOfView
+        Camera.CameraType = cameraType
+        Camera.CFrame = cameraCFrame
+        Camera.Focus = cameraFocus
+
+        UserInputService.MouseIconEnabled = mouseIconEnabled
+        UserInputService.MouseBehavior = mouseBehavior
+
+        -- EKLENDİ: Kesinlikle mouse ayarlarını varsayılana çeviriyoruz, mouse donması engellenir:
+        UserInputService.MouseIconEnabled = true
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
+end
+
+local enabled = false
+
+local function StartFreecam()
+    local camCFrame = Camera.CFrame
+    cameraPos = camCFrame.Position
+    cameraRot = Vector2.new(camCFrame:ToEulerAnglesYXZ()) -- pitch, yaw
+    cameraFov = Camera.FieldOfView
+
+    velSpring:Reset(Vector3.new())
+
+    PlayerState.Push()
+    StartInputCapture()
+    RunService:BindToRenderStep("Freecam", Enum.RenderPriority.Camera.Value, StepFreecam)
+    if script.SetAttribute then
+        script:SetAttribute(FREECAM_ENABLED_ATTRIBUTE_NAME, true)
+    end
+end
+
+local function StopFreecam()
+    RunService:UnbindFromRenderStep("Freecam")
+    StopInputCapture()
+    PlayerState.Pop()
+    -- EKLENDİ: Kesin mouse ayarlarını sıfırla
+    UserInputService.MouseIconEnabled = true
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
+    if script.SetAttribute then
+        script:SetAttribute(FREECAM_ENABLED_ATTRIBUTE_NAME, false)
+    end
+end
+
+local function ToggleFreecam()
+    if enabled then
+        StopFreecam()
+    else
+        StartFreecam()
+    end
+    enabled = not enabled
+end
+
+-- Toggle freecam with Shift+P
+local function CheckMacro()
+    for i = 1, #FREECAM_MACRO_KB - 1 do
+        if not UserInputService:IsKeyDown(FREECAM_MACRO_KB[i]) then
+            return false
+        end
+    end
+    return true
+end
+
+local function HandleToggleInput(action, state, input)
+    if state == Enum.UserInputState.Begin and input.KeyCode == FREECAM_MACRO_KB[#FREECAM_MACRO_KB] then
+        if CheckMacro() then ToggleFreecam() end
+    end
+    return Enum.ContextActionResult.Pass
+end
+
+ContextActionService:BindActionAtPriority("FreecamToggle", HandleToggleInput, false, TOGGLE_INPUT_PRIORITY, FREECAM_MACRO_KB[#FREECAM_MACRO_KB])
+
+return {
+    StartFreecam = StartFreecam,
+    StopFreecam = StopFreecam,
+    ToggleFreecam = ToggleFreecam,
+}
