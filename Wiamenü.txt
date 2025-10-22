@@ -37,7 +37,7 @@ local Tabs = {
     Hitbox = Window:AddTab('Hitbox'),
     Aimbot = Window:AddTab('Aimbot'),
     Combat = Window:AddTab('⚔️ Combat'),
-    ['Silent Aim'] = Window:AddTab('Silent Aim'),
+    ['Silent Aim'] = Window:AddTab('Nigger'),
     Vehicles = Window:AddTab('🚗 Araç'),
     ['UI Ayarları'] = Window:AddTab('UI Ayarları'),
 }
@@ -3831,4 +3831,5 @@ CreateFastShootOption("Deagle", "PistolScript", 5, {[1]="Visible",[2]="Weapon",[
 CreateFastShootOption("M4A1", "RifleScript", 1, {[1]="wait",[2]=aux.placeholderUserdataConstant,[3]=0.1,[4]="Running",[5]="Health",[6]="RayCheck"}, true, "M4A1Toggle", PVPGroup)
 
 CreateFastShootOption("Shotgun", "ShotgunScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false, "ShotgunToggle", PVPGroup)
+
 
