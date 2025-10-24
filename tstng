@@ -1,0 +1,1389 @@
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+-- Library Configuration
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = false
+Library.NotifySide = "Left"
+
+-- Global Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local MarketplaceService = game:GetService("MarketplaceService")
+local CollectionService = game:GetService("CollectionService")
+local Camera = Workspace.CurrentCamera
+
+local gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
+local Window = Library:CreateWindow({
+    Title = '🔥 ' .. gameName .. ' 🔥',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = false,
+    UnlockMouseWhileOpen = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0,
+})
+
+-- ===========================================
+-- MODULE: PVP Features
+-- ===========================================
+local PVPTab = Window:AddTab('PVP')
+local PVPGroupBox = PVPTab:AddLeftGroupbox('PVP Controls')
+
+-- Kamera Bypass Module
+local KameraBypass = {}
+KameraBypass.Enabled = false
+KameraBypass.CameraConnection = nil
+KameraBypass.Humanoid = nil
+
+function KameraBypass:SetupCamera()
+    if not self.Humanoid or self.Humanoid.Health <= 0 then return end
+    local cam = Workspace.CurrentCamera
+    if cam.CameraSubject ~= self.Humanoid then
+        cam.CameraSubject = self.Humanoid
+    end
+end
+
+function KameraBypass:UpdateCharacter(char)
+    self.Humanoid = char:WaitForChild("Humanoid")
+    if self.Enabled then
+        self:SetupCamera()
+        if not self.CameraConnection then
+            self.CameraConnection = RunService.Heartbeat:Connect(function()
+                pcall(function() self:SetupCamera() end)
+            end)
+        end
+    end
+end
+
+function KameraBypass:Enable(value)
+    self.Enabled = value
+    if value then
+        if self.Humanoid then
+            self:SetupCamera()
+        end
+        if not self.CameraConnection then
+            self.CameraConnection = RunService.Heartbeat:Connect(function()
+                pcall(function() self:SetupCamera() end)
+            end)
+        end
+    else
+        if self.CameraConnection then
+            self.CameraConnection:Disconnect()
+            self.CameraConnection = nil
+        end
+    end
+end
+
+-- Initialize Kamera Bypass
+LocalPlayer.CharacterAdded:Connect(function(char)
+    KameraBypass:UpdateCharacter(char)
+end)
+if LocalPlayer.Character then
+    KameraBypass:UpdateCharacter(LocalPlayer.Character)
+end
+
+PVPGroupBox:AddToggle('KameraBypassToggle', {
+    Text = 'Kamera Bypass',
+    Default = false,
+    Callback = function(value)
+        KameraBypass:Enable(value)
+    end
+})
+
+-- ESP Module
+local ESP = {}
+ESP.Settings = { Enabled = false, MaxDistance = 200 }
+ESP.Connections = {}
+ESP.PlayerListeners = {}
+
+function ESP:CleanupPlayerListeners(player)
+    local list = self.PlayerListeners[player]
+    if list then
+        for _, conn in ipairs(list) do
+            if conn and conn.Disconnect then
+                conn:Disconnect()
+            end
+        end
+        self.PlayerListeners[player] = nil
+    end
+end
+
+function ESP:ApplyNameTagSettings(nt, isEnabled)
+    if not nt then return end
+    nt.AlwaysOnTop = isEnabled
+    nt.MaxDistance = isEnabled and 10000 or 200
+    nt.Enabled = isEnabled
+end
+
+function ESP:SetupPlayerESP(player, isEnabled)
+    self:CleanupPlayerListeners(player)
+    local conns = {}
+    self.PlayerListeners[player] = conns
+
+    local function handleCharacter(char)
+        local nt = char:FindFirstChild("NameTag")
+        if nt then
+            self:ApplyNameTagSettings(nt, isEnabled)
+            table.insert(conns, nt:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
+                nt.AlwaysOnTop = isEnabled
+            end))
+            table.insert(conns, nt:GetPropertyChangedSignal("MaxDistance"):Connect(function()
+                nt.MaxDistance = isEnabled and 10000 or 200
+            end))
+            table.insert(conns, nt:GetPropertyChangedSignal("Enabled"):Connect(function()
+                nt.Enabled = isEnabled
+            end))
+        end
+    end
+
+    if player.Character then
+        handleCharacter(player.Character)
+    end
+
+    table.insert(conns, player.CharacterAdded:Connect(function(char)
+        char:WaitForChild("NameTag", 2)
+        handleCharacter(char)
+    end))
+
+    table.insert(conns, player:GetPropertyChangedSignal("Character"):Connect(function()
+        if player.Character then
+            handleCharacter(player.Character)
+        end
+    end))
+end
+
+function ESP:Toggle(enabled)
+    self.Settings.Enabled = enabled
+    self.Settings.MaxDistance = enabled and 10000 or 200
+
+    if self.LoopConnection then
+        self.LoopConnection:Disconnect()
+        self.LoopConnection = nil
+    end
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            self:SetupPlayerESP(plr, enabled)
+        end
+    end
+
+    local addConn = Players.PlayerAdded:Connect(function(plr)
+        if plr ~= LocalPlayer then
+            self:SetupPlayerESP(plr, enabled)
+        end
+    end)
+    table.insert(self.Connections, addConn)
+
+    if enabled then
+        self.LoopConnection = RunService.Heartbeat:Connect(function()
+            local lpChar = LocalPlayer.Character
+            if not lpChar or not lpChar:FindFirstChild("HumanoidRootPart") then return end
+
+            local myPos = lpChar.HumanoidRootPart.Position
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
+                    if dist <= self.Settings.MaxDistance then
+                        local nt = plr.Character:FindFirstChild("NameTag")
+                        if nt then
+                            self:ApplyNameTagSettings(nt, true)
+                        end
+                    end
+                end
+            end
+        end)
+        Library:Notify("ESP Aktif (10000 Max Mesafe, AlwaysOnTop ve Enabled Açık)", 2)
+    else
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character then
+                local nt = plr.Character:FindFirstChild("NameTag")
+                if nt then
+                    self:ApplyNameTagSettings(nt, false)
+                end
+            end
+            self:CleanupPlayerListeners(plr)
+        end
+        Library:Notify("ESP Kapatıldı (200 Mesafe, AlwaysOnTop ve Enabled Kapalı)", 2)
+    end
+end
+
+PVPGroupBox:AddToggle('ESPToggle', {
+    Text = 'ESP Etkinleştir',
+    Default = false,
+    Tooltip = 'ESP aç/kapat (AlwaysOnTop, Enabled ve Mesafe otomatik ayarlanır)',
+    Callback = function(value)
+        ESP:Toggle(value)
+    end
+})
+
+-- ===========================================
+-- MODULE: UI Settings
+-- ===========================================
+local UITab = Window:AddTab('UI')
+local UIGroup = UITab:AddLeftGroupbox('UI Customization')
+
+UIGroup:AddToggle('KeyUI', {
+    Default = Library.KeybindFrame.Visible,
+    Text = 'Show Keybinds',
+    Callback = function(v)
+        Library.KeybindFrame.Visible = v
+    end
+})
+
+UIGroup:AddToggle('Cursor', {
+    Text = 'Custom Cursor',
+    Default = true,
+    Callback = function(v)
+        Library.ShowCustomCursor = v
+    end
+})
+
+UIGroup:AddLabel('Menu Key'):AddKeyPicker('MenuBind', {
+    Default = 'RightShift',
+    NoUI = true
+})
+Library.ToggleKeybind = Options.MenuBind
+
+UIGroup:AddButton('Unload UI', function()
+    Library:Unload()
+end)
+
+-- ===========================================
+-- MODULE: Universal Features
+-- ===========================================
+local MainTab = Window:AddTab('Universal')
+
+-- ===========================================
+-- SUBMODULE: Fly System
+-- ===========================================
+local Fly = {}
+Fly.Enabled = false
+Fly.Speed = 50
+Fly.Connection = nil
+Fly.IdlePosition = Vector3.new(0, 0, 0)
+Fly.LastInputTime = 0
+Fly.InputTimeout = 0.3
+Fly.HoverStrength = 0.05
+Fly.Randomization = 0.0002
+Fly.UpdateThrottle = 1/120
+
+function Fly:GetCharacter()
+    if not LocalPlayer.Character or LocalPlayer.Character.Parent ~= Workspace then
+        return nil
+    end
+    local char = LocalPlayer.Character
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not rootPart or not rootPart:IsA("BasePart") then
+        return nil
+    end
+    if humanoid.Health <= 0 or rootPart.Anchored then
+        return nil
+    end
+    return { character = char, humanoid = humanoid, rootPart = rootPart }
+end
+
+function Fly:Start()
+    local charData = self:GetCharacter()
+    if not charData then
+        Library:Notify("Character not ready. Retrying...", 2)
+        task.wait(1)
+        return self:Start()
+    end
+
+    local rootPart = charData.rootPart
+    local humanoid = charData.humanoid
+
+    self.IdlePosition = rootPart.Position
+    rootPart.CFrame = CFrame.new(self.IdlePosition, rootPart.Position + Workspace.CurrentCamera.CFrame.LookVector)
+
+    self.Enabled = true
+    humanoid.PlatformStand = true
+    self.LastInputTime = tick()
+
+    self.Connection = RunService.Heartbeat:Connect(function(dt)
+        if not self.Enabled then return end
+
+        local now = tick()
+        if now - self.LastInputTime < self.UpdateThrottle then return end
+
+        local freshCharData = self:GetCharacter()
+        if not freshCharData then
+            self:Stop()
+            Library:Notify("Character lost - Fly stopped", 2)
+            return
+        end
+
+        local freshRoot = freshCharData.rootPart
+        local camera = Workspace.CurrentCamera
+        local currentPos = freshRoot.Position
+
+        local moveVector = Vector3.new(0, 0, 0)
+        local hasInput = false
+
+        local camForward = camera.CFrame.LookVector
+        local camRight = camera.CFrame.RightVector
+        local upVec = Vector3.new(0, 1, 0)
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveVector = moveVector + camForward
+            hasInput = true
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveVector = moveVector - camForward
+            hasInput = true
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveVector = moveVector - camRight
+            hasInput = true
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveVector = moveVector + camRight
+            hasInput = true
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            moveVector = moveVector + upVec
+            hasInput = true
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveVector = moveVector - upVec
+            hasInput = true
+        end
+
+        local targetPos
+        if hasInput then
+            moveVector = moveVector.Unit * self.Speed * dt * 60
+            moveVector = moveVector + Vector3.new(
+                (math.random() - 0.5) * self.Randomization * 2,
+                0,
+                (math.random() - 0.5) * self.Randomization * 2
+            )
+            targetPos = currentPos + moveVector
+            self.LastInputTime = now
+            self.IdlePosition = targetPos
+        else
+            targetPos = Vector3.new(self.IdlePosition.X, self.IdlePosition.Y, self.IdlePosition.Z)
+            if currentPos.Y < self.IdlePosition.Y - 0.01 then
+                targetPos = targetPos + Vector3.new(0, self.HoverStrength * dt * 60, 0)
+            end
+            local correction = (targetPos - currentPos)
+            moveVector = correction * 3
+        end
+
+        local newCFrame = CFrame.new(targetPos, targetPos + camForward)
+        freshRoot.CFrame = freshRoot.CFrame:Lerp(newCFrame, 0.8)
+
+        freshCharData.humanoid.PlatformStand = true
+    end)
+
+    Library:Notify("Fly activated - Position locked, no teleport/drift", 2)
+end
+
+function Fly:Stop()
+    self.Enabled = false
+    local charData = self:GetCharacter()
+    if charData then
+        charData.humanoid.PlatformStand = false
+    end
+    if self.Connection then
+        self.Connection:Disconnect()
+        self.Connection = nil
+    end
+    Library:Notify("Fly deactivated", 2)
+end
+
+-- Fly UI
+local FlyGroup = MainTab:AddLeftGroupbox('Fly System')
+FlyGroup:AddToggle('FlyToggle', {
+    Text = 'Fly: OFF',
+    Default = false,
+    Callback = function(value)
+        if value then
+            Fly:Start()
+            Toggles.FlyToggle.Text = 'Fly: ON'
+        else
+            Fly:Stop()
+            Toggles.FlyToggle.Text = 'Fly: OFF'
+        end
+    end
+})
+
+FlyGroup:AddSlider('FlySpeedSlider', {
+    Text = 'Fly Speed: 50',
+    Default = 50,
+    Min = 16,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(value)
+        Fly.Speed = value
+        Options.FlySpeedSlider.Text = 'Fly Speed: ' .. value
+        if Fly.Enabled then
+            Library:Notify('Speed updated to ' .. value, 1)
+        end
+    end
+})
+
+FlyGroup:AddLabel('Keybind'):AddKeyPicker('FlyKeybind', {
+    Default = 'F',
+    Mode = 'Toggle',
+    Text = 'Fly Off (When Active)',
+    Callback = function()
+        if Fly.Enabled then
+            Toggles.FlyToggle:SetValue(false)
+        end
+    end
+})
+
+-- Respawn Handler for Fly
+local FlyRespawnConnection
+function Fly:SetupRespawn()
+    if FlyRespawnConnection then FlyRespawnConnection:Disconnect() end
+    FlyRespawnConnection = LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(1)
+        if Fly.Enabled then
+            Fly:Stop()
+            task.wait(0.2)
+            Fly:Start()
+            Library:Notify('Fly restored after respawn', 2)
+        end
+    end)
+end
+Fly:SetupRespawn()
+
+-- ===========================================
+-- SUBMODULE: Utils
+-- ===========================================
+local UtilsGroup = MainTab:AddRightGroupbox('Utility Functions')
+local function ResetCharacter()
+    local charData = Fly:GetCharacter()  -- Reuse validation
+    if charData then
+        charData.humanoid.Health = 0
+        if charData.humanoid.Health > 0 then
+            charData.humanoid:ChangeState(Enum.HumanoidStateType.Dead)
+        end
+        Library:Notify("Character reset", 2)
+    else
+        Library:Notify("Cannot reset character", 3)
+    end
+end
+
+UtilsGroup:AddButton({
+    Text = 'Reset Character',
+    Func = ResetCharacter,
+    Tooltip = 'Safe client-side reset'
+})
+
+-- ===========================================
+-- SUBMODULE: Noclip System
+-- ===========================================
+local Noclip = {}
+Noclip.Enabled = false
+Noclip.Connection = nil
+Noclip.OriginalCanCollide = {}
+Noclip.BodyParts = {}
+
+function Noclip:GetCharacterParts(character)
+    local parts = {}
+    for _, obj in pairs(character:GetDescendants()) do
+        if obj:IsA("BasePart") and obj ~= character:FindFirstChild("HumanoidRootPart") then
+            self.OriginalCanCollide[obj] = obj.CanCollide
+            table.insert(parts, obj)
+        end
+    end
+    return parts
+end
+
+local function UpdateNoclipCharacter(newChar)
+    Noclip.BodyParts = Noclip:GetCharacterParts(newChar)
+    Noclip.OriginalCanCollide = {}
+    if Noclip.Enabled then
+        for _, part in pairs(Noclip.BodyParts) do
+            part.CanCollide = false
+        end
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(UpdateNoclipCharacter)
+if LocalPlayer.Character then
+    UpdateNoclipCharacter(LocalPlayer.Character)
+end
+
+function Noclip:EnableNoclip()
+    for _, part in pairs(self.BodyParts) do
+        if part and part.Parent then
+            part.CanCollide = false
+        end
+    end
+end
+
+function Noclip:DisableNoclip()
+    for _, part in pairs(self.BodyParts) do
+        if part and part.Parent and self.OriginalCanCollide[part] ~= nil then
+            part.CanCollide = self.OriginalCanCollide[part]
+        else
+            part.CanCollide = true
+        end
+    end
+end
+
+function Noclip:Toggle(enable)
+    self.Enabled = enable
+    if enable then
+        self:EnableNoclip()
+        if self.Connection then self.Connection:Disconnect() end
+        self.Connection = RunService.Stepped:Connect(function()
+            if self.Enabled then
+                self:EnableNoclip()
+            end
+        end)
+        Library:Notify("Noclip ON - Pass through walls safely!", 3)
+    else
+        if self.Connection then
+            self.Connection:Disconnect()
+            self.Connection = nil
+        end
+        self:DisableNoclip()
+        Library:Notify("Noclip OFF - Back to normal", 2)
+    end
+end
+
+local NoclipGroup = MainTab:AddRightGroupbox('Noclip System')
+NoclipGroup:AddToggle('NoclipToggle', {
+    Text = 'Noclip (Ultra Stable)',
+    Default = false,
+    Tooltip = 'Pure wall clipping - No character breaking, perfect toggle',
+    Callback = function(value)
+        Noclip:Toggle(value)
+    end
+})
+
+-- ===========================================
+-- SUBMODULE: Freecam System
+-- ===========================================
+local Freecam = {}
+Freecam.Enabled = false
+Freecam.NavSpeed = 1
+Freecam.MouseSensitivity = 0.005
+Freecam.CameraPos = Vector3.new()
+Freecam.CameraRot = Vector2.new()
+
+-- Spring for Velocity
+local Spring = {}
+Spring.__index = Spring
+
+function Spring.new(freq, pos)
+    local self = setmetatable({}, Spring)
+    self.f = freq
+    self.p = pos
+    self.v = Vector3.new(0,0,0)
+    return self
+end
+
+function Spring:Update(dt, goal)
+    local f = self.f * 2 * math.pi
+    local p0 = self.p
+    local v0 = self.v
+
+    local offset = goal - p0
+    local decay = math.exp(-f * dt)
+
+    local p1 = goal + (v0 * dt - offset * (f * dt + 1)) * decay
+    local v1 = (f * dt * (offset * f - v0) + v0) * decay
+
+    self.p = p1
+    self.v = v1
+
+    return p1
+end
+
+function Spring:Reset(pos)
+    self.p = pos
+    self.v = Vector3.new(0,0,0)
+end
+
+Freecam.VelSpring = Spring.new(1.5, Vector3.new())
+
+-- Constants
+local PI = math.pi
+local CLAMP = math.clamp or function(x, min, max) return math.max(min, math.min(max, x)) end
+local RAD = math.rad
+local PITCH_LIMIT = RAD(90)
+local NAV_GAIN = Vector3.new(3, 3, 3) * 64
+local TOGGLE_INPUT_PRIORITY = Enum.ContextActionPriority.Low.Value
+local INPUT_PRIORITY = Enum.ContextActionPriority.High.Value
+local FREECAM_MACRO_KB = {Enum.KeyCode.LeftShift, Enum.KeyCode.P}
+
+-- Input States
+Freecam.Keyboard = { W = 0, A = 0, S = 0, D = 0, E = 0, Q = 0, Up = 0, Down = 0 }
+Freecam.MouseDelta = Vector2.new()
+
+local NAV_KEYBOARD_SPEED = Vector3.new(1, 1, 1)
+local NAV_SHIFT_MUL = 0.25
+local NAV_ADJ_SPEED = 0.75
+
+function Freecam:UpdateKeyboard(action, state, input)
+    local isDown = state == Enum.UserInputState.Begin and 1 or 0
+    if input.KeyCode == Enum.KeyCode.W then self.Keyboard.W = isDown
+    elseif input.KeyCode == Enum.KeyCode.A then self.Keyboard.A = isDown
+    elseif input.KeyCode == Enum.KeyCode.S then self.Keyboard.S = isDown
+    elseif input.KeyCode == Enum.KeyCode.D then self.Keyboard.D = isDown
+    elseif input.KeyCode == Enum.KeyCode.E then self.Keyboard.E = isDown
+    elseif input.KeyCode == Enum.KeyCode.Q then self.Keyboard.Q = isDown
+    elseif input.KeyCode == Enum.KeyCode.Up then self.Keyboard.Up = isDown
+    elseif input.KeyCode == Enum.KeyCode.Down then self.Keyboard.Down = isDown
+    end
+    return Enum.ContextActionResult.Sink
+end
+
+function Freecam:OnMouseMove(action, state, input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        self.MouseDelta = self.MouseDelta + Vector2.new(-input.Delta.Y, -input.Delta.X)
+    end
+    return Enum.ContextActionResult.Sink
+end
+
+function Freecam:GetVelocity(dt)
+    self.NavSpeed = CLAMP(self.NavSpeed + dt * (self.Keyboard.Up - self.Keyboard.Down) * NAV_ADJ_SPEED, 0.1, 10)
+
+    local shiftPressed = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+    local speedMultiplier = self.NavSpeed * (shiftPressed and NAV_SHIFT_MUL or 1)
+
+    local moveDir = Vector3.new(
+        (self.Keyboard.D - self.Keyboard.A),
+        (self.Keyboard.E - self.Keyboard.Q),
+        (self.Keyboard.S - self.Keyboard.W)
+    ) * NAV_KEYBOARD_SPEED * speedMultiplier
+
+    return moveDir
+end
+
+function Freecam:Step(dt)
+    local targetVel = self:GetVelocity(dt)
+    local vel = self.VelSpring:Update(dt, targetVel)
+
+    self.CameraRot = self.CameraRot + self.MouseDelta * self.MouseSensitivity
+    self.MouseDelta = Vector2.new(0, 0)
+
+    self.CameraRot = Vector2.new(CLAMP(self.CameraRot.X, -PITCH_LIMIT, PITCH_LIMIT), self.CameraRot.Y % (2 * PI))
+
+    local zoomFactor = 1
+    local cf = CFrame.new(self.CameraPos) * CFrame.fromOrientation(self.CameraRot.X, self.CameraRot.Y, 0)
+    self.CameraPos = (cf * CFrame.new(vel * NAV_GAIN * dt * zoomFactor)).Position
+
+    local Camera = Workspace.CurrentCamera
+    Camera.CFrame = CFrame.new(self.CameraPos) * CFrame.fromOrientation(self.CameraRot.X, self.CameraRot.Y, 0)
+    Camera.Focus = Camera.CFrame
+end
+
+function Freecam:StartInputCapture()
+    ContextActionService:BindActionAtPriority("FreecamKeyboard", function(...) return self:UpdateKeyboard(...) end, false, INPUT_PRIORITY,
+        Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
+        Enum.KeyCode.E, Enum.KeyCode.Q,
+        Enum.KeyCode.Up, Enum.KeyCode.Down
+    )
+    ContextActionService:BindActionAtPriority("FreecamMouseMove", function(...) return self:OnMouseMove(...) end, false, INPUT_PRIORITY, Enum.UserInputType.MouseMovement)
+end
+
+function Freecam:StopInputCapture()
+    self.NavSpeed = Options.FreecamNavSpeed.Value
+    self.MouseDelta = Vector2.new()
+
+    self.Keyboard = { W=0, A=0, S=0, D=0, E=0, Q=0, Up=0, Down=0 }
+
+    ContextActionService:UnbindAction("FreecamKeyboard")
+    ContextActionService:UnbindAction("FreecamMouseMove")
+end
+
+-- Player State Management
+local PlayerState = {}
+do
+    local mouseBehavior, mouseIconEnabled
+    local cameraType, cameraFocus, cameraCFrame, cameraFieldOfView
+    local coreGuis = { Backpack = true, Chat = true, Health = true, PlayerList = true }
+    local screenGuis = {}
+    local setCores = { BadgesNotificationsActive = true, PointsNotificationsActive = true }
+
+    function PlayerState.Push()
+        cameraFieldOfView = Workspace.CurrentCamera.FieldOfView
+
+        for name in pairs(coreGuis) do
+            coreGuis[name] = StarterGui:GetCoreGuiEnabled(Enum.CoreGuiType[name])
+            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType[name], false)
+        end
+        for name in pairs(setCores) do
+            setCores[name] = StarterGui:GetCore(name)
+            StarterGui:SetCore(name, false)
+        end
+
+        local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if playerGui then
+            for _, gui in pairs(playerGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and gui.Enabled then
+                    table.insert(screenGuis, gui)
+                    gui.Enabled = false
+                end
+            end
+        end
+
+        local Camera = Workspace.CurrentCamera
+        cameraType = Camera.CameraType
+        Camera.CameraType = Enum.CameraType.Custom
+
+        cameraCFrame = Camera.CFrame
+        cameraFocus = Camera.Focus
+
+        mouseIconEnabled = UserInputService.MouseIconEnabled
+        UserInputService.MouseIconEnabled = false
+
+        mouseBehavior = UserInputService.MouseBehavior
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
+
+    function PlayerState.Pop()
+        for name, enabled in pairs(coreGuis) do
+            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType[name], enabled)
+        end
+        for name, enabled in pairs(setCores) do
+            StarterGui:SetCore(name, enabled)
+        end
+        for _, gui in pairs(screenGuis) do
+            if gui.Parent then
+                gui.Enabled = true
+            end
+        end
+        screenGuis = {}
+
+        local Camera = Workspace.CurrentCamera
+        Camera.FieldOfView = cameraFieldOfView
+        Camera.CameraType = cameraType
+        Camera.CFrame = cameraCFrame
+        Camera.Focus = cameraFocus
+
+        UserInputService.MouseIconEnabled = mouseIconEnabled
+        UserInputService.MouseBehavior = mouseBehavior
+
+        UserInputService.MouseIconEnabled = true
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
+end
+
+function Freecam:Start()
+    local Camera = Workspace.CurrentCamera
+    local camCFrame = Camera.CFrame
+    self.CameraPos = camCFrame.Position
+    self.CameraRot = Vector2.new(camCFrame:ToEulerAnglesYXZ())
+
+    self.VelSpring:Reset(Vector3.new())
+
+    PlayerState.Push()
+    self:StartInputCapture()
+    RunService:BindToRenderStep("Freecam", Enum.RenderPriority.Camera.Value, function(dt) self:Step(dt) end)
+    Library:Notify("Freecam enabled! Use WASD to move, QE to up/down, mouse to look. (Shift+P to toggle) - FOV preserved.", 5)
+end
+
+function Freecam:Stop()
+    RunService:UnbindFromRenderStep("Freecam")
+    self:StopInputCapture()
+    PlayerState.Pop()
+
+    UserInputService.MouseIconEnabled = true
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
+    Library:Notify("Freecam disabled.", 3)
+end
+
+function Freecam:Toggle()
+    if self.Enabled then
+        self:Stop()
+    else
+        self:Start()
+    end
+    self.Enabled = not self.Enabled
+end
+
+local function CheckMacro()
+    for i = 1, #FREECAM_MACRO_KB - 1 do
+        if not UserInputService:IsKeyDown(FREECAM_MACRO_KB[i]) then
+            return false
+        end
+    end
+    return true
+end
+
+local function HandleToggleInput(action, state, input)
+    if state == Enum.UserInputState.Begin and input.KeyCode == FREECAM_MACRO_KB[#FREECAM_MACRO_KB] then
+        if CheckMacro() then Freecam:Toggle() end
+    end
+    return Enum.ContextActionResult.Pass
+end
+
+ContextActionService:BindActionAtPriority("FreecamToggle", HandleToggleInput, false, TOGGLE_INPUT_PRIORITY, FREECAM_MACRO_KB[#FREECAM_MACRO_KB])
+
+-- Freecam UI
+local FreecamGroup = MainTab:AddLeftGroupbox('Freecam System')
+FreecamGroup:AddToggle('FreecamEnabled', {
+    Text = 'Enable Freecam',
+    Default = false,
+    Tooltip = 'Toggles the freecam mode. Direct mouse rotation, no smoothing. Controls: WASD move, QE up/down, mouse look. Use Shift+P to toggle. Fully FOV-compatible (no interference with changers).',
+    Callback = function(value)
+        Freecam.Enabled = value
+        if value then
+            Freecam:Start()
+        else
+            Freecam:Stop()
+        end
+    end
+})
+
+local FreecamDep = FreecamGroup:AddDependencyBox()
+FreecamDep:AddSlider('FreecamNavSpeed', {
+    Text = 'Navigation Speed',
+    Default = 1,
+    Min = 0.1,
+    Max = 10,
+    Rounding = 2,
+    Suffix = 'x',
+    Tooltip = 'Base movement speed multiplier. Use Shift to slow down, Up/Down keys to adjust dynamically.',
+    Callback = function(value)
+        Freecam.NavSpeed = value
+    end
+})
+
+FreecamDep:AddSlider('FreecamSensitivity', {
+    Text = 'Mouse Sensitivity',
+    Default = 0.005,
+    Min = 0.001,
+    Max = 0.01,
+    Rounding = 4,
+    Suffix = '',
+    Tooltip = 'Mouse look sensitivity. Higher = faster rotation.',
+    Callback = function(value)
+        Freecam.MouseSensitivity = value
+    end
+})
+
+FreecamDep:SetupDependencies({ { Toggles.FreecamEnabled, true } })
+
+Toggles.FreecamEnabled:OnChanged(function()
+    Freecam.Enabled = Toggles.FreecamEnabled.Value
+end)
+
+-- ===========================================
+-- SUBMODULE: FOV Changer (Protected & Decoupled)
+-- ===========================================
+local UniversalGroupBox = MainTab:AddRightGroupbox('FOV Controls')
+
+local FOVManager = {}
+FOVManager.__index = FOVManager
+
+function FOVManager.new(targetFOV, spoofedFOV)
+	local self = setmetatable({}, FOVManager)
+	self.TARGET_FOV = targetFOV or 70
+	self.SPOOFED_FOV = spoofedFOV or 70
+	self.cam = workspace.CurrentCamera
+	self.connection = nil
+	self.propConnection = nil  -- Separate for prop change
+	self:UpdateFOV()
+	self:SetupConnections()
+	return self
+end
+
+function FOVManager:SetupConnections()
+	-- Camera change handler
+	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+		self.cam = workspace.CurrentCamera
+		self:UpdateFOV()
+	end)
+	
+	-- Advanced FOV protector: Use a low-priority check to avoid loops with other scripts (e.g., freecam)
+	-- Only enforce if deviation > 0.1 to prevent micro-fights; debounce with tick check
+	local lastCheck = 0
+	self.propConnection = self.cam:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+		if tick() - lastCheck < 0.016 then return end  -- ~60 FPS debounce
+		lastCheck = tick()
+		if math.abs(self.cam.FieldOfView - self.TARGET_FOV) > 0.1 then  -- Tolerance for floating-point noise
+			self:UpdateFOV()
+		end
+	end)
+end
+
+function FOVManager:UpdateFOV()
+	if self.connection then
+		self.connection:Disconnect()
+	end
+	self.cam.FieldOfView = self.TARGET_FOV
+	-- Optimized continuous enforcement: Heartbeat with priority lower than camera updates, but aggressive enough
+	-- Use Stepped for pre-physics to minimize conflicts
+	self.connection = game:GetService("RunService").Stepped:Connect(function()
+		if math.abs(self.cam.FieldOfView - self.TARGET_FOV) > 0.1 then
+			self.cam.FieldOfView = self.TARGET_FOV
+		end
+	end)
+end
+
+function FOVManager:SetFOV(newFOV)
+	if type(newFOV) ~= "number" then 
+		warn("FOV must be a number")
+		return 
+	end
+	self.TARGET_FOV = math.clamp(newFOV, 10, 120)
+	self:UpdateFOV()
+	print("FOV updated to:", self.TARGET_FOV)
+end
+
+function FOVManager:SetSpoofedFOV(newSpoofedFOV)
+	if type(newSpoofedFOV) ~= "number" then 
+		warn("Spoofed FOV must be a number")
+		return 
+	end
+	self.SPOOFED_FOV = newSpoofedFOV
+end
+
+function FOVManager:Destroy()
+	if self.connection then
+		self.connection:Disconnect()
+	end
+	if self.propConnection then
+		self.propConnection:Disconnect()
+	end
+end
+
+local fovManager = FOVManager.new(70, 70)
+
+UniversalGroupBox:AddSlider('FOVSlider', {
+	Text = 'FOV Value',
+	Default = 70,
+	Min = 10,
+	Max = 120,
+	Rounding = 0,
+	Compact = false,
+	Suffix = '°',
+
+	Callback = function(Value)
+		fovManager:SetFOV(Value)
+	end,
+
+	Tooltip = 'Protected FOV changer: Fully compatible with freecam and other scripts. Any value 10-120 works without crashes.',
+})
+
+-- ===========================================
+-- MODULE: PVP Features
+-- ===========================================
+-- Team Switching Module
+local TeamSwitch = {}
+TeamSwitch.RemoteFunction = nil
+TeamSwitch.Connections = {}
+
+function TeamSwitch:Initialize()
+    local success, remote = pcall(function()
+        return game:GetService("ReplicatedStorage"):WaitForChild("RemoteFunction", 5)
+    end)
+    if success and remote and remote:IsA("RemoteFunction") then
+        self.RemoteFunction = remote
+        Library:Notify("Team Switching initialized successfully", 2)
+    else
+        Library:Notify("Error: RemoteFunction not found in ReplicatedStorage", 3)
+    end
+end
+
+function TeamSwitch:ChangeTeam(teamName)
+    if not self.RemoteFunction then
+        Library:Notify("Error: Team switching not available (RemoteFunction missing)", 3)
+        return
+    end
+    task.spawn(function()
+        local success, err = pcall(function()
+            local args = { [1] = "SetTeam", [2] = teamName }
+            self.RemoteFunction:InvokeServer(unpack(args))
+        end)
+        if success then
+            Library:Notify("Team changed to: " .. teamName, 2)
+        else
+            Library:Notify("Team change failed: " .. tostring(err), 3)
+        end
+    end)
+end
+
+-- Initialize Team Switching
+TeamSwitch:Initialize()
+
+-- Team Switching UI
+local TeamSwitchGroup = PVPTab:AddRightGroupbox('Team Switching')
+TeamSwitchGroup:AddButton({
+    Text = 'Police Team',
+    Func = function() TeamSwitch:ChangeTeam("Police") end,
+    Tooltip = 'Switch to Police team'
+})
+TeamSwitchGroup:AddButton({
+    Text = 'Prisoners Team',
+    Func = function() TeamSwitch:ChangeTeam("Prisoners") end,
+    Tooltip = 'Switch to Prisoners team'
+})
+TeamSwitchGroup:AddButton({
+    Text = 'Heroes Team',
+    Func = function() TeamSwitch:ChangeTeam("Heroes") end,
+    Tooltip = 'Switch to Heroes team'
+})
+
+-- Keycard Exploit Module
+local KeycardExploit = {}
+KeycardExploit.Event = nil
+KeycardExploit.Connections = {}
+
+function KeycardExploit:Initialize()
+    local success, event = pcall(function()
+        return game:GetService("ReplicatedStorage"):WaitForChild("Event", 5)
+    end)
+    if success and event and event:IsA("RemoteEvent") then
+        self.Event = event
+        Library:Notify("Keycard Exploit initialized successfully", 2)
+    else
+        Library:Notify("Error: Event not found in ReplicatedStorage", 3)
+    end
+end
+
+function KeycardExploit:Execute()
+    if not self.Event then
+        Library:Notify("Error: Keycard exploit not available (Event missing)", 3)
+        return
+    end
+    task.spawn(function()
+        local success, err = pcall(function()
+            local players = Players:GetPlayers()
+            for i = 1, 10 do -- Reduced from 50 to 10 to prevent server spam
+                for _, player in ipairs(players) do
+                    if player ~= LocalPlayer and player:IsA("Player") then
+                        local args = { [1] = "Pickpocket", [2] = player }
+                        self.Event:FireServer(unpack(args))
+                        task.wait(0.05) -- Small delay to prevent rate-limiting
+                    end
+                end
+                task.wait(0.1) -- Delay between batches
+            end
+        end)
+        if success then
+            Library:Notify("Keycard Exploit executed (10x per player)", 3)
+        else
+            Library:Notify("Keycard Exploit failed: " .. tostring(err), 3)
+        end
+    end)
+end
+
+-- Initialize Keycard Exploit
+KeycardExploit:Initialize()
+
+-- Keycard Exploit UI
+local KeycardGroup = PVPTab:AddRightGroupbox('Keycard Exploit')
+KeycardGroup:AddButton({
+    Text = 'Execute Keycard Exploit',
+    Func = function() KeycardExploit:Execute() end,
+    Tooltip = 'Attempts to pickpocket all players for keycards (10x per player)',
+    DoubleClick = true -- Requires double-click to prevent accidental activation
+})
+
+-- AntiSallanma (Anti-Camera Shake) Module
+local AntiSallanma = {}
+AntiSallanma.Enabled = false
+AntiSallanma.CameraShaker = nil
+
+function AntiSallanma:Initialize()
+    local success, module = pcall(function()
+        return require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("CameraShaker", 5))
+    end)
+    if success and module then
+        self.CameraShaker = module
+        Library:Notify("AntiSallanma initialized successfully", 2)
+    else
+        Library:Notify("Error: CameraShaker module not found in ReplicatedStorage", 3)
+        return false
+    end
+    return true
+end
+
+function AntiSallanma:Enable()
+    if not self.CameraShaker then
+        if not self:Initialize() then
+            return
+        end
+    end
+    local success, err = pcall(function()
+        local returnNil = function() return nil end
+        self.CameraShaker.StartShake = returnNil
+        self.CameraShaker.ShakeOnce = returnNil
+        self.CameraShaker.ShakeSustain = returnNil
+        self.CameraShaker.CameraShakeInstance = returnNil
+        self.CameraShaker.Shake = returnNil
+        self.CameraShaker.Start = returnNil
+    end)
+    if success then
+        self.Enabled = true
+        Library:Notify("✅ AntiSallanma aktif edildi!", 2)
+    else
+        self.Enabled = false
+        Library:Notify("❌ AntiSallanma failed: " .. tostring(err), 3)
+        warn("AntiSallanma Error: ", err)
+    end
+end
+
+function AntiSallanma:Disable()
+    -- Note: Disabling is not implemented as the module override is not reversible without reloading the module
+    -- If you want to support toggling off, you would need to store the original functions
+    self.Enabled = false
+    Library:Notify("AntiSallanma cannot be disabled (module override is permanent)", 3)
+end
+
+-- Initialize AntiSallanma
+AntiSallanma:Initialize()
+
+-- AntiSallanma UI
+PVPGroupBox:AddToggle('AntiSallanmaToggle', {
+    Text = 'AntiSallanma',
+    Default = false,
+    Tooltip = 'Kamera sallanmasını devre dışı bırakır. Not: Kalıcıdır, kapatılamaz.',
+    Callback = function(value)
+        if value then
+            AntiSallanma:Enable()
+        else
+            AntiSallanma:Disable()
+        end
+    end
+})
+
+-- ===========================================
+-- NEW: FastShoot Module (Left Side - Dedicated Groupbox)
+-- ===========================================
+local FastShootGroup = PVPTab:AddLeftGroupbox('FastShoot Controls')
+local FastShoot = {}
+FastShoot.Aux = nil
+FastShoot.LoopConnections = {}
+FastShoot.ActiveTools = {}
+
+-- Hydroxide Aux Loader with Error Handling
+function FastShoot:InitializeAux()
+    if self.Aux then return true end
+    
+    local success, result = pcall(function()
+        return loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Upbolt/Hydroxide/revision/ohaux.lua"))()
+    end)
+    
+    if success and result then
+        self.Aux = result
+        Library:Notify("✅ Hydroxide Aux loaded successfully", 2)
+        return true
+    else
+        Library:Notify("❌ Failed to load Hydroxide Aux", 4)
+        warn("FastShoot Aux Load Error:", result)
+        return false
+    end
+end
+
+-- Weapon Configuration
+FastShoot.Weapons = {
+    AWP = { scriptName = "RifleScript", upvalueIndex = 3, constants = { [1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R" }, mouseHold = false },
+    Deagle = { scriptName = "PistolScript", upvalueIndex = 5, constants = { [1]="Visible",[2]="Weapon",[3]="Icon",[4]="script",[6]="Parent",[7]="TextureId" }, mouseHold = false },
+    M4A1 = { scriptName = "RifleScript", upvalueIndex = 1, constants = { [1]="wait",[2]=nil,[3]=0.1,[4]="Running",[5]="Health",[6]="RayCheck" }, mouseHold = true },
+    Shotgun = { scriptName = "ShotgunScript", upvalueIndex = 3, constants = { [1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R" }, mouseHold = false }
+}
+
+function FastShoot:GetTool(toolName)
+    return LocalPlayer.Backpack:FindFirstChild(toolName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(toolName))
+end
+
+function FastShoot:FindClosure(tool, scriptName, upvalueIndex, constants)
+    local scriptPath = tool:FindFirstChild(scriptName) or tool:FindFirstChildWhichIsA("LocalScript")
+    if not scriptPath then return nil end
+    
+    local success, closure = pcall(function()
+        return self.Aux.searchClosure(scriptPath, "Unnamed function", upvalueIndex, constants)
+    end)
+    
+    return success and closure or nil
+end
+
+function FastShoot:StartLoop(toolName, config)
+    if not self:InitializeAux() then return end
+    
+    local toolId = toolName .. "_" .. tick()
+    self.ActiveTools[toolId] = { toolName = toolName, config = config }
+    
+    local holdingMouse = false
+    local closureCache = nil
+    
+    -- Mouse hold input handling
+    if config.mouseHold then
+        local inputBeganConn = UserInputService.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                holdingMouse = true
+            end
+        end)
+        local inputEndedConn = UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                holdingMouse = false
+            end
+        end)
+        
+        table.insert(self.LoopConnections, inputBeganConn)
+        table.insert(self.LoopConnections, inputEndedConn)
+    end
+    
+    -- Main FastShoot loop
+    local loopConn = task.spawn(function()
+        while self.ActiveTools[toolId] do
+            local tool = self:GetTool(toolName)
+            if tool then
+                local closure = closureCache or self:FindClosure(tool, config.scriptName, config.upvalueIndex, config.constants)
+                if closure then
+                    closureCache = closure
+                    
+                    if config.mouseHold then
+                        if holdingMouse then
+                            pcall(function() debug.setupvalue(closure, config.upvalueIndex, true) end)
+                        end
+                    else
+                        pcall(function()
+                            if debug.getupvalue(closure, config.upvalueIndex) == true then
+                                debug.setupvalue(closure, config.upvalueIndex, false)
+                            end
+                        end)
+                    end
+                else
+                    closureCache = nil
+                end
+            else
+                closureCache = nil
+            end
+            task.wait(0.5) -- Optimized: 0.5s interval for stability
+        end
+    end)
+    
+    table.insert(self.LoopConnections, loopConn)
+    Library:Notify(toolName .. " FastShoot ✅ ACTIVE", 2)
+end
+
+function FastShoot:StopLoop(toolName)
+    for id, data in pairs(self.ActiveTools) do
+        if data.toolName == toolName then
+            self.ActiveTools[id] = nil
+            Library:Notify(toolName .. " FastShoot ❌ STOPPED", 2)
+            break
+        end
+    end
+end
+
+function FastShoot:StopAll()
+    for id in pairs(self.ActiveTools) do
+        self.ActiveTools[id] = nil
+    end
+    Library:Notify("All FastShoot ❌ STOPPED", 2)
+end
+
+-- FastShoot UI Creation Helper
+local function CreateFastShootUI(weaponName, group)
+    local toggleId = weaponName .. "FastShootToggle"
+    
+    group:AddToggle(toggleId, {
+        Text = weaponName .. " FastShoot",
+        Default = false,
+        Tooltip = "Toggle " .. weaponName .. " rapid fire (Auto-detects tool)",
+        Callback = function(value)
+            if value then
+                FastShoot:StartLoop(weaponName, FastShoot.Weapons[weaponName])
+                Toggles[toggleId].Text = weaponName .. " FastShoot: ON"
+            else
+                FastShoot:StopLoop(weaponName)
+                Toggles[toggleId].Text = weaponName .. " FastShoot: OFF"
+            end
+        end
+    })
+    
+    group:AddButton({
+        Text = "Apply " .. weaponName,
+        Func = function()
+            FastShoot:StartLoop(weaponName, FastShoot.Weapons[weaponName])
+            Library:Notify(weaponName .. " FastShoot Applied! (Manual)", 3)
+        end,
+        Tooltip = "Manual one-time FastShoot activation"
+    })
+end
+
+-- Create UI for all weapons
+CreateFastShootUI("AWP", FastShootGroup)
+CreateFastShootUI("Deagle", FastShootGroup)
+CreateFastShootUI("M4A1", FastShootGroup)
+CreateFastShootUI("Shotgun", FastShootGroup)
+
+FastShootGroup:AddDivider()
+FastShootGroup:AddButton({
+    Text = "Stop All FastShoot",
+    Func = function()
+        FastShoot:StopAll()
+        -- Reset all toggle texts
+        for _, weaponName in ipairs({"AWP", "Deagle", "M4A1", "Shotgun"}) do
+            local toggleId = weaponName .. "FastShootToggle"
+            if Toggles[toggleId] then
+                Toggles[toggleId]:SetValue(false)
+                Toggles[toggleId].Text = weaponName .. " FastShoot: OFF"
+            end
+        end
+    end,
+    Tooltip = "Emergency stop for all FastShoot features"
+})
+
+-- ===========================================
+-- Global Cleanup
+-- ===========================================
+Library:OnUnload(function()
+    -- Kamera Bypass
+    if KameraBypass.CameraConnection then
+        KameraBypass.CameraConnection:Disconnect()
+    end
+
+    -- ESP
+    if ESP.LoopConnection then
+        ESP.LoopConnection:Disconnect()
+    end
+    for _, conn in ipairs(ESP.Connections) do
+        conn:Disconnect()
+    end
+
+    -- Fly
+    Fly:Stop()
+
+    -- Noclip
+    if Noclip.Connection then
+        Noclip.Connection:Disconnect()
+    end
+    Noclip:DisableNoclip()
+
+    -- Freecam
+    if Freecam.Enabled then
+        Freecam:Stop()
+    end
+
+    -- FOV
+    fovManager:Destroy()
+end)
+
+-- Expose for external use
+return {
+    KameraBypass = KameraBypass,
+    ESP = ESP,
+    Fly = Fly,
+    Noclip = Noclip,
+    Freecam = Freecam,
+    FOV = fovManager
+}
