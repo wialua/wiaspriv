@@ -248,14 +248,14 @@ function stopGhostFarm()
 end
 
 -- =======================================
--- 🐣 Advanced Hatch System (Linoria Entegre)
+-- 🐣 Ultra Stable Hatch System (Linoria Entegre)
 -- =======================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HatchRemote = ReplicatedStorage:WaitForChild("Functions"):WaitForChild("Hatch")
 
 -- ==============================
---  Yeni Sekme / Grup
+-- Yeni Sekme / Grup
 -- ==============================
 local HatchGroup = Tabs.Main:AddRightGroupbox('Advanced Hatch')
 
@@ -264,7 +264,6 @@ HatchGroup:AddInput('PetName', {
     Default = '',
     Text = 'Pet Adı',
     Placeholder = 'örn: Pumpkin',
-    Tooltip = 'Pet adını yaz (case sensitive olabilir)',
 })
 
 -- Dropdown: Mode
@@ -272,82 +271,59 @@ HatchGroup:AddDropdown('HatchMode', {
     Values = {'Single', 'Triple', 'Octuple'},
     Default = 1,
     Text = 'Hatch Modu',
-    Tooltip = 'Hatch modunu seç',
 })
 
 -- Loop Toggle
 HatchGroup:AddToggle('LoopHatch', {
     Text = 'Loop Hatch',
     Default = false,
-    Tooltip = 'Seçili pet ve mod ile sürekli hatch yapar'
 })
 
--- Hatch Button
+-- Hatch Button (Manuel)
 HatchGroup:AddButton({
     Text = '🐣 Hatch Now',
     Func = function()
         local pet = Options.PetName.Value
         local mode = Options.HatchMode.Value
+        if pet == '' or not mode then return end
 
-        if pet == '' or not mode then
-            Library:Notify('⚠️ Pet adı veya mod boş olamaz!', 3)
-            return
-        end
-
-        local success, err = pcall(function()
-            -- Tek seferlik 3 hızlı tetikleme
-            for i = 1, 3 do
+        -- Tek seferde 10 hızlı tetikleme
+        pcall(function()
+            for i = 1, 10 do
                 HatchRemote:InvokeServer(pet, mode)
-                task.wait(0.05)
             end
         end)
-
-        if success then
-            Library:Notify(('✅ Hatch başarılı: %s [%s]'):format(pet, mode), 3)
-        else
-            Library:Notify(('❌ Hatch hatası: %s'):format(err), 4)
-        end
     end
 })
 
 -- ==============================
--- Loop Sistemi
+-- Loop Sistemi (Aşırı Hızlı ve Stabil)
 -- ==============================
 local looping = false
-local loopThread
 
-Toggles.LoopHatch:OnChanged(function()
-    looping = Toggles.LoopHatch.Value
-
+Toggles.LoopHatch:OnChanged(function(value)
+    looping = value
     if looping then
-        Library:Notify('🔁 Loop Hatch başlatıldı', 3)
-
-        loopThread = task.spawn(function()
+        task.spawn(function()
             while looping do
                 local pet = Options.PetName.Value
                 local mode = Options.HatchMode.Value
 
                 if pet ~= '' and mode then
-                    local ok, err = pcall(function()
-                        HatchRemote:InvokeServer(pet, mode)
+                    -- 10 kez hızlı tetikleme
+                    pcall(function()
+                        for i = 1, 10 do
+                            HatchRemote:InvokeServer(pet, mode)
+                        end
                     end)
-
-                    if not ok then
-                        warn('Hatch hatası:', err)
-                    end
-                else
-                    Library:Notify('⚠️ Pet veya mod boş!', 2)
                 end
 
-                -- Çok hızlı olmasın, ping korumalı stabil hız
-                task.wait(0.25)
+                task.wait() -- minimal yield, FPS dostu
             end
         end)
-    else
-        Library:Notify('⏹️ Loop Hatch durduruldu', 3)
-        looping = false
     end
 end)
+
 
 -- ==============================
 -- 🏠 Auto Ev (Linoria Group)
