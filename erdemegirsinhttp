@@ -303,3 +303,63 @@ Toggles.LoopHatch:OnChanged(function()
         looping = false
     end
 end)
+
+-- ==============================
+-- 🏠 Auto Ev (Linoria Group)
+-- ==============================
+local touchEvParts = {
+    game:GetService("Workspace").Houses.House1.Pad.Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House2:GetChildren()[2].Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House3.Model.Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House4:GetChildren()[2].Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House5:GetChildren()[2].Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House6.Model.Pad.TouchInterest
+}
+
+local AutoEvGroup = Tabs.Main:AddRightGroupbox('Auto Ev')
+
+AutoEvGroup:AddToggle('AutoEv', {
+    Text = '🏠 Auto Ev',
+    Default = false,
+    Tooltip = 'Ev padlerine otomatik dokunur (stabil, lag yapmaz)'
+})
+
+-- ==============================
+--  Core Fonksiyonlar
+-- ==============================
+local autoEvRunning = false
+local autoEvLoop
+
+Toggles.AutoEv:OnChanged(function()
+    if Toggles.AutoEv.Value then
+        if autoEvRunning then return end
+        autoEvRunning = true
+        Library:Notify('🏠 Auto Ev başlatıldı!', 3)
+
+        autoEvLoop = task.spawn(function()
+            while autoEvRunning do
+                local player = game.Players.LocalPlayer
+                local char = player.Character
+                local hrp = char and char:FindFirstChild('HumanoidRootPart')
+
+                if hrp then
+                    for _, touch in ipairs(touchEvParts) do
+                        if not autoEvRunning then break end
+                        if touch and touch.Parent then
+                            pcall(function()
+                                -- TouchInterest objesi içinde olduğu Part’e dokun
+                                firetouchinterest(hrp, touch.Parent, 0)
+                                firetouchinterest(hrp, touch.Parent, 1)
+                            end)
+                            task.wait(0.15) -- her pad arası minik gecikme (lag koruma)
+                        end
+                    end
+                end
+                task.wait(0.3) -- ana loop bekleme, ping stabil
+            end
+        end)
+    else
+        autoEvRunning = false
+        Library:Notify('⏹️ Auto Ev durduruldu.', 3)
+    end
+end)
