@@ -409,92 +409,55 @@ Toggles.AutoEv:OnChanged(function()
     end
 end)
 
--- ==============================
--- Auto Rebirth Group (UI Uyumlu)
--- ==============================
-local AutoRebirthGroup = Tabs.Main:AddLeftGroupbox("Auto Rebirth") -- <-- Dikkat: Tabs.Main kullanıyoruz
+-- Auto Rebirth Group
+local RebirthGroup = Tabs.Main:AddLeftGroupbox("Auto Rebirth")
 
 -- Input: Rebirth miktarı
-AutoRebirthGroup:AddInput("RebirthAmount", {
-    Default = "10000",
-    Text = "Rebirth Miktarı",
-    Placeholder = "Kaç rebirth atılsın",
-    Numeric = true,
+RebirthGroup:AddInput('RebirthAmountInput', {
+    Text = 'Rebirth Amount',
+    Placeholder = 'Örn: 10000',
+    Default = '10000',
     Callback = function(v)
-        print("Rebirth miktarı güncellendi:", v)
+        Options.RebirthAmountInput.Value = tonumber(v) or 1
     end
 })
 
-Options.RebirthAmount:OnChanged(function()
-    local val = tonumber(Options.RebirthAmount.Value)
-    if not val or val <= 0 then
-        Options.RebirthAmount:SetValue("10000")
-    end
-end)
-
--- Toggle: Auto Rebirth
-AutoRebirthGroup:AddToggle("AutoRebirth", {
-    Text = "Otomatik Rebirth",
-    Default = false,
-    Tooltip = "Toggle açıkken sürekli rebirth atar"
+-- Toggle
+RebirthGroup:AddToggle('AutoRebirthToggle', {
+    Text = 'Enable Auto Rebirth',
+    Default = false
 })
 
--- Button: Manuel Rebirth
-AutoRebirthGroup:AddButton({
-    Text = "Manuel Rebirth",
-    Tooltip = "Tek seferlik rebirth at",
+-- Manual Button
+RebirthGroup:AddButton({
+    Text = 'Rebirth Now',
     Func = function()
-        local count = tonumber(Options.RebirthAmount.Value) or 10000
-        task.spawn(function()
-            pcall(function()
-                game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(count)
-                game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(count) -- tek seferde 2 kez
-            end)
+        local amount = tonumber(Options.RebirthAmountInput.Value) or 1
+        pcall(function()
+            game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(amount)
         end)
     end
 })
 
--- ==============================
--- Auto Rebirth Loop (FPS Dostu)
--- ==============================
+-- Loop kontrol
 local autoRebirthRunning = false
-local autoRebirthConn
 
-local function startAutoRebirth()
-    if autoRebirthRunning then return end
-    autoRebirthRunning = true
-    Library:Notify("⚡ Auto Rebirth Başladı!", 2)
-
-    local tickCounter = 0
-    autoRebirthConn = game:GetService("RunService").Heartbeat:Connect(function(dt)
-        if not autoRebirthRunning then return end
-        tickCounter += dt
-
-        if tickCounter >= 0.003 then -- ultra hızlı ama FPS dostu
-            local count = tonumber(Options.RebirthAmount.Value) or 10000
-            pcall(function()
-                game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(count)
-                game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(count)
-            end)
-            tickCounter = 0
-        end
-    end)
-end
-
-local function stopAutoRebirth()
-    autoRebirthRunning = false
-    if autoRebirthConn then
-        autoRebirthConn:Disconnect()
-        autoRebirthConn = nil
-    end
-    Library:Notify("⏹️ Auto Rebirth Durduruldu", 2)
-end
-
--- Toggle callback
-Toggles.AutoRebirth:OnChanged(function(v)
-    if v then
-        startAutoRebirth()
-    else
-        stopAutoRebirth()
+-- Toggle değişimini dinle
+Toggles.AutoRebirthToggle:OnChanged(function(value)
+    autoRebirthRunning = value
+    if value then
+        -- Loopu task.spawn ile başlat
+        task.spawn(function()
+            local RebirthEvent = game:GetService("ReplicatedStorage").Activates.Rebirth
+            while autoRebirthRunning do
+                local amount = tonumber(Options.RebirthAmountInput.Value) or 1
+                -- Tek seferde 2 kez tetikleme
+                pcall(function()
+                    RebirthEvent:FireServer(amount)
+                    RebirthEvent:FireServer(amount)
+                end)
+                task.wait() -- minimal yield, FPS düşmez
+            end
+        end)
     end
 end)
