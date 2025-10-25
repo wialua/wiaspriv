@@ -43,118 +43,123 @@ local Tabs = {
     UISettings = Window:AddTab('UI Settings')
 }
 
--- ==============================
--- ⚡ Auto Touch (Stable Version)
--- ==============================
+-- ======================================
+-- ⚡ Auto Touch (Guaranteed Stable Build)
+-- ======================================
 
--- TouchInterest listesi
+local Workspace = game:GetService("Workspace")
+local Player = game:GetService("Players").LocalPlayer
+
+-- Bölgeler (her biri birden fazla TouchInterest içeriyor)
 local touchParts = {
     ["1.Bölge"] = {
-        game:GetService("Workspace").Buttons_1.x1.Touch2.TouchInterest,
-        game:GetService("Workspace").Buttons_4.x10.Touch2.TouchInterest,
-        game:GetService("Workspace").Buttons_1.x25.Touch2.TouchInterest
+        Workspace.Buttons_1.x1.Touch2.TouchInterest,
+        Workspace.Buttons_4.x10.Touch2.TouchInterest,
+        Workspace.Buttons_1.x25.Touch2.TouchInterest
     },
     ["2.Bölge"] = {
-        game:GetService("Workspace").Buttons_2.x1.Touch2.TouchInterest,
-        game:GetService("Workspace").Buttons_2.x10.Touch2.TouchInterest,
-        game:GetService("Workspace").Buttons_2.x25.Touch2.TouchInterest
+        Workspace.Buttons_2.x1.Touch2.TouchInterest,
+        Workspace.Buttons_2.x10.Touch2.TouchInterest,
+        Workspace.Buttons_2.x25.Touch2.TouchInterest
     },
     ["3.Bölge"] = {
-        game:GetService("Workspace").Buttons_3.x1.Touch2.TouchInterest,
-        game:GetService("Workspace").Buttons_3.x10.Touch2.TouchInterest,
-        game:GetService("Workspace").Buttons_3.x25.Touch2.TouchInterest
+        Workspace.Buttons_3.x1.Touch2.TouchInterest,
+        Workspace.Buttons_3.x10.Touch2.TouchInterest,
+        Workspace.Buttons_3.x25.Touch2.TouchInterest
     },
     ["4.Bölge"] = {
-        game:GetService("Workspace").Buttons_4.x1.Touch2.TouchInterest,
-        game:GetService("Workspace").Buttons_4.x10.Touch2.TouchInterest,
-        game:GetService("Workspace").Buttons_4.x25.Touch2.TouchInterest
+        Workspace.Buttons_4.x1.Touch2.TouchInterest,
+        Workspace.Buttons_4.x10.Touch2.TouchInterest,
+        Workspace.Buttons_4.x25.Touch2.TouchInterest
     },
     ["Normal Luck"] = {
-        game:GetService("Workspace").Buttons_99.x1.Touch2.TouchInterest
+        Workspace.Buttons_99.x1.Touch2.TouchInterest
     },
     ["5x Luck"] = {
-        game:GetService("Workspace").Buttons_99.x10.Touch2.TouchInterest
+        Workspace.Buttons_99.x10.Touch2.TouchInterest
     },
     ["10x Luck"] = {
-        game:GetService("Workspace").Buttons_99.x25.Touch2.TouchInterest
+        Workspace.Buttons_99.x25.Touch2.TouchInterest
     }
 }
 
--- ==============================
--- UI Grubu
--- ==============================
+-- ======================================
+-- Linoria UI Bölümü
+-- ======================================
 local TouchTab = Tabs.Main:AddLeftGroupbox('Auto Touch')
 
-TouchTab:AddDropdown('TouchZones', {
+TouchTab:AddDropdown('AutoTouchZones', {
     Values = {"1.Bölge","2.Bölge","3.Bölge","4.Bölge","Normal Luck","5x Luck","10x Luck"},
     Multi = true,
-    Text = "Seç Dokunulacak Bölgeler",
-    Default = {},
-    Tooltip = "Seçilen bölgelere otomatik dokunur."
+    Text = "Bölgeleri Seç",
+    Tooltip = "Seçilen bölgelerdeki tuşlara otomatik dokunur.",
+    Default = {}
 })
 
-TouchTab:AddToggle('AutoTouch', {
-    Text = '⚡ Auto Touch',
+TouchTab:AddToggle('AutoTouchToggle', {
+    Text = "⚡ Auto Touch",
     Default = false,
-    Tooltip = 'Seçili bölgelerdeki butonlara otomatik dokunur.'
+    Tooltip = "Seçilen bölgelerdeki butonlara otomatik dokunur."
 })
 
--- ==============================
--- Çekirdek Sistem
--- ==============================
+-- ======================================
+-- Çalışma Mantığı
+-- ======================================
 local autoTouchRunning = false
+local autoTouchThread
 
-local function doTouch(hrp, part)
-    if not hrp or not part then return end
+local function safeTouch(part)
+    if not part or not part.Parent then return end
+    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
     pcall(function()
-        firetouchinterest(hrp, part, 0)
-        firetouchinterest(hrp, part, 1)
+        firetouchinterest(hrp, part.Parent, 0)
+        firetouchinterest(hrp, part.Parent, 1)
     end)
 end
 
 local function startAutoTouch()
     if autoTouchRunning then return end
     autoTouchRunning = true
-    Library:Notify("⚡ Auto Touch Başladı", 2)
+    Library:Notify("⚡ Auto Touch başladı!", 3)
 
-    task.spawn(function()
+    autoTouchThread = task.spawn(function()
         while autoTouchRunning do
-            local hrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local selected = Options.TouchZones.Value
-                for _, zoneName in ipairs(selected) do
-                    local zoneList = touchParts[zoneName]
-                    if zoneList then
-                        for _, touch in ipairs(zoneList) do
+            local selectedZones = Options.AutoTouchZones.Value
+            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+
+            if hrp and selectedZones and #selectedZones > 0 then
+                for _, zoneName in ipairs(selectedZones) do
+                    local list = touchParts[zoneName]
+                    if list then
+                        for _, ti in ipairs(list) do
                             if not autoTouchRunning then break end
-                            if touch and touch.Parent then
-                                doTouch(hrp, touch.Parent)
-                                task.wait(0.1) -- her dokunuş arası minik gecikme (ping koruma)
-                            end
+                            safeTouch(ti)
+                            task.wait(0.1) -- her dokunuş arası kısa gecikme
                         end
                     end
                 end
             end
-            task.wait(0.3) -- ana loop bekleme
+
+            task.wait(0.25) -- ana loop aralığı
         end
     end)
 end
 
 local function stopAutoTouch()
     autoTouchRunning = false
-    Library:Notify("⏹️ Auto Touch Durduruldu", 2)
+    Library:Notify("⏹️ Auto Touch durduruldu.", 3)
 end
 
--- ==============================
--- Toggle Kontrolü
--- ==============================
-Toggles.AutoTouch:OnChanged(function()
-    if Toggles.AutoTouch.Value then
+Toggles.AutoTouchToggle:OnChanged(function()
+    if Toggles.AutoTouchToggle.Value then
         startAutoTouch()
     else
         stopAutoTouch()
     end
 end)
+
 
 -- ==============================
 -- Ghost Farm Tab (Yeni Grup)
@@ -401,5 +406,95 @@ Toggles.AutoEv:OnChanged(function()
     else
         autoEvRunning = false
         Library:Notify('⏹️ Auto Ev durduruldu.', 3)
+    end
+end)
+
+-- ==============================
+-- Auto Rebirth Group (UI Uyumlu)
+-- ==============================
+local AutoRebirthGroup = Tabs.Main:AddLeftGroupbox("Auto Rebirth") -- <-- Dikkat: Tabs.Main kullanıyoruz
+
+-- Input: Rebirth miktarı
+AutoRebirthGroup:AddInput("RebirthAmount", {
+    Default = "10000",
+    Text = "Rebirth Miktarı",
+    Placeholder = "Kaç rebirth atılsın",
+    Numeric = true,
+    Callback = function(v)
+        print("Rebirth miktarı güncellendi:", v)
+    end
+})
+
+Options.RebirthAmount:OnChanged(function()
+    local val = tonumber(Options.RebirthAmount.Value)
+    if not val or val <= 0 then
+        Options.RebirthAmount:SetValue("10000")
+    end
+end)
+
+-- Toggle: Auto Rebirth
+AutoRebirthGroup:AddToggle("AutoRebirth", {
+    Text = "Otomatik Rebirth",
+    Default = false,
+    Tooltip = "Toggle açıkken sürekli rebirth atar"
+})
+
+-- Button: Manuel Rebirth
+AutoRebirthGroup:AddButton({
+    Text = "Manuel Rebirth",
+    Tooltip = "Tek seferlik rebirth at",
+    Func = function()
+        local count = tonumber(Options.RebirthAmount.Value) or 10000
+        task.spawn(function()
+            pcall(function()
+                game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(count)
+                game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(count) -- tek seferde 2 kez
+            end)
+        end)
+    end
+})
+
+-- ==============================
+-- Auto Rebirth Loop (FPS Dostu)
+-- ==============================
+local autoRebirthRunning = false
+local autoRebirthConn
+
+local function startAutoRebirth()
+    if autoRebirthRunning then return end
+    autoRebirthRunning = true
+    Library:Notify("⚡ Auto Rebirth Başladı!", 2)
+
+    local tickCounter = 0
+    autoRebirthConn = game:GetService("RunService").Heartbeat:Connect(function(dt)
+        if not autoRebirthRunning then return end
+        tickCounter += dt
+
+        if tickCounter >= 0.003 then -- ultra hızlı ama FPS dostu
+            local count = tonumber(Options.RebirthAmount.Value) or 10000
+            pcall(function()
+                game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(count)
+                game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(count)
+            end)
+            tickCounter = 0
+        end
+    end)
+end
+
+local function stopAutoRebirth()
+    autoRebirthRunning = false
+    if autoRebirthConn then
+        autoRebirthConn:Disconnect()
+        autoRebirthConn = nil
+    end
+    Library:Notify("⏹️ Auto Rebirth Durduruldu", 2)
+end
+
+-- Toggle callback
+Toggles.AutoRebirth:OnChanged(function(v)
+    if v then
+        startAutoRebirth()
+    else
+        stopAutoRebirth()
     end
 end)
