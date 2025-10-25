@@ -409,11 +409,30 @@ Toggles.AutoEv:OnChanged(function()
     end
 end)
 
--- Auto Rebirth Group
-local RebirthGroup = Tabs.Main:AddLeftGroupbox("Auto Rebirth")
+-- ==============================
+-- Auto Actions Group (Click + Rebirth)
+-- ==============================
+local AutoActionsGroup = Tabs.Main:AddLeftGroupbox("Auto Actions")
 
--- Input: Rebirth miktarı
-RebirthGroup:AddInput('RebirthAmountInput', {
+-- ===== Auto Click =====
+AutoActionsGroup:AddToggle('AutoClickToggle', {
+    Text = 'Enable Auto Click',
+    Default = false
+})
+
+AutoActionsGroup:AddButton({
+    Text = 'Click Now',
+    Func = function()
+        local clickEvent = game:GetService("ReplicatedStorage").Events.Click
+        pcall(function()
+            clickEvent:FireServer()
+            clickEvent:FireServer() -- tek seferde 2 kez tetikleme
+        end)
+    end
+})
+
+-- ===== Auto Rebirth =====
+AutoActionsGroup:AddInput('RebirthAmountInput', {
     Text = 'Rebirth Amount',
     Placeholder = 'Örn: 10000',
     Default = '10000',
@@ -422,39 +441,59 @@ RebirthGroup:AddInput('RebirthAmountInput', {
     end
 })
 
--- Toggle
-RebirthGroup:AddToggle('AutoRebirthToggle', {
+AutoActionsGroup:AddToggle('AutoRebirthToggle', {
     Text = 'Enable Auto Rebirth',
     Default = false
 })
 
--- Manual Button
-RebirthGroup:AddButton({
+AutoActionsGroup:AddButton({
     Text = 'Rebirth Now',
     Func = function()
         local amount = tonumber(Options.RebirthAmountInput.Value) or 1
+        local rebirthEvent = game:GetService("ReplicatedStorage").Activates.Rebirth
         pcall(function()
-            game:GetService("ReplicatedStorage").Activates.Rebirth:FireServer(amount)
+            for i = 1, 10 do
+                rebirthEvent:FireServer(amount)
+            end
         end)
     end
 })
 
+-- ==============================
 -- Loop kontrol
+-- ==============================
+local autoClickRunning = false
 local autoRebirthRunning = false
 
--- Toggle değişimini dinle
+-- Auto Click Toggle
+Toggles.AutoClickToggle:OnChanged(function(value)
+    autoClickRunning = value
+    if value then
+        task.spawn(function()
+            local clickEvent = game:GetService("ReplicatedStorage").Events.Click
+            while autoClickRunning do
+                pcall(function()
+                    clickEvent:FireServer()
+                    clickEvent:FireServer() -- tek seferde 2 kez
+                end)
+                task.wait() -- minimal yield, FPS düşmez
+            end
+        end)
+    end
+end)
+
+-- Auto Rebirth Toggle
 Toggles.AutoRebirthToggle:OnChanged(function(value)
     autoRebirthRunning = value
     if value then
-        -- Loopu task.spawn ile başlat
         task.spawn(function()
-            local RebirthEvent = game:GetService("ReplicatedStorage").Activates.Rebirth
+            local rebirthEvent = game:GetService("ReplicatedStorage").Activates.Rebirth
             while autoRebirthRunning do
                 local amount = tonumber(Options.RebirthAmountInput.Value) or 1
-                -- Tek seferde 2 kez tetikleme
                 pcall(function()
-                    RebirthEvent:FireServer(amount)
-                    RebirthEvent:FireServer(amount)
+                    for i = 1, 10 do
+                        rebirthEvent:FireServer(amount)
+                    end
                 end)
                 task.wait() -- minimal yield, FPS düşmez
             end
