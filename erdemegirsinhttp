@@ -1,0 +1,305 @@
+-- =====================================
+-- LinoriaLib Full Example (Detailed, Modular, Commented)
+-- Written by Wally | Fully Explained Version
+-- =====================================
+
+-- ==============================
+-- 1. LOAD LIBRARY & ADDONS
+-- ==============================
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+-- Shortcut tables for easier access
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+-- ==============================
+-- 2. GLOBAL SETTINGS
+-- ==============================
+Library.ShowToggleFrameInKeybinds = true   -- Show toggles in Keybind menu (mobile-friendly)
+Library.ShowCustomCursor = true           -- Use Linoria custom cursor globally
+Library.NotifySide = "Left"               -- Notifications appear on Left/Right
+
+-- ==============================
+-- 3. CREATE WINDOW
+-- ==============================
+local Window = Library:CreateWindow({
+    Title = 'MemeAvcısı',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = false,
+    UnlockMouseWhileOpen = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    UISettings = Window:AddTab('UI Settings')
+}
+
+local touchParts = {
+    ["1.Bölge"] = game:GetService("Workspace").Buttons_1.x1.Touch2.TouchInterest,
+    ["2.Bölge"] = game:GetService("Workspace").Buttons_2.x1.Touch2.TouchInterest,
+    ["3.Bölge"] = game:GetService("Workspace").Buttons_3.x1.Touch2.TouchInterest,
+    ["4.Bölge"] = game:GetService("Workspace").Buttons_4.x1.Touch2.TouchInterest,
+    ["Normal Event"] = game:GetService("Workspace").Buttons_99.x1.Touch2.TouchInterest,
+    ["Event 5x Bounty Luck"] = game:GetService("Workspace").Buttons_99.x10.Touch2.TouchInterest,
+    ["Event 10x Bounty Luck"] = game:GetService("Workspace").Buttons_99.x25.Touch2.TouchInterest
+}
+
+-- ==============================
+-- Auto Touch Tab
+-- ==============================
+local TouchTab = Tabs.Main:AddLeftGroupbox('Auto Touch')
+
+-- MultiDropdown
+TouchTab:AddDropdown('AutoTouchDropdown', {
+    Values = {"1.Bölge","2.Bölge","3.Bölge","4.Bölge","Normal Event","Event 5x Bounty Luck","Event 10x Bounty Luck"},
+    Multi = true,
+    Text = "Select Touch Parts",
+    Default = {},
+    Callback = function(v)
+        Options.AutoTouchEnabled.Value = #v > 0
+    end
+})
+
+-- Toggle for enabling/disabling auto touch
+TouchTab:AddToggle('AutoTouchEnabled', {
+    Text = "Enable Auto Touch",
+    Default = false,
+    Callback = function(v)
+        if v then
+            startAutoTouch()
+        else
+            stopAutoTouch()
+        end
+    end
+})
+
+-- ==============================
+-- Auto Touch Functions
+-- ==============================
+local autoTouchRunning = false
+local autoTouchLoop
+
+function startAutoTouch()
+    if autoTouchRunning then return end
+    autoTouchRunning = true
+
+    autoTouchLoop = game:GetService('RunService').RenderStepped:Connect(function()
+        if not autoTouchRunning then return end
+        local selected = Options.AutoTouchDropdown.Value
+        for _, name in ipairs(selected) do
+            local touch = touchParts[name]
+            if touch and game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild('HumanoidRootPart') then
+                local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
+                -- Fire touch with TouchInterest parent (Part)
+                firetouchinterest(hrp, touch.Parent, 0)
+                firetouchinterest(hrp, touch.Parent, 1)
+            end
+        end
+        task.wait(0.3) -- 0.3 saniye bekleme, spam yapmaz
+    end)
+end
+
+function stopAutoTouch()
+    autoTouchRunning = false
+    if autoTouchLoop then
+        autoTouchLoop:Disconnect()
+        autoTouchLoop = nil
+    end
+end
+
+-- ==============================
+-- Ghost Farm Tab (Yeni Grup)
+-- ==============================
+local GhostGroup = Tabs.Main:AddRightGroupbox('Ghost Farm')
+
+GhostGroup:AddDropdown('GhostType', {
+    Values = {"Common Ghost", "Uncommon Ghost", "Rare Ghost", "Epic Ghost", "Legendary Ghost"},
+    Multi = false,
+    Text = "Select Ghost Type",
+    Default = "Common Ghost",
+})
+
+GhostGroup:AddToggle('AutoGhostFarm', {
+    Text = "Enable Ghost Farm",
+    Default = false,
+    Tooltip = "Automatically farms selected ghosts",
+    Callback = function(v)
+        if v then
+            startGhostFarm()
+        else
+            stopGhostFarm()
+        end
+    end
+})
+
+-- ==============================
+-- Ghost Farm Functions
+-- ==============================
+local ghostRunning = false
+local ghostLoop
+
+-- Küçük-büyük harf, birleşik yazım fark etmeden arama yapan fonksiyon:
+local function matchGhostName(objName, selectedType)
+    local cleanName = string.lower(objName)
+    local cleanType = string.lower(selectedType:gsub("%s+", "")) -- boşlukları sil
+    return string.find(cleanName, cleanType) ~= nil
+end
+
+function findClosestGhost(selectedType)
+    local workspaceChildren = game:GetService("Workspace"):GetChildren()
+    local hrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local closest, dist = nil, math.huge
+    for _, obj in ipairs(workspaceChildren) do
+        -- Cube.001 içeren objeleri tara
+        local cube = obj:FindFirstChild("Cube.001")
+        if cube and cube:FindFirstChild("ProximityPrompt") and matchGhostName(obj.Name, selectedType) then
+            local mag = (cube.Position - hrp.Position).Magnitude
+            if mag < dist then
+                closest = cube
+                dist = mag
+            end
+        end
+    end
+    return closest
+end
+
+function startGhostFarm()
+    if ghostRunning then return end
+    ghostRunning = true
+
+    ghostLoop = task.spawn(function()
+        while ghostRunning do
+            local selected = Options.GhostType.Value
+            local cube = findClosestGhost(selected)
+            if cube and cube:FindFirstChild("ProximityPrompt") then
+                local prompt = cube.ProximityPrompt
+                prompt.HoldDuration = 0
+                local hrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    -- Karakteri yaklaştır
+                    hrp.CFrame = CFrame.new(cube.Position + Vector3.new(0, 3, 0))
+                    task.wait(0.15)
+                    fireproximityprompt(prompt)
+                end
+            end
+            task.wait(0.25) -- çok hızlı olmasın, ping rahat
+        end
+    end)
+end
+
+function stopGhostFarm()
+    ghostRunning = false
+end
+
+-- =======================================
+-- 🐣 Advanced Hatch System (Linoria Entegre)
+-- =======================================
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HatchRemote = ReplicatedStorage:WaitForChild("Functions"):WaitForChild("Hatch")
+
+-- ==============================
+--  Yeni Sekme / Grup
+-- ==============================
+local HatchGroup = Tabs.Main:AddRightGroupbox('Advanced Hatch')
+
+-- Textbox: Pet Name
+HatchGroup:AddInput('PetName', {
+    Default = '',
+    Text = 'Pet Adı',
+    Placeholder = 'örn: Pumpkin',
+    Tooltip = 'Pet adını yaz (case sensitive olabilir)',
+})
+
+-- Dropdown: Mode
+HatchGroup:AddDropdown('HatchMode', {
+    Values = {'Single', 'Triple', 'Octuple'},
+    Default = 1,
+    Text = 'Hatch Modu',
+    Tooltip = 'Hatch modunu seç',
+})
+
+-- Loop Toggle
+HatchGroup:AddToggle('LoopHatch', {
+    Text = 'Loop Hatch',
+    Default = false,
+    Tooltip = 'Seçili pet ve mod ile sürekli hatch yapar'
+})
+
+-- Hatch Button
+HatchGroup:AddButton({
+    Text = '🐣 Hatch Now',
+    Func = function()
+        local pet = Options.PetName.Value
+        local mode = Options.HatchMode.Value
+
+        if pet == '' or not mode then
+            Library:Notify('⚠️ Pet adı veya mod boş olamaz!', 3)
+            return
+        end
+
+        local success, err = pcall(function()
+            -- Tek seferlik 3 hızlı tetikleme
+            for i = 1, 3 do
+                HatchRemote:InvokeServer(pet, mode)
+                task.wait(0.05)
+            end
+        end)
+
+        if success then
+            Library:Notify(('✅ Hatch başarılı: %s [%s]'):format(pet, mode), 3)
+        else
+            Library:Notify(('❌ Hatch hatası: %s'):format(err), 4)
+        end
+    end
+})
+
+-- ==============================
+-- Loop Sistemi
+-- ==============================
+local looping = false
+local loopThread
+
+Toggles.LoopHatch:OnChanged(function()
+    looping = Toggles.LoopHatch.Value
+
+    if looping then
+        Library:Notify('🔁 Loop Hatch başlatıldı', 3)
+
+        loopThread = task.spawn(function()
+            while looping do
+                local pet = Options.PetName.Value
+                local mode = Options.HatchMode.Value
+
+                if pet ~= '' and mode then
+                    local ok, err = pcall(function()
+                        HatchRemote:InvokeServer(pet, mode)
+                    end)
+
+                    if not ok then
+                        warn('Hatch hatası:', err)
+                    end
+                else
+                    Library:Notify('⚠️ Pet veya mod boş!', 2)
+                end
+
+                -- Çok hızlı olmasın, ping korumalı stabil hız
+                task.wait(0.25)
+            end
+        end)
+    else
+        Library:Notify('⏹️ Loop Hatch durduruldu', 3)
+        looping = false
+    end
+end)
