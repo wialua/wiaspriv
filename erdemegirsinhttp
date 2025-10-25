@@ -43,78 +43,118 @@ local Tabs = {
     UISettings = Window:AddTab('UI Settings')
 }
 
+-- ==============================
+-- ⚡ Auto Touch (Stable Version)
+-- ==============================
+
+-- TouchInterest listesi
 local touchParts = {
-    ["1.Bölge"] = game:GetService("Workspace").Buttons_1.x1.Touch2.TouchInterest,
-    ["2.Bölge"] = game:GetService("Workspace").Buttons_2.x1.Touch2.TouchInterest,
-    ["3.Bölge"] = game:GetService("Workspace").Buttons_3.x1.Touch2.TouchInterest,
-    ["4.Bölge"] = game:GetService("Workspace").Buttons_4.x1.Touch2.TouchInterest,
-    ["Normal Event"] = game:GetService("Workspace").Buttons_99.x1.Touch2.TouchInterest,
-    ["Event 5x Bounty Luck"] = game:GetService("Workspace").Buttons_99.x10.Touch2.TouchInterest,
-    ["Event 10x Bounty Luck"] = game:GetService("Workspace").Buttons_99.x25.Touch2.TouchInterest
+    ["1.Bölge"] = {
+        game:GetService("Workspace").Buttons_1.x1.Touch2.TouchInterest,
+        game:GetService("Workspace").Buttons_4.x10.Touch2.TouchInterest,
+        game:GetService("Workspace").Buttons_1.x25.Touch2.TouchInterest
+    },
+    ["2.Bölge"] = {
+        game:GetService("Workspace").Buttons_2.x1.Touch2.TouchInterest,
+        game:GetService("Workspace").Buttons_2.x10.Touch2.TouchInterest,
+        game:GetService("Workspace").Buttons_2.x25.Touch2.TouchInterest
+    },
+    ["3.Bölge"] = {
+        game:GetService("Workspace").Buttons_3.x1.Touch2.TouchInterest,
+        game:GetService("Workspace").Buttons_3.x10.Touch2.TouchInterest,
+        game:GetService("Workspace").Buttons_3.x25.Touch2.TouchInterest
+    },
+    ["4.Bölge"] = {
+        game:GetService("Workspace").Buttons_4.x1.Touch2.TouchInterest,
+        game:GetService("Workspace").Buttons_4.x10.Touch2.TouchInterest,
+        game:GetService("Workspace").Buttons_4.x25.Touch2.TouchInterest
+    },
+    ["Normal Luck"] = {
+        game:GetService("Workspace").Buttons_99.x1.Touch2.TouchInterest
+    },
+    ["5x Luck"] = {
+        game:GetService("Workspace").Buttons_99.x10.Touch2.TouchInterest
+    },
+    ["10x Luck"] = {
+        game:GetService("Workspace").Buttons_99.x25.Touch2.TouchInterest
+    }
 }
 
 -- ==============================
--- Auto Touch Tab
+-- UI Grubu
 -- ==============================
 local TouchTab = Tabs.Main:AddLeftGroupbox('Auto Touch')
 
--- MultiDropdown
-TouchTab:AddDropdown('AutoTouchDropdown', {
-    Values = {"1.Bölge","2.Bölge","3.Bölge","4.Bölge","Normal Event","Event 5x Bounty Luck","Event 10x Bounty Luck"},
+TouchTab:AddDropdown('TouchZones', {
+    Values = {"1.Bölge","2.Bölge","3.Bölge","4.Bölge","Normal Luck","5x Luck","10x Luck"},
     Multi = true,
-    Text = "Select Touch Parts",
+    Text = "Seç Dokunulacak Bölgeler",
     Default = {},
-    Callback = function(v)
-        Options.AutoTouchEnabled.Value = #v > 0
-    end
+    Tooltip = "Seçilen bölgelere otomatik dokunur."
 })
 
--- Toggle for enabling/disabling auto touch
-TouchTab:AddToggle('AutoTouchEnabled', {
-    Text = "Enable Auto Touch",
+TouchTab:AddToggle('AutoTouch', {
+    Text = '⚡ Auto Touch',
     Default = false,
-    Callback = function(v)
-        if v then
-            startAutoTouch()
-        else
-            stopAutoTouch()
-        end
-    end
+    Tooltip = 'Seçili bölgelerdeki butonlara otomatik dokunur.'
 })
 
 -- ==============================
--- Auto Touch Functions
+-- Çekirdek Sistem
 -- ==============================
 local autoTouchRunning = false
-local autoTouchLoop
 
-function startAutoTouch()
-    if autoTouchRunning then return end
-    autoTouchRunning = true
-
-    autoTouchLoop = game:GetService('RunService').RenderStepped:Connect(function()
-        if not autoTouchRunning then return end
-        local selected = Options.AutoTouchDropdown.Value
-        for _, name in ipairs(selected) do
-            local touch = touchParts[name]
-            if touch and game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild('HumanoidRootPart') then
-                local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
-                -- Fire touch with TouchInterest parent (Part)
-                firetouchinterest(hrp, touch.Parent, 0)
-                firetouchinterest(hrp, touch.Parent, 1)
-            end
-        end
-        task.wait(0.3) -- 0.3 saniye bekleme, spam yapmaz
+local function doTouch(hrp, part)
+    if not hrp or not part then return end
+    pcall(function()
+        firetouchinterest(hrp, part, 0)
+        firetouchinterest(hrp, part, 1)
     end)
 end
 
-function stopAutoTouch()
-    autoTouchRunning = false
-    if autoTouchLoop then
-        autoTouchLoop:Disconnect()
-        autoTouchLoop = nil
-    end
+local function startAutoTouch()
+    if autoTouchRunning then return end
+    autoTouchRunning = true
+    Library:Notify("⚡ Auto Touch Başladı", 2)
+
+    task.spawn(function()
+        while autoTouchRunning do
+            local hrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local selected = Options.TouchZones.Value
+                for _, zoneName in ipairs(selected) do
+                    local zoneList = touchParts[zoneName]
+                    if zoneList then
+                        for _, touch in ipairs(zoneList) do
+                            if not autoTouchRunning then break end
+                            if touch and touch.Parent then
+                                doTouch(hrp, touch.Parent)
+                                task.wait(0.1) -- her dokunuş arası minik gecikme (ping koruma)
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.3) -- ana loop bekleme
+        end
+    end)
 end
+
+local function stopAutoTouch()
+    autoTouchRunning = false
+    Library:Notify("⏹️ Auto Touch Durduruldu", 2)
+end
+
+-- ==============================
+-- Toggle Kontrolü
+-- ==============================
+Toggles.AutoTouch:OnChanged(function()
+    if Toggles.AutoTouch.Value then
+        startAutoTouch()
+    else
+        stopAutoTouch()
+    end
+end)
 
 -- ==============================
 -- Ghost Farm Tab (Yeni Grup)
