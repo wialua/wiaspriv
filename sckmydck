@@ -1,0 +1,558 @@
+-- =====================================
+-- LinoriaLib Full Example (Detailed, Modular, Commented)
+-- Written by Wally | Fully Explained Version
+-- =====================================
+
+-- ==============================
+-- 1. LOAD LIBRARY & ADDONS
+-- ==============================
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+-- Shortcut tables for easier access
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+-- ==============================
+-- 2. GLOBAL SETTINGS
+-- ==============================
+Library.ShowToggleFrameInKeybinds = true   -- Show toggles in Keybind menu (mobile-friendly)
+Library.ShowCustomCursor = true           -- Use Linoria custom cursor globally
+Library.NotifySide = "Left"               -- Notifications appear on Left/Right
+
+-- ==============================
+-- 3. CREATE WINDOW
+-- ==============================
+local Window = Library:CreateWindow({
+    Title = 'MemeAvcısı',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = false,
+    UnlockMouseWhileOpen = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    UISettings = Window:AddTab('UI Settings')
+}
+
+-- ======================================
+-- ⚡ Auto Touch (Guaranteed Stable Build)
+-- ======================================
+
+local Workspace = game:GetService("Workspace")
+local Player = game:GetService("Players").LocalPlayer
+
+-- Bölgeler (her biri birden fazla TouchInterest içeriyor)
+local touchParts = {
+    ["1.Bölge"] = {
+        Workspace.Buttons_1.x1.Touch2.TouchInterest,
+        Workspace.Buttons_4.x10.Touch2.TouchInterest,
+        Workspace.Buttons_1.x25.Touch2.TouchInterest
+    },
+    ["2.Bölge"] = {
+        Workspace.Buttons_2.x1.Touch2.TouchInterest,
+        Workspace.Buttons_2.x10.Touch2.TouchInterest,
+        Workspace.Buttons_2.x25.Touch2.TouchInterest
+    },
+    ["3.Bölge"] = {
+        Workspace.Buttons_3.x1.Touch2.TouchInterest,
+        Workspace.Buttons_3.x10.Touch2.TouchInterest,
+        Workspace.Buttons_3.x25.Touch2.TouchInterest
+    },
+    ["4.Bölge"] = {
+        Workspace.Buttons_4.x1.Touch2.TouchInterest,
+        Workspace.Buttons_4.x10.Touch2.TouchInterest,
+        Workspace.Buttons_4.x25.Touch2.TouchInterest
+    },
+    ["Normal Luck"] = {
+        Workspace.Buttons_99.x1.Touch2.TouchInterest
+    },
+    ["5x Luck"] = {
+        Workspace.Buttons_99.x10.Touch2.TouchInterest
+    },
+    ["10x Luck"] = {
+        Workspace.Buttons_99.x25.Touch2.TouchInterest
+    }
+}
+
+-- ======================================
+-- Linoria UI Bölümü
+-- ======================================
+local TouchTab = Tabs.Main:AddLeftGroupbox('Auto Touch')
+
+TouchTab:AddDropdown('AutoTouchZones', {
+    Values = {"1.Bölge","2.Bölge","3.Bölge","4.Bölge","Normal Luck","5x Luck","10x Luck"},
+    Multi = true,
+    Text = "Bölgeleri Seç",
+    Tooltip = "Seçilen bölgelerdeki tuşlara otomatik dokunur.",
+    Default = {}
+})
+
+TouchTab:AddToggle('AutoTouchToggle', {
+    Text = "⚡ Auto Touch",
+    Default = false,
+    Tooltip = "Seçilen bölgelerdeki butonlara otomatik dokunur."
+})
+
+-- ======================================
+-- Çalışma Mantığı
+-- ======================================
+local autoTouchRunning = false
+local autoTouchThread
+
+local function safeTouch(part)
+    if not part or not part.Parent then return end
+    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    pcall(function()
+        firetouchinterest(hrp, part.Parent, 0)
+        firetouchinterest(hrp, part.Parent, 1)
+    end)
+end
+
+local function startAutoTouch()
+    if autoTouchRunning then return end
+    autoTouchRunning = true
+    Library:Notify("⚡ Auto Touch başladı!", 3)
+
+    autoTouchThread = task.spawn(function()
+        while autoTouchRunning do
+            local selectedZones = Options.AutoTouchZones.Value
+            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+
+            if hrp and selectedZones and #selectedZones > 0 then
+                for _, zoneName in ipairs(selectedZones) do
+                    local list = touchParts[zoneName]
+                    if list then
+                        for _, ti in ipairs(list) do
+                            if not autoTouchRunning then break end
+                            safeTouch(ti)
+                            task.wait(0.1) -- her dokunuş arası kısa gecikme
+                        end
+                    end
+                end
+            end
+
+            task.wait(0.25) -- ana loop aralığı
+        end
+    end)
+end
+
+local function stopAutoTouch()
+    autoTouchRunning = false
+    Library:Notify("⏹️ Auto Touch durduruldu.", 3)
+end
+
+Toggles.AutoTouchToggle:OnChanged(function()
+    if Toggles.AutoTouchToggle.Value then
+        startAutoTouch()
+    else
+        stopAutoTouch()
+    end
+end)
+
+-- ==============================
+-- Ghost Farm & Server Hop Script
+-- ==============================
+
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+
+local GhostGroup = Tabs.Main:AddRightGroupbox('Ghost Farm')
+
+GhostGroup:AddDropdown('GhostType', {
+    Values = {"Common Ghost", "Uncommon Ghost", "Rare Ghost", "Epic Ghost", "Legendary Ghost"},
+    Multi = false,
+    Text = "Select Ghost Type",
+    Default = "Legendary Ghost",
+})
+
+GhostGroup:AddToggle('AutoGhostFarm', {
+    Text = "Enable Ghost Farm",
+    Default = true,
+    Tooltip = "Automatically farms selected ghosts",
+    Callback = function(v)
+        if v then
+            startGhostFarm()
+        else
+            stopGhostFarm()
+        end
+    end
+})
+
+-- ==============================
+-- Ghost Farm Functions
+-- ==============================
+local ghostRunning = false
+local ghostLoop
+
+-- Küçük-büyük harf, birleşik yazım fark etmeden arama yapan fonksiyon:
+local function matchGhostName(objName, selectedType)
+    local cleanName = string.lower(objName)
+    local cleanType = string.lower(selectedType:gsub("%s+", "")) -- boşlukları sil
+    return string.find(cleanName, cleanType) ~= nil
+end
+
+function findClosestGhost(selectedType)
+    local workspaceChildren = Workspace:GetChildren()
+    local hrp = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local closest, dist = nil, math.huge
+    for _, obj in ipairs(workspaceChildren) do
+        -- Cube.001 içeren objeleri tara
+        local cube = obj:FindFirstChild("Cube.001")
+        if cube and cube:FindFirstChild("ProximityPrompt") and matchGhostName(obj.Name, selectedType) then
+            local mag = (cube.Position - hrp.Position).Magnitude
+            if mag < dist then
+                closest = cube
+                dist = mag
+            end
+        end
+    end
+    return closest
+end
+
+function startGhostFarm()
+    if ghostRunning then return end
+    ghostRunning = true
+
+    ghostLoop = task.spawn(function()
+        while ghostRunning do
+            local selected = Options.GhostType.Value
+            local cube = findClosestGhost(selected)
+            if cube and cube:FindFirstChild("ProximityPrompt") then
+                local prompt = cube.ProximityPrompt
+                -- HoldDuration'ı 0 yap
+                prompt.HoldDuration = 0
+                -- MaxActivationDistance'i çok uzak bir değere ayarla
+                prompt.MaxActivationDistance = 1000000
+                
+                local hrp = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    -- Karakteri yaklaştır (Opsiyonel, bu hızlı tetiklemeye gerek olmayabilir)
+                    hrp.CFrame = CFrame.new(cube.Position + Vector3.new(0, 3, 0))
+                    task.wait(0.1)
+                    -- ProximityPrompt'ı hemen tetikle
+                    fireproximityprompt(prompt)
+                end
+            end
+            task.wait(0.1) -- ping'e göre hız ayarlaması yap
+        end
+    end)
+end
+
+function stopGhostFarm()
+    ghostRunning = false
+end
+
+-- ==============================
+-- Server Hop Functions
+-- ==============================
+local ServersUrl = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+local Server, Next = nil, nil
+
+local function ListServers(cursor)
+    local Raw = game:HttpGet(ServersUrl .. ((cursor and "&cursor=" .. cursor) or ""))
+    local responseData = HttpService:JSONDecode(Raw)
+    return responseData and responseData.data or {}
+end
+
+local function switchServer()
+    -- Server hop işlemi
+    local serversList = ListServers(Next)
+
+    if #serversList == 0 then
+        warn("Sunucular listesi boş!")
+        return
+    end
+
+    -- Sunuculardan rastgele birini seç
+    repeat
+        Server = serversList[math.random(1, #serversList)]
+        Next = serversList.nextPageCursor
+    until Server
+
+    -- Eğer sunucu boşsa ve aynı sunucu değilse, geçiş yap
+    if Server.playing < Server.maxPlayers and Server.id ~= game.JobId then
+        local success, errorMessage = pcall(function()
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id, Players.LocalPlayer)
+        end)
+        if not success then
+            warn("Sunucuya geçiş yapılamadı: " .. errorMessage)
+        else
+            print("Yeni sunucuya başarıyla geçiş yapıldı!")
+        end
+    else
+        print("Geçiş yapılacak uygun sunucu bulunamadı.")
+    end
+end
+
+-- ==============================
+-- Main Loop with Server Hop
+-- ==============================
+local function mainLoop()
+    while true do
+        local selected = Options.GhostType.Value
+        local cube = findClosestGhost(selected)
+
+        -- Eğer Legendary Ghost yoksa, sunucu değiştir
+        if not cube then
+            print("Legendary Ghost bulunamadı, sunucu değiştiriliyor...")
+            switchServer()
+        else
+            print("Legendary Ghost bulundu, farm başlatılıyor...")
+            startGhostFarm()
+        end
+
+        -- 0.1 saniyede bir kontrol et
+        task.wait(0.1)
+    end
+end
+
+-- ==============================
+-- Start the Farm and Server Hop
+-- ==============================
+mainLoop()
+
+
+-- =======================================
+-- 🐣 Ultra Stable Hatch System (Linoria Entegre)
+-- =======================================
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HatchRemote = ReplicatedStorage:WaitForChild("Functions"):WaitForChild("Hatch")
+
+-- ==============================
+-- Yeni Sekme / Grup
+-- ==============================
+local HatchGroup = Tabs.Main:AddRightGroupbox('Advanced Hatch')
+
+-- Textbox: Pet Name
+HatchGroup:AddInput('PetName', {
+    Default = '',
+    Text = 'Pet Adı',
+    Placeholder = 'örn: Pumpkin',
+})
+
+-- Dropdown: Mode
+HatchGroup:AddDropdown('HatchMode', {
+    Values = {'Single', 'Triple', 'Octuple'},
+    Default = 1,
+    Text = 'Hatch Modu',
+})
+
+-- Loop Toggle
+HatchGroup:AddToggle('LoopHatch', {
+    Text = 'Loop Hatch',
+    Default = false,
+})
+
+-- Hatch Button (Manuel)
+HatchGroup:AddButton({
+    Text = '🐣 Hatch Now',
+    Func = function()
+        local pet = Options.PetName.Value
+        local mode = Options.HatchMode.Value
+        if pet == '' or not mode then return end
+
+        -- Tek seferde 10 hızlı tetikleme
+        pcall(function()
+            for i = 1, 10 do
+                HatchRemote:InvokeServer(pet, mode)
+            end
+        end)
+    end
+})
+
+-- ==============================
+-- Loop Sistemi (Aşırı Hızlı ve Stabil)
+-- ==============================
+local looping = false
+
+Toggles.LoopHatch:OnChanged(function(value)
+    looping = value
+    if looping then
+        task.spawn(function()
+            while looping do
+                local pet = Options.PetName.Value
+                local mode = Options.HatchMode.Value
+
+                if pet ~= '' and mode then
+                    -- 10 kez hızlı tetikleme
+                    pcall(function()
+                        for i = 1, 10 do
+                            HatchRemote:InvokeServer(pet, mode)
+                        end
+                    end)
+                end
+
+                task.wait() -- minimal yield, FPS dostu
+            end
+        end)
+    end
+end)
+
+
+-- ==============================
+-- 🏠 Auto Ev (Linoria Group)
+-- ==============================
+local touchEvParts = {
+    game:GetService("Workspace").Houses.House1.Pad.Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House2:GetChildren()[2].Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House3.Model.Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House4:GetChildren()[2].Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House5:GetChildren()[2].Pad.TouchInterest,
+    game:GetService("Workspace").Houses.House6.Model.Pad.TouchInterest
+}
+
+local AutoEvGroup = Tabs.Main:AddRightGroupbox('Auto Ev')
+
+AutoEvGroup:AddToggle('AutoEv', {
+    Text = '🏠 Auto Ev',
+    Default = false,
+    Tooltip = 'Ev padlerine otomatik dokunur (stabil, lag yapmaz)'
+})
+
+-- ==============================
+--  Core Fonksiyonlar
+-- ==============================
+local autoEvRunning = false
+local autoEvLoop
+
+Toggles.AutoEv:OnChanged(function()
+    if Toggles.AutoEv.Value then
+        if autoEvRunning then return end
+        autoEvRunning = true
+        Library:Notify('🏠 Auto Ev başlatıldı!', 3)
+
+        autoEvLoop = task.spawn(function()
+            while autoEvRunning do
+                local player = game.Players.LocalPlayer
+                local char = player.Character
+                local hrp = char and char:FindFirstChild('HumanoidRootPart')
+
+                if hrp then
+                    for _, touch in ipairs(touchEvParts) do
+                        if not autoEvRunning then break end
+                        if touch and touch.Parent then
+                            pcall(function()
+                                -- TouchInterest objesi içinde olduğu Part’e dokun
+                                firetouchinterest(hrp, touch.Parent, 0)
+                                firetouchinterest(hrp, touch.Parent, 1)
+                            end)
+                            task.wait(0.15) -- her pad arası minik gecikme (lag koruma)
+                        end
+                    end
+                end
+                task.wait(0.3) -- ana loop bekleme, ping stabil
+            end
+        end)
+    else
+        autoEvRunning = false
+        Library:Notify('⏹️ Auto Ev durduruldu.', 3)
+    end
+end)
+
+-- ==============================
+-- Auto Actions Group (Click + Rebirth)
+-- ==============================
+local AutoActionsGroup = Tabs.Main:AddLeftGroupbox("Auto Actions")
+
+-- ===== Auto Click =====
+AutoActionsGroup:AddToggle('AutoClickToggle', {
+    Text = 'Enable Auto Click',
+    Default = false
+})
+
+AutoActionsGroup:AddButton({
+    Text = 'Click Now',
+    Func = function()
+        local clickEvent = game:GetService("ReplicatedStorage").Events.Click
+        pcall(function()
+            clickEvent:FireServer()
+            clickEvent:FireServer() -- tek seferde 2 kez tetikleme
+        end)
+    end
+})
+
+-- ===== Auto Rebirth =====
+AutoActionsGroup:AddInput('RebirthAmountInput', {
+    Text = 'Rebirth Amount',
+    Placeholder = 'Örn: 10000',
+    Default = '10000',
+    Callback = function(v)
+        Options.RebirthAmountInput.Value = tonumber(v) or 1
+    end
+})
+
+AutoActionsGroup:AddToggle('AutoRebirthToggle', {
+    Text = 'Enable Auto Rebirth',
+    Default = false
+})
+
+AutoActionsGroup:AddButton({
+    Text = 'Rebirth Now',
+    Func = function()
+        local amount = tonumber(Options.RebirthAmountInput.Value) or 1
+        local rebirthEvent = game:GetService("ReplicatedStorage").Activates.Rebirth
+        pcall(function()
+            for i = 1, 10 do
+                rebirthEvent:FireServer(amount)
+            end
+        end)
+    end
+})
+
+-- ==============================
+-- Loop kontrol
+-- ==============================
+local autoClickRunning = false
+local autoRebirthRunning = false
+
+-- Auto Click Toggle
+Toggles.AutoClickToggle:OnChanged(function(value)
+    autoClickRunning = value
+    if value then
+        task.spawn(function()
+            local clickEvent = game:GetService("ReplicatedStorage").Events.Click
+            while autoClickRunning do
+                pcall(function()
+                    clickEvent:FireServer()
+                    clickEvent:FireServer() -- tek seferde 2 kez
+                end)
+                task.wait() -- minimal yield, FPS düşmez
+            end
+        end)
+    end
+end)
+
+-- Auto Rebirth Toggle
+Toggles.AutoRebirthToggle:OnChanged(function(value)
+    autoRebirthRunning = value
+    if value then
+        task.spawn(function()
+            local rebirthEvent = game:GetService("ReplicatedStorage").Activates.Rebirth
+            while autoRebirthRunning do
+                local amount = tonumber(Options.RebirthAmountInput.Value) or 1
+                pcall(function()
+                    for i = 1, 10 do
+                        rebirthEvent:FireServer(amount)
+                    end
+                end)
+                task.wait() -- minimal yield, FPS düşmez
+            end
+        end)
+    end
+end)
