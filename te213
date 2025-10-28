@@ -1,0 +1,99 @@
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true -- Keybind menüsünde toggle'ları göster (mobil dostu)
+Library.ShowCustomCursor = false -- Linoria özel imleci kullan
+Library.NotifySide = "Left" -- Bildirimler sol tarafta
+
+local Window = Library:CreateWindow({
+    Title = 'Nigga',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = false,
+    UnlockMouseWhileOpen = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Ana = Window:AddTab('Ana Sayfa'),
+}
+
+local SolGrup = Tabs.Ana:AddLeftGroupbox('Auto Clicker (Sabit Maks Hız)')
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local AutoClickEvent = ReplicatedStorage.Packages.Knit.Services:GetChildren()[21].RE:GetChildren()[3]
+
+local AutoClickRunning = false
+local AutoClickConnection = nil
+
+SolGrup:AddToggle('AutoClickToggle', {
+    Text = 'Auto Clicker\'ı Etkinleştir',
+    Tooltip = 'Otomatik tıklayıcıyı aç/kapat',
+    Default = false,
+    Callback = function(value)
+        AutoClickRunning = value
+        if value then
+            Library:Notify('Auto Clicker başlatıldı!', 3)
+            AutoClickConnection = coroutine.create(function()
+                while AutoClickRunning do
+                    AutoClickEvent:FireServer()
+                    task.wait(0.001) -- Sabit minimum hız: crash'siz maksimum
+                end
+            end)
+            coroutine.resume(AutoClickConnection)
+        else
+            Library:Notify('Auto Clicker durduruldu!')
+            if AutoClickConnection then
+                coroutine.close(AutoClickConnection)
+                AutoClickConnection = nil
+            end
+        end
+    end
+})
+
+-- Ana sekme üzerine yeni bir grup kutusu ekliyoruz
+local SolGrup = Tabs.Ana:AddLeftGroupbox('Auto Rebirth')
+
+-- Rebirth Sayısını ayarlamak için bir Textbox ekliyoruz
+SolGrup:AddInput('RebirthSayisiTextbox', {
+    Default = '27',  -- Varsayılan olarak 27 yazıyor
+    Text = 'Rebirth Sayısı',
+    Placeholder = 'Yazınız...',
+    Callback = function(v) 
+        -- Burada Textbox içindeki değeri alıyoruz ve sayıya dönüştürüyoruz
+        RebirthSayisi = tonumber(v) or 27  -- Eğer geçerli bir sayı değilse, varsayılan 27 kullanılır
+        print("Rebirth Sayısı Ayarlandı:", RebirthSayisi)
+    end
+})
+
+-- Auto-Rebirth Toggle'ı ekliyoruz
+SolGrup:AddToggle('AutoRebirthToggle', {
+    Text = 'Auto Rebirth (Sürekli)',
+    Tooltip = 'Toggle açık olduğunda sürekli rebirth atılır.',
+    Default = false,  -- Başlangıçta kapalı
+    Callback = function(state) 
+        -- Toggle açıldığında aktif olacak fonksiyon
+        if state then
+            -- Burada sürekli rebirth tetikleme işlemi başlatılır
+            while Toggles.AutoRebirthToggle.Value do
+                -- Event'i tetikleyerek rebirth işlemini başlatıyoruz
+                local Event = game:GetService("ReplicatedStorage").Packages.Knit.Services:GetChildren()[6].RF["jag k\195\164nner en bot, hon heter anna, anna heter hon"]
+                Event:InvokeServer(RebirthSayisi)
+                wait(0.1)  -- Hızlı bir şekilde işlem yapılabilmesi için kısa bir bekleme süresi (0.1 saniye)
+            end
+        end
+    end
+})
+
+-- Toggle'ın durumu değiştiğinde çalışacak fonksiyon (isteğe bağlı)
+Toggles.AutoRebirthToggle:OnChanged(function()
+    print("Auto Rebirth Toggle durumu:", Toggles.AutoRebirthToggle.Value)
+end)
