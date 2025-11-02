@@ -1362,6 +1362,102 @@ BuildUI = function()
         Content = "In order to get this egg, you need to spin the Halloween Wheel (100m one) 5 times, and then craft a few golden monkeys from the Jungle Egg. You need to have the hints unlocked, so use the button above. Sorry I didn't automate this, I'm too lazy 💀"
     })
 
+local RebirthSection = Tabs.Main:AddSection("Rebirths")
+
+    local selectedRebirthIndex = "Max Unlocked"
+    local rebirthDropdown
+    local rebirthOptions = {}
+    local isMaxUnlockedSelected = true -- Default to true since "Max Unlocked" is the default
+    local autoRebirthRunning = false
+
+    -- This function gets ALL rebirths for the initial dropdown population.
+    local function getAllRebirthOptions()
+        local Rebirths = require(ReplicatedStorage.Shared.List.Rebirths)
+        local options = {}
+        for index, amount in pairs(Rebirths) do
+            table.insert(options, {index = index, amount = amount, display = Functions.suffixes(amount) .. " Rebirths"})
+        end
+        table.sort(options, function(a, b) return a.amount < b.amount end)
+        return options
+    end
+
+    -- This function dynamically finds the best UNLOCKED rebirth you can do right now.
+    GetBestRebirthOption = function()
+        local Rebirths = require(ReplicatedStorage.Shared.List.Rebirths)
+        local Upgrades = require(ReplicatedStorage.Shared.List.Upgrades)
+        local buttonUpgrade = Upgrades.rebirthButtons.upgrades[DataController.data.upgrades.rebirthButtons or 0]
+        local unlockedOptions = {}
+        for rebirthId, rebirthAmount in pairs(Rebirths) do
+            if buttonUpgrade.value >= rebirthId then
+                table.insert(unlockedOptions, {id = rebirthId, amount = rebirthAmount})
+            end
+        end
+        table.sort(unlockedOptions, function(a, b) return a.amount > b.amount end)
+        return #unlockedOptions > 0 and unlockedOptions[1].id or nil
+    end
+
+    -- This function is now only called ONCE.
+    updateRebirthDropdown = function()
+        pcall(function()
+            local options = getAllRebirthOptions() 
+            rebirthOptions = options
+            local dropdownValues = {"Max Unlocked"}
+            for _, option in ipairs(options) do table.insert(dropdownValues, option.display) end
+            if rebirthDropdown then rebirthDropdown:SetValues(dropdownValues) end
+        end)
+    end
+
+    performRebirth = function()
+        local rebirthIndex
+        if isMaxUnlockedSelected then
+            -- This is called repeatedly by the toggle, always getting the latest best option.
+            rebirthIndex = GetBestRebirthOption()
+        elseif selectedRebirthIndex > 0 and selectedRebirthIndex <= #rebirthOptions then
+            rebirthIndex = rebirthOptions[selectedRebirthIndex].index
+        end
+        if rebirthIndex then
+            RebirthService:rebirth(rebirthIndex)
+            return true
+        end
+        return false
+    end
+
+    rebirthDropdown = RebirthSection:Dropdown("RebirthDropdown", {
+        Title = "Select Rebirth Amount", Values = {}, Searchable = true, Default = "Max Unlocked", Multi = false,
+        Callback = function(selectedValue)
+            if selectedValue == "Max Unlocked" then
+                isMaxUnlockedSelected = true
+            else
+                isMaxUnlockedSelected = false
+                for i, option in ipairs(rebirthOptions) do
+                    if option.display == selectedValue then selectedRebirthIndex = i; break end
+                end
+            end
+        end
+    })
+
+    local AutoRebirth = RebirthSection:Toggle("AutoRebirth", {
+        Title = "Auto Rebirth", Default = false,
+        Callback = function(Value)
+            autoRebirthRunning = Value
+            if Value then
+                task.spawn(function()
+                    while autoRebirthRunning do
+                        pcall(performRebirth)
+                        task.wait(0.2)
+                    end
+                end)
+            end
+        end
+    })
+
+    -- CORRECTED: This task now runs only ONCE to populate the dropdown.
+    task.spawn(function()
+        DataController:waitForData()
+        task.wait(2) -- Wait for data to be stable before the initial population.
+        pcall(updateRebirthDropdown) -- Call it once and then the task ends.
+    end)
+
     -- Final UI setup calls
     SaveManager:SetLibrary(Library)
     InterfaceManager:SetLibrary(Library)
@@ -1405,6 +1501,7 @@ task.spawn(function()
     Tabs = {
         Halloween = Window:AddTab({ Title = "Halloween Event", Icon = "ghost" }),
         PumpkinHunt = Window:AddTab({ Title = "Pumpkin Hunt", Icon = "map" }),
+        Main = Window:AddTab({ Title = "Other", Icon = "map" }),
         Settings = Window:AddTab({ Title = "Settings", Icon = "cog" }),
 
     }
