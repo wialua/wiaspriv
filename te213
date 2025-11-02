@@ -1266,17 +1266,6 @@ BuildUI = function()
     ThemeManager:ApplyToTab(SettingsTab)
     SaveManager:LoadAutoloadConfig()
 
-    -- Watermark (isteğe bağlı, kullanıcı dostu)
-    Library:SetWatermarkVisibility(true)
-    local FPS=60; local Timer=tick(); local Counter=0
-    local Conn=game:GetService('RunService').RenderStepped:Connect(function()
-        Counter+=1
-        if tick()-Timer>=1 then FPS=Counter; Timer=tick(); Counter=0 end
-        Library:SetWatermark(('RCU Halloween | %s FPS | %s ms'):format(FPS, math.floor(game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue())))
-    end)
-    Library:OnUnload(function() Conn:Disconnect(); print('UI Unloaded') end)
-end
-
 -- Başlatma: Knit ve servisleri başlat, Linoria penceresini oluştur, sekmeleri ekle, UI’yi kur
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
