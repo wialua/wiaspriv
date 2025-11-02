@@ -1186,7 +1186,7 @@ BuildUI = function()
 
     PumpkinHunt:Button({
         Title = "Claim All Hints & Some Pumpkins",
-        Description = "Claims most pumpkins instantly. Use the toggles below to get the rest.",
+        Description = "Çoğu balkabağını anında toplar. Kalanını almak için aşağıdakileri kullan.",
         Callback = function()
             task.spawn(function()
                 -- Get necessary services and data
