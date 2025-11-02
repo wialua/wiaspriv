@@ -1236,7 +1236,7 @@ BuildUI = function()
     })
 
     PumpkinTab:AddRightGroupbox('Info'):AddLabel('Zombie Pumpkin', true, 'ZombiePumpkinInfo')
-    Library.Labels.ZombiePumpkinInfo:SetText("To get this egg: spin Halloween Wheel (100m) 5x, craft golden monkeys from Jungle Egg, and unlock hints via the button above. Not automated. 💀")
+    Library.Labels.ZombiePumpkinInfo:SetText("Bu yumurtayı almak için: Halloween Çarkı'nı (100m) 5 kez çevir, Jungle Egg'den altın maymunlar yap ve yukarıdaki düğme ile ipuçlarını aç")
 
     -- Settings sekmesi
     local MenuGroup = SettingsTab:AddLeftGroupbox('Menu Settings')
