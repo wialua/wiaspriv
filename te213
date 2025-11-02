@@ -1231,7 +1231,7 @@ BuildUI = function()
     
     local GetHauntedPumpkinToggle = Tabs.PumpkinHunt:Toggle("GetHauntedPumpkin", {
         Title = "Get Haunted Pumpkin",
-        Description = "You must have gotten all the hints using the button above. This kills a spiders and pumpkins in a sequence to get the Haunted Pumpkin.",
+        Description = "Yukarıdaki butonu kullanarak tüm ipuçlarını almış olmalısınız. Bu, bir dizi şeklinde örümcekleri ve balkabağlarını öldürerek Haunted Balkabağını elde eder.",
         Default = false,
         Callback = function(enabled)
             if getHauntedPumpkinThread then task.cancel(getHauntedPumpkinThread); getHauntedPumpkinThread = nil end
@@ -1359,7 +1359,7 @@ BuildUI = function()
 
     Tabs.PumpkinHunt:Paragraph("ZombiePumpkinInfo", {
         Title = "Zombie Pumpkin",
-        Content = "In order to get this egg, you need to spin the Halloween Wheel (100m one) 5 times, and then craft a few golden monkeys from the Jungle Egg. You need to have the hints unlocked, so use the button above. Sorry I didn't automate this, I'm too lazy 💀"
+        Content = "Bu yumurtayı alabilmek için Halloween Çarkı'nı (100m olan) 5 kez çevirmen ve ardından Jungle Egg'ten birkaç altın maymun yapman gerekiyor. İpuçlarının kilidinin açılmış olması gerek, bu yüzden yukarıdaki düğmeyi kullan."
     })
 
 local RebirthSection = Tabs.Main:AddSection("Rebirths")
