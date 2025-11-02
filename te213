@@ -1,85 +1,63 @@
--- =====================================
--- LinoriaLib Full Integration of Fluent UI Code
--- Adapted by Grok: Keeps original logic intact, only replaces UI calls with LinoriaLib equivalents.
--- Sections simulated with Groupboxes or Dividers/Labels for organization.
--- Paragraphs replaced with dynamic Labels (using SetText for updates).
--- Multi Dropdowns use Multi=true.
--- All callbacks, threads, and game logic unchanged.
--- =====================================
-
--- ==============================
--- 1. LOAD LIBRARY & ADDONS
--- ==============================
+-- LinoriaLib yükleme
 local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
-
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
--- Shortcut tables for easier access
+-- Kısa yollar
 local Options = Library.Options
 local Toggles = Library.Toggles
 
--- ==============================
--- 2. GLOBAL SETTINGS
--- ==============================
-Library.ShowToggleFrameInKeybinds = true   -- Show toggles in Keybind menu (mobile-friendly)
-Library.ShowCustomCursor = false           -- Use Linoria custom cursor globally
-Library.NotifySide = "Left"               -- Notifications appear on Left/Right
-
--- ==============================
--- 3. CREATE WINDOW
--- ==============================
-local Window = Library:CreateWindow({
-    Title = "Wia Rebirth Ultimate Champions - Halloween",
-    Center = true,
-    AutoShow = true,
-    Resizable = true,
-    ShowCustomCursor = false,
-    UnlockMouseWhileOpen = true,
-    NotifySide = "Left",
-    TabPadding = 8,
-    MenuFadeTime = 0.2
-})
-
--- ==============================
--- 4. CREATE TABS
--- ==============================
-local Tabs = {
-    Halloween = Window:AddTab('Halloween Event'),
-    Ana = Window:AddTab('Later'),
-}
-
--- Original code integrations start here (anti-AFK and garbage collect unchanged)
+-- Orijinal script bağımlılıkları (değiştirilmedi)
+local SaveManagerFluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/bigbeanscripts/Pet-Warriors/refs/heads/main/test"))()
+local InterfaceManagerFluent = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/InterfaceManager.luau"))()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/SenhorLDS/ProjectLDSHUB/refs/heads/main/Anti%20AFK"))()
 
+-- Roblox servisleri
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- Global variables for game services and controllers
+-- Knit ve oyun servisleri
 local Knit, ClickService, UpgradeService, DataController, Functions, Util, Values
 
--- Global variables for UI window and tabs (already defined above)
+-- Global UI referansları
+local Window, Tabs
 
+-- Hafif GC
 spawn(function()
     while wait(30) do 
         pcall(function() collectgarbage("collect") end)
     end
 end)
 
--- BuildUI function with LinoriaLib adaptations
+-- BuildUI: Tüm özellikleri Linoria groupbox/elementlerine taşıyoruz
 BuildUI = function()
+    -- Sekme ve grup tanımları
+    local HalloweenTab = Tabs.Halloween
+    local PumpkinTab = Tabs.PumpkinHunt
+    local SettingsTab = Tabs.Settings
 
+    -- Halloween sekmesi; sol/sağ grup kutuları
+    local Left = HalloweenTab:AddLeftGroupbox('Core & Hatch')
+    local Right = HalloweenTab:AddRightGroupbox('Combat & Progress')
+
+    -- Ek gruplar (Linoria düzeni için bölümlere dağıtım)
+    local ShopBox = HalloweenTab:AddLeftGroupbox('Shop & Rewards')
+    local ChestBox = HalloweenTab:AddLeftGroupbox('Cursed/Boss Cave')
+    local ForestBox = HalloweenTab:AddRightGroupbox('Forest Upgrades')
+    local PotBox = HalloweenTab:AddRightGroupbox('Monsters Pot')
+    local WheelBox = HalloweenTab:AddLeftGroupbox('Halloween Wheel')
+    local RebirthBox = HalloweenTab:AddRightGroupbox('Rebirth')
+
+    -- Değişkenler
     local mobDropdown, AutoHitToggle, EquipBest, HitSpeed, AutoUpgradeSwordToggle, AutoRebirthToggle
 
-    -- Simulate "Auto Click" Section with Left Groupbox
-    local AutoClickGroup = Tabs.Halloween:AddLeftGroupbox('Auto Click')
-
-    AutoClickGroup:AddToggle('AutoClick', {
+    -- 1) Auto Click
+    Left:AddToggle('AutoClick', {
         Text = 'Auto Click',
-        Tooltip = 'Otomatik Tıklayıcı!',
+        Tooltip = 'Automatically clicks for you - Extremely fast!',
         Default = false,
         Callback = function(Value)
             AutoClicking = Value
@@ -94,10 +72,7 @@ BuildUI = function()
         end
     })
 
-    -- Simulate "Auto Hatch (Halloween)" Section with another Groupbox
-    local HalloweenHatchGroup = Tabs.Halloween:AddLeftGroupbox('Oto halloween pet açma')
-
-    -- Get egg names from the Halloween map and add the special boss egg
+    -- 2) Auto Hatch (Halloween)
     local halloweenEggOptions = {}
     pcall(function()
         local eggFolder = Workspace.Game.Maps:FindFirstChild("0Halloween") and Workspace.Game.Maps["0Halloween"]:FindFirstChild("Eggs")
@@ -105,38 +80,38 @@ BuildUI = function()
             for _, eggModel in ipairs(eggFolder:GetChildren()) do table.insert(halloweenEggOptions, eggModel.Name) end
         end
     end)
-    table.insert(halloweenEggOptions, "Halloween (Boss)")
-    
+    table.insert(halloweenEggOptions, "Spooky (Boss)")
     local selectedHalloweenEgg = halloweenEggOptions[1] or "Basic"
 
-    -- UI Element 1: Egg Selection Dropdown
-    HalloweenHatchGroup:AddDropdown('SelectHalloweenEgg', {
-        Text = 'Select Egg',
+    Left:AddDivider()
+    Left:AddLabel('Auto Hatch (Halloween)')
+
+    Left:AddDropdown('SelectHalloweenEgg', {
         Values = halloweenEggOptions,
-        Default = 1,  -- Index-based default
+        Default = selectedHalloweenEgg,
+        Multi = false,
+        Text = 'Select Egg',
         Callback = function(value) selectedHalloweenEgg = value end
     })
 
-    -- UI Element 2: Hatch Amount Dropdown
     local halloweenHatchAmounts = {["1x"]=1, ["3x"]=3, ["Max"]=99}
     local selectedHalloweenAmount = halloweenHatchAmounts["Max"]
-    HalloweenHatchGroup:AddDropdown('SelectHalloweenHatchAmount', {
+    Left:AddDropdown('SelectHalloweenHatchAmount', {
+        Values = {"1x","3x","Max"},
+        Default = "Max",
+        Multi = false,
         Text = 'Select Hatch Amount',
-        Values = {"1x", "3x", "Max"},
-        Default = 3,  -- Index for "Max"
         Callback = function(value) selectedHalloweenAmount = halloweenHatchAmounts[value] or 1 end
     })
 
-    -- UI Element 3: Lucky Eggs Toggle
     local useHalloweenLuckyEggs = false
-    HalloweenHatchGroup:AddToggle('UseHalloweenLuckyEggs', {
+    Left:AddToggle('UseHalloweenLuckyEggs', {
         Text = 'Use Lucky Eggs',
-        Tooltip = 'Does not apply to the \'Halloween (Boss)\' egg.',
+        Tooltip = "Does not apply to the 'Spooky (Boss)' egg.",
         Default = false,
         Callback = function(enabled) useHalloweenLuckyEggs = enabled end
     })
 
-    -- Ensure the global hatch delay logic is present
     if not _G.SmartHatchDelay then
         _G.SmartHatchDelay = 4.11
         task.spawn(function()
@@ -150,10 +125,9 @@ BuildUI = function()
             end
         end)
     end
-    
-    -- UI Element 4: Auto Hatch Toggle
-    local autoHalloweenHatchThread = nil
-    HalloweenHatchGroup:AddToggle('AutoHatchHalloween', {
+
+    local autoHalloweenHatchThread
+    Left:AddToggle('AutoHatchHalloween', {
         Text = 'Auto Hatch Event Eggs',
         Default = false,
         Callback = function(enabled)
@@ -162,8 +136,8 @@ BuildUI = function()
                 autoHalloweenHatchThread = task.spawn(function()
                     while enabled do
                         pcall(function()
-                            if selectedHalloweenEgg == "Halloween (Boss)" then
-                                Knit.GetService("EggService").openEgg._re:FireServer("Halloween", selectedHalloweenAmount, {isBossCave = true})
+                            if selectedHalloweenEgg == "Spooky (Boss)" then
+                                Knit.GetService("EggService").openEgg._re:FireServer("Spooky", selectedHalloweenAmount, {isBossCave = true})
                             else
                                 local args = {selectedHalloweenEgg, selectedHalloweenAmount}
                                 if useHalloweenLuckyEggs then
@@ -180,8 +154,7 @@ BuildUI = function()
         end
     })
 
-    -- UI Element 5: Hide Animation Toggle
-    HalloweenHatchGroup:AddToggle('HideHalloweenHatchAnimation', {
+    Left:AddToggle('HideHalloweenHatchAnimation', {
         Text = 'Hide Hatch Animation',
         Default = false,
         Callback = function(Value)
@@ -203,34 +176,28 @@ BuildUI = function()
             overrideFunctions(Value)
         end
     })
-    
-    -- Simulate "Mini Chests" Section with Right Groupbox (to balance UI)
-    local MiniChestsGroup = Tabs.Halloween:AddRightGroupbox('Mini Chests')
-    
-    local collectChestsThread = nil
 
-    MiniChestsGroup:AddToggle('CollectMiniChests', {
+    -- 3) Mini Chests
+    Left:AddDivider()
+    Left:AddLabel('Mini Chests')
+
+    local collectChestsThread
+    Left:AddToggle('CollectMiniChests', {
         Text = 'Collect Mini Chests',
-        Tooltip = 'Automatically collects the mini chests in the Halloween world.',
+        Tooltip = 'Automatically collects the mini chests in the Halloween world (must be in Halloween map).',
         Default = false,
         Callback = function(enabled)
-            if collectChestsThread then
-                task.cancel(collectChestsThread)
-                collectChestsThread = nil
-            end
-
+            if collectChestsThread then task.cancel(collectChestsThread); collectChestsThread = nil end
             if enabled then
                 collectChestsThread = task.spawn(function()
                     while enabled do
                         pcall(function()
                             local chestsFolder = Workspace.Game.Maps:FindFirstChild("0Halloween") 
                                 and Workspace.Game.Maps["0Halloween"]:FindFirstChild("MiniChests")
-
                             if chestsFolder then
                                 for _, chest in ipairs(chestsFolder:GetChildren()) do
                                     local touchPart = chest:FindFirstChild("Touch")
                                     local prompt = touchPart and touchPart:FindFirstChildOfClass("ProximityPrompt")
-
                                     if prompt and prompt.Enabled then
                                         fireproximityprompt(prompt)
                                         task.wait(2)
@@ -245,64 +212,49 @@ BuildUI = function()
         end
     })
 
-    -- Simulate "Halloween Shop" Section with another Groupbox
-    local HalloweenShopGroup = Tabs.Halloween:AddRightGroupbox('Halloween Shop')
+    -- 4) Shop & Rewards
+    ShopBox:AddLabel('Halloween Shop')
 
-    local shopItemNames = {}
-    local shopItemMap = {}
-    local autoBuyShopThread = nil
-
+    local shopItemNames, shopItemMap, autoBuyShopThread = {}, {}, nil
     pcall(function()
         local HalloweenShopList = require(ReplicatedStorage.Shared.List.Halloween.HalloweenShop)
         local itemsToSort = {}
-
         for id, cost in pairs(HalloweenShopList) do
             local displayName = string.format("%s (Cost: %s)", id, Functions.suffixes(cost))
             table.insert(itemsToSort, { display = displayName, id = id, cost = cost })
             shopItemMap[displayName] = { id = id, cost = cost }
         end
-
         table.sort(itemsToSort, function(a, b) return a.cost < b.cost end)
-
-        for _, itemData in ipairs(itemsToSort) do
-            table.insert(shopItemNames, itemData.display)
-        end
+        for _, itemData in ipairs(itemsToSort) do table.insert(shopItemNames, itemData.display) end
     end)
 
-    local shopDropdown = HalloweenShopGroup:AddDropdown('SelectShopItems', {
-        Text = 'Select Items to Auto Buy',
+    local shopDropdown = ShopBox:AddDropdown('SelectShopItems', {
         Values = shopItemNames,
         Multi = true,
-        Callback = function(v) end  -- Placeholder, value accessed via Options.SelectShopItems.Value
+        Default = {},
+        Text = 'Select Items to Auto Buy'
     })
 
-    HalloweenShopGroup:AddToggle('AutoBuyShopItems', {
+    ShopBox:AddToggle('AutoBuyShopItems', {
         Text = 'Auto Buy',
-        Tooltip = 'Automatically buys selected items you don\'t own and can afford.',
+        Tooltip = "Automatically buys selected items you don't own and can afford.",
         Default = false,
         Callback = function(enabled)
-            if autoBuyShopThread then
-                task.cancel(autoBuyShopThread)
-                autoBuyShopThread = nil
-            end
-
+            if autoBuyShopThread then task.cancel(autoBuyShopThread); autoBuyShopThread = nil end
             if enabled then
                 autoBuyShopThread = task.spawn(function()
                     while enabled do
                         pcall(function()
-                            local selectedItems = Options.SelectShopItems.Value
+                            local selectedItems = shopDropdown.Value
                             if not next(selectedItems) then return end
-
                             local playerData = DataController:getData()
                             local candyCornItem = Util.itemUtils.getItemFromName(playerData, "candyCorns")
                             local myCandyCorns = candyCornItem and candyCornItem:getAmount() or 0
                             local playerOwnedData = playerData.halloweenShop or {}
-
                             for displayName, isSelected in pairs(selectedItems) do
                                 if isSelected then
                                     local shopData = shopItemMap[displayName]
                                     if not playerOwnedData[shopData.id] and myCandyCorns >= shopData.cost then
-                                        -- Corrected function name from buyHalloweenShop to buyShop
                                         Knit.GetService("HalloweenService"):buyShop(shopData.id)
                                         myCandyCorns = myCandyCorns - shopData.cost
                                         task.wait(1)
@@ -316,23 +268,17 @@ BuildUI = function()
             end
         end
     })
-    
 
-    -- Simulate "Halloween Rewards" Section
-    local HalloweenRewardsGroup = Tabs.Halloween:AddLeftGroupbox('Halloween Rewards')
+    ShopBox:AddDivider()
+    ShopBox:AddLabel('Halloween Rewards')
 
-    local autoClaimRewardThread = nil
-
-    HalloweenRewardsGroup:AddToggle('AutoClaimHalloweenReward', {
+    local autoClaimRewardThread
+    ShopBox:AddToggle('AutoClaimHalloweenReward', {
         Text = 'Auto Claim Halloween Rewards',
         Tooltip = 'Automatically claims rewards when you have Halloween Tickets.',
         Default = false,
         Callback = function(enabled)
-            if autoClaimRewardThread then
-                task.cancel(autoClaimRewardThread)
-                autoClaimRewardThread = nil
-            end
-
+            if autoClaimRewardThread then task.cancel(autoClaimRewardThread); autoClaimRewardThread = nil end
             if enabled then
                 autoClaimRewardThread = task.spawn(function()
                     while enabled do
@@ -352,12 +298,11 @@ BuildUI = function()
         end
     })
 
-    -- Simulate "Cursed Chest" Section
-    local CursedChestGroup = Tabs.Halloween:AddLeftGroupbox('Cursed Chest')
-    
+    -- 5) Cursed Chest
+    ChestBox:AddLabel('Cursed Chest')
     local useOneKeyThread, useAllKeysThread = nil, nil
 
-    CursedChestGroup:AddToggle('AutoUseOneCursedKey', {
+    ChestBox:AddToggle('AutoUseOneCursedKey', {
         Text = 'Use 1x Cursed Key',
         Tooltip = 'Uses one Cursed Key (every second).',
         Default = false,
@@ -374,7 +319,7 @@ BuildUI = function()
         end
     })
 
-    CursedChestGroup:AddToggle('AutoUseAllCursedKeys', {
+    ChestBox:AddToggle('AutoUseAllCursedKeys', {
         Text = 'Use All Cursed Keys',
         Tooltip = 'Uses all available Cursed Keys every 5 seconds.',
         Default = false,
@@ -391,54 +336,51 @@ BuildUI = function()
         end
     })
 
-    -- Simulate "Halloween Mobs" Section
-    local HalloweenMobsGroup = Tabs.Halloween:AddRightGroupbox('Halloween Mobs')
+    -- 6) Halloween Mobs (Combat)
+    Right:AddLabel('Halloween Mobs')
 
-    local mobNames = {}
-    local MobsModule = nil
-    local autoHitThread = nil
-
+    local mobNames, MobsModule, autoHitThread = {}, nil, nil
     pcall(function()
         MobsModule = require(ReplicatedStorage.Shared.List.Halloween.Mobs)
-        for id, data in pairs(MobsModule) do table.insert(mobNames, id) end
+        for id, _ in pairs(MobsModule) do table.insert(mobNames, id) end
         table.sort(mobNames)
     end)
-    
-    mobDropdown = HalloweenMobsGroup:AddDropdown('SelectMobs', {
-        Text = 'Select Mobs to Target',
+
+    mobDropdown = Right:AddDropdown('SelectMobs', {
         Values = mobNames,
         Multi = true,
-        Callback = function(v) end  -- Value accessed via Options.SelectMobs.Value
+        Default = {},
+        Text = 'Select Mobs to Target'
     })
 
-    AutoHitToggle = HalloweenMobsGroup:AddToggle('AutoHit', {
+    AutoHitToggle = Right:AddToggle('AutoHit', {
         Text = 'Auto Kill Mobs',
-        Tooltip = 'Kills selected mobs. If none of the selected mbos are available, it will kill mobs based on your weapon damage.',
+        Tooltip = 'Kills selected mobs. If none available, picks by your weapon damage.',
         Default = false,
         Callback = function(enabled)
             if autoHitThread then task.cancel(autoHitThread); autoHitThread = nil end
-
             if enabled then
                 autoHitThread = task.spawn(function()
                     while enabled do
                         pcall(function()
-                            local selectedMobTypes = Options.SelectMobs.Value
+                            local selectedMobTypes = mobDropdown.Value
                             local playerData = DataController:getData()
                             local activeMobs = playerData and playerData.mobs
-                            
                             if not activeMobs or not next(activeMobs) then return end
 
                             local availableTypes = {}
                             for instanceId, mobData in pairs(activeMobs) do
                                 if selectedMobTypes[mobData.mobId] then
-                                    local mobId = mobData.mobId; availableTypes[mobId] = availableTypes[mobId] or {}
-                                    if MobsModule[mobId] then table.insert(availableTypes[mobId], { id = instanceId, health = MobsModule[mobId].hp - (mobData.damage or 0) }) end
+                                    local mobId = mobData.mobId
+                                    availableTypes[mobId] = availableTypes[mobId] or {}
+                                    if MobsModule[mobId] then
+                                        table.insert(availableTypes[mobId], { id = instanceId, health = MobsModule[mobId].hp - (mobData.damage or 0) })
+                                    end
                                 end
                             end
 
                             local target
                             local typeKeys = {}; for typeName in pairs(availableTypes) do table.insert(typeKeys, typeName) end
-
                             if #typeKeys > 0 then
                                 local chosenTypeName = typeKeys[math.random(1, #typeKeys)]
                                 local mobsOfChosenType = availableTypes[chosenTypeName]
@@ -453,7 +395,6 @@ BuildUI = function()
                                     local itemStats = HalloweenItems[itemData.nm]
                                     if itemStats and itemStats.index and itemStats.index > bestIndex then bestIndex, bestSwordInfo = itemStats.index, itemStats end
                                 end
-                                
                                 if bestSwordInfo then
                                     local damageLimit = bestSwordInfo.multiplier * 25
                                     local viableTargets = {}
@@ -463,13 +404,11 @@ BuildUI = function()
                                             table.insert(viableTargets, { id = instanceId, name = mobData.mobId, health = mobStats.hp - (mobData.damage or 0) })
                                         end
                                     end
-
                                     if #viableTargets > 0 then
                                         table.sort(viableTargets, function(a, b) return a.health > b.health end)
                                         target = viableTargets[1]
                                     end
                                 end
-
                                 if not target then
                                     local lowestHealth = math.huge
                                     for instanceId, mobData in pairs(activeMobs) do
@@ -496,9 +435,9 @@ BuildUI = function()
     })
 
     local originalWeaponSpeed = Values.weaponSpeed
-    HitSpeed = HalloweenMobsGroup:AddToggle('IncreaseSwordSpeed', {
+    HitSpeed = Right:AddToggle('IncreaseSwordSpeed', {
         Text = 'Increase Sword Speed',
-        Tooltip = 'Makes your sword swing much faster. This works best when hitting mobs manually.',
+        Tooltip = 'Makes your sword swing much faster; best when hitting manually.',
         Default = false,
         Callback = function(Value)
             if Value then
@@ -510,7 +449,7 @@ BuildUI = function()
     })
 
     local isAutoEquipSwordEnabled = false
-    EquipBest = HalloweenMobsGroup:AddToggle('AutoEquipBestSword', {
+    EquipBest = Right:AddToggle('AutoEquipBestSword', {
         Text = 'Auto Equip Best Sword',
         Tooltip = 'Automatically equips the best Halloween sword you own.',
         Default = false,
@@ -522,7 +461,6 @@ BuildUI = function()
                         pcall(function()
                             local HalloweenEventItems = require(ReplicatedStorage.Shared.List.Items.HalloweenEvent)
                             local playerData = DataController:getData()
-                            
                             if not playerData.inventory or not playerData.inventory.halloweenEvent then return end
                             local bestSwordIndex = -1
                             local bestInventoryId = nil
@@ -535,9 +473,7 @@ BuildUI = function()
                                     end
                                 end
                             end
-
                             if not bestInventoryId then return end
-
                             if not playerData.isHalloweenWeaponEquipped then
                                 Knit.GetService("InventoryService"):useItem(bestInventoryId)
                             else
@@ -548,9 +484,8 @@ BuildUI = function()
                                         break
                                     end
                                 end
-
                                 if currentInventoryId ~= bestInventoryId then
-                                     Knit.GetService("InventoryService"):useItem(bestInventoryId)
+                                    Knit.GetService("InventoryService"):useItem(bestInventoryId)
                                 end
                             end
                         end)
@@ -561,24 +496,22 @@ BuildUI = function()
         end
     })
 
-    -- Simulate "Sword Upgrades" Section
-    local SwordUpgradesGroup = Tabs.Halloween:AddLeftGroupbox('Sword Upgrades')
+    -- 7) Sword Upgrades
+    Right:AddDivider()
+    Right:AddLabel('Sword Upgrades')
 
-    local autoUpgradeSwordThread, originalAutoHitSettings = nil, nil
-
-    -- Helper function to find raw item data from player's inventory
     local function findRawItem(playerData, itemName)
         if not playerData or not playerData.inventory then return nil end
         for category, items in pairs(playerData.inventory) do
             if type(items) == "table" then
-                for _, data in pairs(items) do if type(data) == "table" and data.nm == itemName then return data end
+                for _, data in pairs(items) do
+                    if type(data) == "table" and data.nm == itemName then return data end
                 end
             end
         end
         return nil
     end
-    
-    -- Helper map to find which mobs drop which materials
+
     local function generateItemSourceMap()
         local sources = {}
         local mobs = require(ReplicatedStorage.Shared.List.Halloween.Mobs)
@@ -594,21 +527,17 @@ BuildUI = function()
     end
     local itemSourceMap = generateItemSourceMap()
 
-    -- The status paragraph that updates every second (use Label and update with SetText)
-    local upgradeStatusLabel = SwordUpgradesGroup:AddLabel('Loading...', true)
-    Library.Labels.UpgradeStatus = upgradeStatusLabel  -- Index for dynamic update
+    -- Paragraph -> indeksli label
+    Right:AddLabel('UpgradeProgress', true, 'UpgradeStatus')
+    Library.Labels.UpgradeStatus:SetText('Loading...')
 
-    -- Background task to keep the status paragraph updated
     task.spawn(function()
         while true do
             pcall(function()
                 local playerData = DataController:getData()
                 if not playerData then return end
-
                 local HalloweenItems = require(ReplicatedStorage.Shared.List.Items.HalloweenEvent)
                 local WeaponUpgrader = require(ReplicatedStorage.Shared.List.Halloween.WeaponUpgrader)
-
-                -- Find current and next weapon
                 local currentWeaponIndex, currentWeaponName = -1, "None"
                 for _, itemData in pairs(playerData.inventory.halloweenEvent or {}) do
                     local itemStats = HalloweenItems[itemData.nm]
@@ -617,21 +546,16 @@ BuildUI = function()
                         currentWeaponName = itemStats.name
                     end
                 end
-
                 local nextWeaponName = nil
                 for name, data in pairs(HalloweenItems) do
-                    if data.index and data.index == currentWeaponIndex + 1 then
-                        nextWeaponName = name; break
-                    end
+                    if data.index and data.index == currentWeaponIndex + 1 then nextWeaponName = name; break end
                 end
-                
                 local contentLines = {"Current: " .. currentWeaponName}
                 if not nextWeaponName then
                     table.insert(contentLines, "\n🎉 You have the BEST weapon!")
                 else
                     local recipe = WeaponUpgrader[nextWeaponName]
                     table.insert(contentLines, "Next: " .. HalloweenItems[nextWeaponName].name .. "\n")
-                    
                     for _, reqItem in ipairs(recipe.required) do
                         local itemName = reqItem:getName()
                         local needed = reqItem:getAmount()
@@ -646,25 +570,23 @@ BuildUI = function()
         end
     end)
 
-    AutoUpgradeSwordToggle = SwordUpgradesGroup:AddToggle('AutoUpgradeSword', {
+    local autoUpgradeSwordThread, originalAutoHitSettingsSword
+    AutoUpgradeSwordToggle = Right:AddToggle('AutoUpgradeSword', {
         Text = 'Auto Upgrade Sword',
         Tooltip = 'Automatically upgrades your sword and farms only the necessary materials.',
         Default = false,
         Callback = function(enabled)
             if autoUpgradeSwordThread then task.cancel(autoUpgradeSwordThread); autoUpgradeSwordThread = nil end
-
             if enabled then
-                originalAutoHitSettings = { selectedMobs = Options.SelectMobs.Value, autoHitState = Toggles.AutoHit.Value, EquipBestState = Toggles.AutoEquipBestSword.Value, HitSpeedState = Toggles.IncreaseSwordSpeed.Value }
-                
+                originalAutoHitSettingsSword = { selectedMobs = mobDropdown.Value, autoHitState = AutoHitToggle.Value, EquipBestState = EquipBest.Value, HitSpeedState = HitSpeed.Value }
                 autoUpgradeSwordThread = task.spawn(function()
                     while enabled do
                         pcall(function()
                             local playerData = DataController:getData()
                             local HalloweenItems = require(ReplicatedStorage.Shared.List.Items.HalloweenEvent)
                             local WeaponUpgrader = require(ReplicatedStorage.Shared.List.Halloween.WeaponUpgrader)
-                            local MobsModule = require(ReplicatedStorage.Shared.List.Halloween.Mobs)
+                            local MModule = require(ReplicatedStorage.Shared.List.Halloween.Mobs)
 
-                            -- Find current and next weapon
                             local currentWeaponIndex = -1
                             for _, itemData in pairs(playerData.inventory.halloweenEvent or {}) do
                                 local itemStats = HalloweenItems[itemData.nm]
@@ -674,22 +596,17 @@ BuildUI = function()
                             for name, data in pairs(HalloweenItems) do
                                 if data.index and data.index == currentWeaponIndex + 1 then nextWeaponName = name; break end
                             end
-                            if not nextWeaponName then 
-                                Toggles.AutoHit:SetValue(false) -- Max weapon, so turn off farming
-                                return 
+                            if not nextWeaponName then
+                                AutoHitToggle:SetValue(false)
+                                return
                             end
 
-                            -- Check requirements and separate missing materials
                             local canAfford, missingMaterials, isMissingCandy = true, {}, false
                             for _, reqItem in ipairs(WeaponUpgrader[nextWeaponName].required) do
                                 local itemName, needed = reqItem:getName(), reqItem:getAmount()
                                 if (findRawItem(playerData, itemName) or {am=0}).am < needed then
                                     canAfford = false
-                                    if itemName == "candyCorns" then
-                                        isMissingCandy = true
-                                    else
-                                        table.insert(missingMaterials, itemName)
-                                    end
+                                    if itemName == "candyCorns" then isMissingCandy = true else table.insert(missingMaterials, itemName) end
                                 end
                             end
 
@@ -697,10 +614,7 @@ BuildUI = function()
                                 Knit.GetService("HalloweenWeaponService"):upgradeWeapon()
                                 task.wait(2)
                             else
-                                -- NEW FARMING LOGIC
                                 local mobsToFarm = {}
-                                
-                                -- Priority 1: Farm specific mobs for non-candy materials
                                 if #missingMaterials > 0 then
                                     for _, material in ipairs(missingMaterials) do
                                         if itemSourceMap[material] then
@@ -709,7 +623,6 @@ BuildUI = function()
                                             end
                                         end
                                     end
-                                -- Priority 2: If ONLY candy is missing, farm the best mob for it
                                 elseif isMissingCandy then
                                     local bestSwordInfo, bestIndex = nil, -1
                                     for _, itemData in pairs(playerData.inventory.halloweenEvent) do
@@ -719,7 +632,7 @@ BuildUI = function()
                                     if bestSwordInfo then
                                         local damageLimit = bestSwordInfo.multiplier * 25
                                         local viableTargets = {}
-                                        for mobId, mobData in pairs(MobsModule) do
+                                        for mobId, mobData in pairs(MModule) do
                                             if mobData.hp <= damageLimit then table.insert(viableTargets, {id = mobId, data = mobData}) end
                                         end
                                         if #viableTargets > 0 then
@@ -729,46 +642,152 @@ BuildUI = function()
                                     end
                                 end
 
-                                -- Update UI
                                 local newSelection = {}
                                 for mobId, _ in pairs(mobsToFarm) do
-                                    for _, mobValue in ipairs(Options.SelectMobs.Values) do
+                                    for _, mobValue in ipairs(mobDropdown.Values) do
                                         if mobValue:lower() == mobId:lower() then newSelection[mobValue] = true end
                                     end
                                 end
-                                Options.SelectMobs:SetValue(newSelection)
-                                Toggles.IncreaseSwordSpeed:SetValue(next(newSelection) ~= nil)
-                                Toggles.AutoEquipBestSword:SetValue(next(newSelection) ~= nil)
-                                Toggles.AutoHit:SetValue(next(newSelection) ~= nil)
+                                mobDropdown:SetValue(newSelection)
+                                HitSpeed:SetValue(next(newSelection) ~= nil)
+                                EquipBest:SetValue(next(newSelection) ~= nil)
+                                AutoHitToggle:SetValue(next(newSelection) ~= nil)
                             end
                         end)
                         task.wait(2)
                     end
                 end)
             else
-                if originalAutoHitSettings then
-                    Options.SelectMobs:SetValue(originalAutoHitSettings.selectedMobs)
-                    Toggles.AutoHit:SetValue(originalAutoHitSettings.autoHitState)
-                    Toggles.AutoEquipBestSword:SetValue(originalAutoHitSettings.EquipBestState)
-                    Toggles.IncreaseSwordSpeed:SetValue(originalAutoHitSettings.HitSpeedState)
-                    originalAutoHitSettings = nil
+                if originalAutoHitSettingsSword then
+                    mobDropdown:SetValue(originalAutoHitSettingsSword.selectedMobs)
+                    AutoHitToggle:SetValue(originalAutoHitSettingsSword.autoHitState)
+                    EquipBest:SetValue(originalAutoHitSettingsSword.EquipBestState)
+                    HitSpeed:SetValue(originalAutoHitSettingsSword.HitSpeedState)
+                    originalAutoHitSettingsSword = nil
                 end
             end
         end
     })
 
-    
-    -- Simulate "Halloween Rebirth" Section
-    local HalloweenRebirthGroup = Tabs.Halloween:AddRightGroupbox('Halloween Rebirth')
+    -- 8) Monsters Pot
+    PotBox:AddLabel('Monsters Pot')
 
-    local autoRebirthThread, originalAutoHitSettings = nil, nil
+    local potOptions, potOptionMap, selectedPotOptionIndex = {}, {}, 1
+    pcall(function()
+        local MonstersPotList = require(ReplicatedStorage.Shared.List.Halloween.MonstersPot)
+        for i, data in ipairs(MonstersPotList) do
+            if data.required and #data.required > 0 then
+                local reqItem = data.required[1]
+                local displayName = string.format("%s - %dx", reqItem.nm, reqItem.am)
+                table.insert(potOptions, displayName)
+                potOptionMap[displayName] = { index = i, reqName = reqItem.nm, reqAmount = reqItem.am }
+            end
+        end
+    end)
 
-    -- NEW: This function dynamically builds a map of items that have ONLY ONE mob source.
+    PotBox:AddDropdown('SelectPotItems', {
+        Values = potOptions,
+        Default = potOptions[1],
+        Text = 'Select Mob Items',
+        Callback = function(value)
+            for i, name in ipairs(potOptions) do
+                if name == value then selectedPotOptionIndex = i; break end
+            end
+        end
+    })
+
+    local craftAmountInput = PotBox:AddInput('CraftAmount', {
+        Default = '1',
+        Numeric = true,
+        Text = 'Amount',
+        Callback = function() end
+    })
+
+    PotBox:AddButton('Exchange Items (Amount)', function()
+        local amount = tonumber(Options.CraftAmount.Value) or 1
+        if amount > 0 then
+            Knit.GetService("HalloweenService"):monstersPot(selectedPotOptionIndex, amount)
+        end
+    end)
+
+    local autoExchangeAllThread
+    PotBox:AddToggle('ExchangeAll', {
+        Text = 'Exchange All',
+        Tooltip = 'Crafts max possible for selected item continuously.',
+        Default = false,
+        Callback = function(enabled)
+            if autoExchangeAllThread then task.cancel(autoExchangeAllThread); autoExchangeAllThread = nil end
+            if enabled then
+                autoExchangeAllThread = task.spawn(function()
+                    while enabled do
+                        pcall(function()
+                            local currentSelectionName = potOptions[selectedPotOptionIndex]
+                            local selectionData = potOptionMap[currentSelectionName]
+                            if selectionData then
+                                local playerData = DataController:getData()
+                                local playerItemAmount = 0
+                                if playerData.inventory and playerData.inventory.halloweenEvent then
+                                    for _, inventoryItemData in pairs(playerData.inventory.halloweenEvent) do
+                                        if inventoryItemData.nm == selectionData.reqName then
+                                            playerItemAmount = inventoryItemData.am or 0
+                                            break
+                                        end
+                                    end
+                                end
+                                local maxCraftable = 0
+                                if selectionData.reqAmount > 0 then
+                                    maxCraftable = math.floor(playerItemAmount / selectionData.reqAmount)
+                                end
+                                if maxCraftable > 0 then
+                                    Knit.GetService("HalloweenService"):monstersPot(selectedPotOptionIndex, maxCraftable)
+                                    task.wait(1)
+                                end
+                            end
+                        end)
+                        task.wait(3)
+                    end
+                end)
+            end
+        end
+    })
+
+    -- 9) Wheel
+    WheelBox:AddLabel('Halloween Wheel')
+    local selectedWheelTier = 1
+    WheelBox:AddDropdown('SelectWheelTier', {
+        Values = {1,2,3,4},
+        Default = selectedWheelTier,
+        Text = 'Select Tier',
+        Callback = function(value) selectedWheelTier = value end
+    })
+
+    local autoSpinThread
+    WheelBox:AddToggle('AutoSpinWheel', {
+        Text = 'Auto Spin Wheel',
+        Default = false,
+        Callback = function(enabled)
+            if autoSpinThread then task.cancel(autoSpinThread); autoSpinThread = nil end
+            if enabled then
+                autoSpinThread = task.spawn(function()
+                    while enabled do
+                        pcall(function()
+                            Knit.GetService("HalloweenService"):halloweenWheelSpin(selectedWheelTier)
+                        end)
+                        task.wait(0.5)
+                    end
+                end)
+            end
+        end
+    })
+
+    -- 10) Rebirth
+    RebirthBox:AddLabel('Halloween Rebirth')
+
     local function generateUniqueDropMap()
         local uniqueMap = {}
         pcall(function()
             local mobs = require(ReplicatedStorage.Shared.List.Halloween.Mobs)
-            local itemSources = {} -- First, find ALL sources for each item
+            local itemSources = {}
             for mobId, mobData in pairs(mobs) do
                 for _, reward in ipairs(mobData.rewards or {}) do
                     if reward.item and reward.item.nm then
@@ -777,97 +796,103 @@ BuildUI = function()
                     end
                 end
             end
-            -- Now, filter for the ones with only one source
             for itemName, sources in pairs(itemSources) do
-                if #sources == 1 then
-                    uniqueMap[itemName] = sources[1] -- Map item name directly to the single mobId
-                end
+                if #sources == 1 then uniqueMap[itemName] = sources[1] end
             end
         end)
         return uniqueMap
     end
     local uniqueDropMap = generateUniqueDropMap()
 
-    local function findRawItem(playerData, itemName)
+    local function findRawItem2(playerData, itemName)
         if not playerData or not playerData.inventory then return nil end
         for _, items in pairs(playerData.inventory) do
-            if type(items) == "table" then for _, data in pairs(items) do if type(data) == "table" and data.nm == itemName then return data end end end
+            if type(items) == "table" then
+                for _, data in pairs(items) do
+                    if type(data) == "table" and data.nm == itemName then return data end
+                end
+            end
         end
         return nil
     end
 
-    -- Rebirth status (use dynamic Label)
-    local rebirthStatusLabel = HalloweenRebirthGroup:AddLabel('Loading...', true)
-    Library.Labels.RebirthStatus = rebirthStatusLabel
+    RebirthBox:AddLabel('Next Rebirth Progress', true, 'RebirthStatus')
+    Library.Labels.RebirthStatus:SetText('Loading...')
 
-    task.spawn(function() while true do pcall(function()
-        local data=DataController:getData(); if not data then return end; local list=require(ReplicatedStorage.Shared.List.Halloween.HalloweenRebirths)
-        local cur=data.halloweenRebirths or 0; local nxt=cur+1; local reqs=list[nxt]
-        local lines={"Current Rebirths: "..cur}; if not reqs then table.insert(lines,"\n🎉 MAXIMUM REBIRTH LEVEL!") else
-        table.insert(lines,"Target: Rebirth "..nxt.."\n"); table.insert(lines,string.format("Candy Corns: %s / %s",Functions.suffixes((findRawItem(data,"candyCorns")or{am=0}).am),Functions.suffixes(reqs.candyCorns)))
-        for _,rItem in ipairs(reqs.required or {}) do table.insert(lines,string.format("%s: %s / %s",rItem:getName(),Functions.suffixes((findRawItem(data,rItem:getName())or{am=0}).am),Functions.suffixes(rItem:getAmount()))) end
-        end; Library.Labels.RebirthStatus:SetText(table.concat(lines,"\n"))
-    end); task.wait(3) end end)
-    
-    AutoRebirthToggle = HalloweenRebirthGroup:AddToggle('AutoRebirth', {
+    task.spawn(function()
+        while true do
+            pcall(function()
+                local data = DataController:getData(); if not data then return end
+                local list = require(ReplicatedStorage.Shared.List.Halloween.HalloweenRebirths)
+                local cur = data.halloweenRebirths or 0; local nxt = cur + 1; local reqs = list[nxt]
+                local lines = {"Current Rebirths: "..cur}
+                if not reqs then
+                    table.insert(lines, "\n🎉 MAXIMUM REBIRTH LEVEL!")
+                else
+                    table.insert(lines, "Target: Rebirth "..nxt.."\n")
+                    table.insert(lines, string.format("Candy Corns: %s / %s", Functions.suffixes((findRawItem2(data,"candyCorns")or{am=0}).am), Functions.suffixes(reqs.candyCorns)))
+                    for _, rItem in ipairs(reqs.required or {}) do
+                        table.insert(lines, string.format("%s: %s / %s", rItem:getName(), Functions.suffixes((findRawItem2(data, rItem:getName())or{am=0}).am), Functions.suffixes(rItem:getAmount())))
+                    end
+                end
+                Library.Labels.RebirthStatus:SetText(table.concat(lines, "\n"))
+            end)
+            task.wait(3)
+        end
+    end)
+
+    local autoRebirthThread, originalAutoHitSettingsRebirth
+    AutoRebirthToggle = RebirthBox:AddToggle('AutoRebirth', {
         Text = 'Auto Rebirth',
-        Tooltip = 'WARNING: Resets Candy Corns. This will farm mobs for needed materials.',
+        Tooltip = 'WARNING: Resets Candy Corns. Farms mobs for needed materials.',
         Default = false,
         Callback = function(enabled)
             if autoRebirthThread then task.cancel(autoRebirthThread); autoRebirthThread = nil end
-
             if enabled then
-                originalAutoHitSettings = { selectedMobs = Options.SelectMobs.Value, autoHitState = Toggles.AutoHit.Value, EquipBestState = Toggles.AutoEquipBestSword.Value, HitSpeedState = Toggles.IncreaseSwordSpeed.Value }
-                
+                originalAutoHitSettingsRebirth = { selectedMobs = mobDropdown.Value, autoHitState = AutoHitToggle.Value, EquipBestState = EquipBest.Value, HitSpeedState = HitSpeed.Value }
                 autoRebirthThread = task.spawn(function()
                     while enabled do
                         pcall(function()
                             local playerData = DataController:getData()
                             local HalloweenRebirths = require(ReplicatedStorage.Shared.List.Halloween.HalloweenRebirths)
                             local currentRebirths = playerData.halloweenRebirths or 0
-                            
                             local mobsToFarm = {}
                             local foundPriorityTarget = false
 
-                            -- Find the EARLIEST future rebirth with missing UNIQUE materials
                             for tier = currentRebirths + 1, #HalloweenRebirths do
                                 for _, reqItem in ipairs(HalloweenRebirths[tier].required or {}) do
                                     local itemName = reqItem:getName()
-                                    -- Check if this item has a unique source
                                     if uniqueDropMap[itemName] then
-                                        local playerAmount = (findRawItem(playerData, itemName) or {am=0}).am
+                                        local playerAmount = (findRawItem2(playerData, itemName) or {am=0}).am
                                         if playerAmount < reqItem:getAmount() then
-                                            -- We have a deficit for a uniquely dropped item. This is our target.
                                             mobsToFarm[uniqueDropMap[itemName]] = true
                                             foundPriorityTarget = true
                                         end
                                     end
                                 end
-                                -- If we found any mobs to farm for this tier, stop looking at later tiers
                                 if foundPriorityTarget then break end
                             end
-                            
-                            -- Update the Auto Hit UI based on our findings
+
                             local finalTargets = {}; for mobId in pairs(mobsToFarm) do table.insert(finalTargets, mobId) end
-                            local newSelection = {}; if #finalTargets > 0 then
-                                for _, mobIdValue in ipairs(Options.SelectMobs.Values) do
+                            local newSelection = {}
+                            if #finalTargets > 0 then
+                                for _, mobIdValue in ipairs(mobDropdown.Values) do
                                     for _, targetId in ipairs(finalTargets) do
                                         if mobIdValue:lower() == targetId:lower() then newSelection[mobIdValue] = true; break end
                                     end
                                 end
                             end
-                            Options.SelectMobs:SetValue(newSelection)
-                            Toggles.AutoHit:SetValue(#finalTargets > 0)
-                            Toggles.AutoEquipBestSword:SetValue(next(newSelection) ~= nil)
-                            Toggles.IncreaseSwordSpeed:SetValue(next(newSelection) ~= nil)
+                            mobDropdown:SetValue(newSelection)
+                            AutoHitToggle:SetValue(#finalTargets > 0)
+                            EquipBest:SetValue(next(newSelection) ~= nil)
+                            HitSpeed:SetValue(next(newSelection) ~= nil)
 
-                            -- Check if the CURRENT rebirth is affordable and execute
                             local currentRequirements = HalloweenRebirths[currentRebirths + 1]
                             if currentRequirements then
                                 local canAfford = true
-                                if (findRawItem(playerData, "candyCorns") or {am=0}).am < currentRequirements.candyCorns then canAfford = false end
+                                if (findRawItem2(playerData, "candyCorns") or {am=0}).am < currentRequirements.candyCorns then canAfford = false end
                                 for _, reqItem in ipairs(currentRequirements.required or {}) do
-                                    if (findRawItem(playerData, reqItem:getName()) or {am=0}).am < reqItem:getAmount() then canAfford = false; break end
+                                    if (findRawItem2(playerData, reqItem:getName()) or {am=0}).am < reqItem:getAmount() then canAfford = false; break end
                                 end
                                 if canAfford then
                                     Knit.GetService("HalloweenService"):halloweenRebirth()
@@ -879,43 +904,38 @@ BuildUI = function()
                     end
                 end)
             else
-                if originalAutoHitSettings then
-                    Options.SelectMobs:SetValue(originalAutoHitSettings.selectedMobs)
-                    Toggles.AutoHit:SetValue(originalAutoHitSettings.autoHitState)
-                    Toggles.AutoEquipBestSword:SetValue(originalAutoHitSettings.EquipBestState)
-                    Toggles.IncreaseSwordSpeed:SetValue(originalAutoHitSettings.HitSpeedState)
-                    originalAutoHitSettings = nil
+                if originalAutoHitSettingsRebirth then
+                    mobDropdown:SetValue(originalAutoHitSettingsRebirth.selectedMobs)
+                    AutoHitToggle:SetValue(originalAutoHitSettingsRebirth.autoHitState)
+                    EquipBest:SetValue(originalAutoHitSettingsRebirth.EquipBestState)
+                    HitSpeed:SetValue(originalAutoHitSettingsRebirth.HitSpeedState)
+                    originalAutoHitSettingsRebirth = nil
                 end
             end
         end
     })
-    
-    -- Simulate "Boss Cave" Section
-    local BossCaveGroup = Tabs.Halloween:AddLeftGroupbox('Boss Cave')
+
+    -- 11) Boss Cave
+    ChestBox:AddDivider()
+    ChestBox:AddLabel('Boss Cave')
 
     local autoCaveThread, originalToggleStates = nil, nil
-    
     local isEventStartingSoon = false
     local inCaveTimer = "N/A"
 
-    -- Cave timer (dynamic Label)
-    local caveTimerLabel = BossCaveGroup:AddLabel('Initializing...', true)
-    Library.Labels.CaveTimer = caveTimerLabel
+    ChestBox:AddLabel('Boss Cave Status', true, 'CaveTimer')
+    Library.Labels.CaveTimer:SetText('Initializing...')
 
-    -- Background task to read the in-game timer from the GUI
     task.spawn(function()
         local timerLabel = LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("MainUI"):WaitForChild("HUD"):WaitForChild("Bars"):WaitForChild("BossCave"):WaitForChild("Timer")
-        
         while true do
             pcall(function()
                 local currentText = timerLabel.Text
                 inCaveTimer = (currentText ~= "" and currentText) or "N/A"
-                
                 local cycle = (Knit.serverTimeNow - 3600) % 10800
                 isEventStartingSoon = cycle <= 300
                 local time = isEventStartingSoon and 300 - cycle or 10800 - cycle
                 local status = isEventStartingSoon and "Starts in: %s" or "Opens in: %s"
-                
                 local statusText = status:format(Functions.formatTime(time)) .. "\nIn-Cave Time: " .. inCaveTimer
                 Library.Labels.CaveTimer:SetText(statusText)
             end)
@@ -923,81 +943,97 @@ BuildUI = function()
         end
     end)
 
-    BossCaveGroup:AddToggle('AutoJoinAndFight', {
+    ChestBox:AddToggle('AutoJoinAndFight', {
         Text = 'Auto Join + Fight',
-        Tooltip = 'Joins the cave and fights the mobs. Temporarily disables other farming mob toggles while in the cave.',
+        Tooltip = 'Joins the cave and fights. Temporarily disables other mob farm toggles.',
         Default = false,
         Callback = function(enabled)
             if autoCaveThread then task.cancel(autoCaveThread); autoCaveThread = nil end
-
             if enabled then
-                originalToggleStates = {
-                    autoRebirth = Toggles.AutoRebirth.Value, autoUpgrade = Toggles.AutoUpgradeSword.Value,
-                    autoHitMobs = Toggles.AutoHit.Value, equipBest = Toggles.AutoEquipBestSword.Value, hitSpeed = Toggles.IncreaseSwordSpeed.Value
-                }
-                
                 autoCaveThread = task.spawn(function()
                     local hasPausedOtherToggles = false
                     local currentTargetId = nil
-                    
-                    while enabled do
+                    while task.wait(0.25) do
                         pcall(function()
                             local cycle = (Knit.serverTimeNow - 3600) % 10800
-
-                            if isEventStartingSoon and cycle >= 270 and cycle <= 300 then
+                            local isJoiningTime = isEventStartingSoon and cycle >= 270 and cycle <= 300
+                            local isInCave = inCaveTimer ~= "N/A" and inCaveTimer ~= "00:00"
+                            if isJoiningTime or isInCave then
                                 if not hasPausedOtherToggles then
-                                    hasPausedOtherToggles = true; print("[Boss Cave] Event starting soon! Pausing other farming toggles.")
-                                    task.defer(function() Toggles.AutoRebirth:SetValue(false); Toggles.AutoUpgradeSword:SetValue(false); Toggles.AutoHit:SetValue(false); Toggles.AutoEquipBestSword:SetValue(true); Toggles.IncreaseSwordSpeed:SetValue(true) end)
+                                    hasPausedOtherToggles = true
+                                    originalToggleStates = {
+                                        autoRebirth = AutoRebirthToggle.Value, autoUpgrade = AutoUpgradeSwordToggle.Value,
+                                        autoHitMobs = AutoHitToggle.Value, equipBest = EquipBest.Value, hitSpeed = HitSpeed.Value,
+                                    }
+                                    task.defer(function()
+                                        AutoRebirthToggle:SetValue(false)
+                                        AutoUpgradeSwordToggle:SetValue(false)
+                                        AutoHitToggle:SetValue(false)
+                                        EquipBest:SetValue(true)
+                                        HitSpeed:SetValue(true)
+                                    end)
                                 end
-                                print("[Boss Cave] Attempting to join..."); Knit.GetService("BossCaveService"):joinBossCave(); task.wait(9);
-                            
-                            -- State 2: Fighting Phase
-                            elseif inCaveTimer ~= "N/A" and inCaveTimer ~= "00:00" then
-                                if not hasPausedOtherToggles then
-                                    hasPausedOtherToggles = true; print("[Boss Cave] Detected inside cave. Pausing other farming toggles.")
-                                    task.defer(function() Toggles.AutoRebirth:SetValue(false); Toggles.AutoUpgradeSword:SetValue(false); Toggles.AutoHit:SetValue(false); Toggles.AutoEquipBestSword:SetValue(true); Toggles.IncreaseSwordSpeed:SetValue(true) end)
+                                if isJoiningTime then
+                                    Knit.GetService("BossCaveService"):joinBossCave()
+                                    task.wait(9)
                                 end
-                                
-                                local isTargetValid=false; if currentTargetId then for _,m in ipairs(game:GetService("CollectionService"):GetTagged("bossCaveMob")) do if m:GetAttribute("mobId")==currentTargetId then isTargetValid=true; break end end end
-                                if not isTargetValid then currentTargetId=nil; local all=game:GetService("CollectionService"):GetTagged("bossCaveMob"); if #all>0 then currentTargetId=all[1]:GetAttribute("mobId") end end
-                                if currentTargetId then Knit.GetService("BossCaveService").damage._re:FireServer(currentTargetId) end
-                            
-                            -- State 3: Restoration Phase (The "else" for the conditions above)
+                                if isInCave then
+                                    local isTargetValid = false
+                                    if currentTargetId then
+                                        for _, mob in ipairs(game:GetService("CollectionService"):GetTagged("bossCaveMob")) do
+                                            if mob:GetAttribute("mobId") == currentTargetId then
+                                                isTargetValid = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                    if not isTargetValid then
+                                        currentTargetId = nil
+                                        local allMobs = game:GetService("CollectionService"):GetTagged("bossCaveMob")
+                                        if #allMobs > 0 then currentTargetId = allMobs[1]:GetAttribute("mobId") end
+                                    end
+                                    if currentTargetId then
+                                        Knit.GetService("BossCaveService").damage._re:FireServer(currentTargetId)
+                                    end
+                                end
                             elseif hasPausedOtherToggles then
-                                if inCaveTimer == "00:00" then print("[Boss Cave] In-cave timer is 00:00. Re-enabling toggles (Attempt 1)...") else print("[Boss Cave] Event ended. Re-enabling toggles (Attempt 1)...") end
-                                task.defer(function() Toggles.AutoRebirth:SetValue(originalToggleStates.autoRebirth); Toggles.AutoUpgradeSword:SetValue(originalToggleStates.autoUpgrade); Toggles.AutoHit:SetValue(originalToggleStates.autoHitMobs); Toggles.AutoEquipBestSword:SetValue(originalToggleStates.equipBest); Toggles.IncreaseSwordSpeed:SetValue(originalToggleStates.hitSpeed) end)
-                                task.wait(1)
-                                print("[Boss Cave] Re-enabling toggles (Attempt 2)...")
-                                task.defer(function() Toggles.AutoRebirth:SetValue(originalToggleStates.autoRebirth); Toggles.AutoUpgradeSword:SetValue(originalToggleStates.autoUpgrade); Toggles.AutoHit:SetValue(originalToggleStates.autoHitMobs); Toggles.AutoEquipBestSword:SetValue(originalToggleStates.equipBest); Toggles.IncreaseSwordSpeed:SetValue(originalToggleStates.hitSpeed) end)
-                                
-                                hasPausedOtherToggles = false; currentTargetId = nil
-                                print("[Boss Cave] Restoration complete.")
+                                if originalToggleStates then
+                                    task.defer(function()
+                                        AutoRebirthToggle:SetValue(originalToggleStates.autoRebirth)
+                                        AutoUpgradeSwordToggle:SetValue(originalToggleStates.autoUpgrade)
+                                        AutoHitToggle:SetValue(originalToggleStates.autoHitMobs)
+                                        EquipBest:SetValue(originalToggleStates.equipBest)
+                                        HitSpeed:SetValue(originalToggleStates.hitSpeed)
+                                    end)
+                                end
+                                hasPausedOtherToggles = false
+                                currentTargetId = nil
                             end
                         end)
-                        task.wait(0.25)
                     end
                 end)
             else
                 if originalToggleStates then
-                    print("[Boss Cave] Master toggle disabled. Restoring all original settings.")
                     task.defer(function()
-                        Toggles.AutoRebirth:SetValue(originalToggleStates.autoRebirth); Toggles.AutoUpgradeSword:SetValue(originalToggleStates.autoUpgrade); Toggles.AutoHit:SetValue(originalToggleStates.autoHitMobs)
-                        Toggles.AutoEquipBestSword:SetValue(originalToggleStates.equipBest); Toggles.IncreaseSwordSpeed:SetValue(originalToggleStates.hitSpeed); originalToggleStates = nil
+                        AutoRebirthToggle:SetValue(originalToggleStates.autoRebirth)
+                        AutoUpgradeSwordToggle:SetValue(originalToggleStates.autoUpgrade)
+                        AutoHitToggle:SetValue(originalToggleStates.autoHitMobs)
+                        EquipBest:SetValue(originalToggleStates.equipBest)
+                        HitSpeed:SetValue(originalToggleStates.hitSpeed)
                     end)
+                    originalToggleStates = nil
                 end
             end
         end
     })
 
-
-    BossCaveGroup:AddToggle('ClaimBossChest', {
+    ChestBox:AddToggle('ClaimBossChest', {
         Text = 'Claim Boss Chest',
         Tooltip = 'Automatically claims the Boss Chest.',
         Default = false,
         Callback = function(enabled)
             local claimThread
             if claimThread then task.cancel(claimThread) end
-
             if enabled then
                 claimThread = task.spawn(function()
                     while enabled do
@@ -1011,29 +1047,25 @@ BuildUI = function()
         end
     })
 
-
-    -- Simulate "Forest Upgrades" Section
-    local ForestUpgradesGroup = Tabs.Halloween:AddRightGroupbox('Forest Upgrades')
-
+    -- 12) Forest Upgrades
     local forestUpgradeNames, ForestUpgradesModule, forestAutoUpgradeThread = {}, nil, nil
-
     pcall(function()
         ForestUpgradesModule = require(ReplicatedStorage.Shared.List.Halloween.ForestUpgrades)
         for name, _ in pairs(ForestUpgradesModule) do table.insert(forestUpgradeNames, name) end
         table.sort(forestUpgradeNames)
     end)
-    
+
     if #forestUpgradeNames > 0 then
-        local upgradesDropdown = ForestUpgradesGroup:AddDropdown('ForestUpgradesDropdown', {
-            Text = 'Select Forest Upgrades',
+        local upgradesDropdown = ForestBox:AddDropdown('ForestUpgradesDropdown', {
             Values = forestUpgradeNames,
             Multi = true,
-            Callback = function(v) end  -- Value via Options.ForestUpgradesDropdown.Value
+            Default = {},
+            Text = 'Select Forest Upgrades'
         })
 
-        ForestUpgradesGroup:AddToggle('AutoUpgradeForest', {
+        ForestBox:AddToggle('AutoUpgradeForest', {
             Text = 'Auto Upgrade',
-            Tooltip = 'Automatically buys selected upgrades when you can afford them.',
+            Tooltip = 'Automatically buys selected upgrades when affordable.',
             Default = false,
             Callback = function(enabled)
                 if forestAutoUpgradeThread then task.cancel(forestAutoUpgradeThread); forestAutoUpgradeThread = nil end
@@ -1041,7 +1073,7 @@ BuildUI = function()
                     forestAutoUpgradeThread = task.spawn(function()
                         while enabled do
                             pcall(function()
-                                local selectedUpgrades = Options.ForestUpgradesDropdown.Value
+                                local selectedUpgrades = upgradesDropdown.Value
                                 if not next(selectedUpgrades) then return end
                                 local playerData = DataController:getData()
                                 for upgradeName, isSelected in pairs(selectedUpgrades) do
@@ -1056,86 +1088,231 @@ BuildUI = function()
                                             local playerAmount = playerItem and playerItem:getAmount() or 0
                                             if playerAmount >= cost:getAmount() then
                                                 UpgradeService:upgradeForest(upgradeName)
-                                                task.wait(1) 
+                                                task.wait(1)
                                             end
                                         end
                                     end
                                 end
                             end)
-                            task.wait(5) 
+                            task.wait(5)
                         end
                     end)
                 end
             end
         })
     end
-    
-    -- Final UI setup calls (adapted to LinoriaLib Save/Theme)
+
+    -- Pumpkin Hunt tab
+    local PumpkinSection = PumpkinTab:AddLeftGroupbox('Pumpkin Hunt')
+
+    PumpkinSection:AddButton('Claim All Hints & Some Pumpkins', function()
+        task.spawn(function()
+            local HalloweenService = Knit.GetService("HalloweenService")
+            local CodesService = Knit.GetService("CodesService")
+            local PumpkinHuntData = require(ReplicatedStorage.Shared.List.Halloween.PumpkinHunt)
+            for pumpkinId, data in pairs(PumpkinHuntData) do
+                if data.hints then
+                    for hintId, hintData in pairs(data.hints) do
+                        if hintData.isFindable then
+                            HalloweenService:claimPumpkinHuntHint(pumpkinId, hintId)
+                            task.wait(0.1)
+                        end
+                    end
+                end
+            end
+            CodesService:redeem("13"); task.wait(0.2)
+            CodesService:redeem("9X7M2KQ5RD"); task.wait(0.2)
+            CodesService:redeem("trickortreat"); task.wait(0.2)
+            for pumpkinId, data in pairs(PumpkinHuntData) do
+                if data.isFindable then
+                    HalloweenService:claimPumpkinHuntPumpkin(pumpkinId)
+                    task.wait(0.1)
+                end
+            end
+        end)
+    end)
+
+    local getHauntedPumpkinThread, originalHauntedPumpkinSettings
+    local AutoBossCaveToggle = Toggles.AutoJoinAndFight -- cave toggle referansı
+
+    PumpkinSection:AddToggle('GetHauntedPumpkin', {
+        Text = 'Get Haunted Pumpkin',
+        Tooltip = "Requires hints from the button above. Kills spiders/pumpkins in sequence.",
+        Default = false,
+        Callback = function(enabled)
+            if getHauntedPumpkinThread then task.cancel(getHauntedPumpkinThread); getHauntedPumpkinThread = nil end
+            if enabled then
+                local initialPlayerData = DataController:getData()
+                if initialPlayerData and initialPlayerData.pumpkinHuntFound and initialPlayerData.pumpkinHuntFound.hauntedPumpkin then
+                    task.defer(function() Toggles.GetHauntedPumpkin:SetValue(false) end)
+                    return
+                end
+                originalHauntedPumpkinSettings = {
+                    autoHit = AutoHitToggle.Value,
+                    autoBossCave = AutoBossCaveToggle and AutoBossCaveToggle.Value or false,
+                    equipBest = EquipBest.Value,
+                    mobSelection = mobDropdown.Value
+                }
+                getHauntedPumpkinThread = task.spawn(function()
+                    local MobsModuleLocal = require(ReplicatedStorage.Shared.List.Halloween.Mobs)
+                    local function killMobUntilDead(targetId)
+                        local currentData = DataController:getData()
+                        while currentData and currentData.mobs and currentData.mobs[targetId] do
+                            Knit.GetService("HalloweenService").damage._re:FireServer(targetId)
+                            task.wait(0.3)
+                            currentData = DataController:getData()
+                        end
+                    end
+                    while task.wait(3) do
+                        pcall(function()
+                            local playerData = DataController:getData()
+                            if playerData.pumpkinHuntFound and playerData.pumpkinHuntFound.hauntedPumpkin then
+                                Toggles.GetHauntedPumpkin:SetValue(false)
+                                return
+                            end
+                            local availableSpiders, availablePumpkins = {}, {}
+                            for instanceId, mobData in pairs(playerData.mobs or {}) do
+                                local mobStats = MobsModuleLocal[mobData.mobId]
+                                if mobStats then
+                                    local currentHealth = mobStats.hp - (mobData.damage or 0)
+                                    local mobInfo = { id = instanceId, health = currentHealth }
+                                    if mobData.mobId:lower() == "spider" then table.insert(availableSpiders, mobInfo)
+                                    elseif mobData.mobId:lower() == "pumpkin" then table.insert(availablePumpkins, mobInfo) end
+                                end
+                            end
+                            if #availableSpiders >= 3 and #availablePumpkins >= 2 then
+                                AutoHitToggle:SetValue(false)
+                                if AutoBossCaveToggle then AutoBossCaveToggle:SetValue(false) end
+                                EquipBest:SetValue(true)
+                                local killOrder = {"spider","pumpkin","spider","spider","pumpkin"}
+                                local spidersToKill = availableSpiders
+                                local pumpkinsToKill = availablePumpkins
+                                for _, mobTypeToKill in ipairs(killOrder) do
+                                    local target
+                                    if mobTypeToKill == "spider" then target = table.remove(spidersToKill, 1)
+                                    elseif mobTypeToKill == "pumpkin" then target = table.remove(pumpkinsToKill, 1) end
+                                    if target then killMobUntilDead(target.id) else break end
+                                end
+                                return
+                            elseif #availableSpiders > 3 or #availablePumpkins > 2 then
+                                AutoHitToggle:SetValue(false)
+                                if AutoBossCaveToggle then AutoBossCaveToggle:SetValue(false) end
+                                EquipBest:SetValue(true)
+                                if #availableSpiders > 3 then
+                                    table.sort(availableSpiders, function(a,b) return a.health < b.health end)
+                                    killMobUntilDead(availableSpiders[1].id)
+                                end
+                                if #availablePumpkins > 2 then
+                                    table.sort(availablePumpkins, function(a,b) return a.health < b.health end)
+                                    killMobUntilDead(availablePumpkins[1].id)
+                                end
+                                return
+                            else
+                                if AutoBossCaveToggle then AutoBossCaveToggle:SetValue(false) end
+                                EquipBest:SetValue(true)
+                                local mobsToFarm = {}
+                                for _, mobName in ipairs(mobDropdown.Values) do
+                                    local lowerName = mobName:lower()
+                                    if lowerName ~= "spider" and lowerName ~= "pumpkin" then
+                                        mobsToFarm[mobName] = true
+                                    end
+                                end
+                                mobDropdown:SetValue(mobsToFarm)
+                                AutoHitToggle:SetValue(true)
+                            end
+                        end)
+                    end
+                end)
+            else
+                if originalHauntedPumpkinSettings then
+                    AutoHitToggle:SetValue(originalHauntedPumpkinSettings.autoHit)
+                    if AutoBossCaveToggle then AutoBossCaveToggle:SetValue(originalHauntedPumpkinSettings.autoBossCave) end
+                    EquipBest:SetValue(originalHauntedPumpkinSettings.equipBest)
+                    mobDropdown:SetValue(originalHauntedPumpkinSettings.mobSelection)
+                    originalHauntedPumpkinSettings = nil
+                end
+            end
+        end
+    })
+
+    PumpkinTab:AddRightGroupbox('Info'):AddLabel('Zombie Pumpkin', true, 'ZombiePumpkinInfo')
+    Library.Labels.ZombiePumpkinInfo:SetText("To get this egg: spin Halloween Wheel (100m) 5x, craft golden monkeys from Jungle Egg, and unlock hints via the button above. Not automated. 💀")
+
+    -- Settings sekmesi
+    local MenuGroup = SettingsTab:AddLeftGroupbox('Menu Settings')
+    MenuGroup:AddToggle('ShowKeybinds', {
+        Text='Show Keybinds',
+        Default=true,
+        Callback=function(v) Library.KeybindFrame.Visible = v end
+    })
+    MenuGroup:AddToggle('CustomCursor', {
+        Text='Custom Cursor',
+        Default=true,
+        Callback=function(v) Library.ShowCustomCursor = v end
+    })
+    MenuGroup:AddLabel('Menu Key'):AddKeyPicker('MenuBind', { Default = 'RightShift', NoUI = true })
+    MenuGroup:AddButton('Unload', function() Library:Unload() end)
+    Library.ToggleKeybind = Options.MenuBind
+
+    -- Linoria Tema ve Kayıt
     ThemeManager:SetLibrary(Library)
     SaveManager:SetLibrary(Library)
     SaveManager:IgnoreThemeSettings()
-    SaveManager:SetIgnoreIndexes({})
-    ThemeManager:SetFolder("FluentScriptHub")  -- Kept as is
-    SaveManager:SetFolder("FluentScriptHub/specific-game")
-    SaveManager:BuildConfigSection(Tabs.Settings)
-    ThemeManager:ApplyToTab(Tabs.Settings)
+    SaveManager:SetIgnoreIndexes({'MenuBind'})
+    ThemeManager:SetFolder('FluentScriptHub')
+    SaveManager:SetFolder('FluentScriptHub/specific-game')
+    SaveManager:SetSubFolder('Place')
+    SaveManager:BuildConfigSection(SettingsTab)
+    ThemeManager:ApplyToTab(SettingsTab)
     SaveManager:LoadAutoloadConfig()
+
+    -- Watermark (isteğe bağlı, kullanıcı dostu)
+    Library:SetWatermarkVisibility(true)
+    local FPS=60; local Timer=tick(); local Counter=0
+    local Conn=game:GetService('RunService').RenderStepped:Connect(function()
+        Counter+=1
+        if tick()-Timer>=1 then FPS=Counter; Timer=tick(); Counter=0 end
+        Library:SetWatermark(('RCU Halloween | %s FPS | %s ms'):format(FPS, math.floor(game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue())))
+    end)
+    Library:OnUnload(function() Conn:Disconnect(); print('UI Unloaded') end)
 end
 
+-- Başlatma: Knit ve servisleri başlat, Linoria penceresini oluştur, sekmeleri ekle, UI’yi kur
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
 
-    -- Initialize Knit and all necessary game services/controllers first
+    -- Knit init
     Knit = require(ReplicatedStorage.Packages.Knit)
     Knit.OnStart():await()
 
     ClickService = Knit.GetService("ClickService")
     UpgradeService = Knit.GetService("UpgradeService")
-    
     DataController = Knit.GetController("DataController")
-    
     Functions = require(ReplicatedStorage.Shared.Functions)
     Util = require(ReplicatedStorage.Shared.Util)
-    Values = require(ReplicatedStorage.Shared.Values)   
+    Values = require(ReplicatedStorage.Shared.Values)
 
-    -- Now that services are ready, build the UI
+    -- Linoria pencere
+    local WindowConfig = {
+        Title = 'bequit army Halloween 🎃',
+        Center = true,
+        AutoShow = true,
+        Resizable = false,
+        ShowCustomCursor = true,
+        UnlockMouseWhileOpen = true,
+        NotifySide = "Left",
+        TabPadding = 8,
+        MenuFadeTime = 0.2
+    }
+    Window = Library:CreateWindow(WindowConfig)
+
+    -- Sekmeler
+    Tabs = {
+        Halloween = Window:AddTab('Halloween Event'),
+        PumpkinHunt = Window:AddTab('Pumpkin Hunt'),
+        Settings = Window:AddTab('Settings')
+    }
+
+    -- UI kur
     BuildUI()
-end)
-
-local SolGrup = Tabs.Ana:AddLeftGroupbox('Auto Rebirth')
-
--- Rebirth Sayısını ayarlamak için bir Textbox ekliyoruz
-SolGrup:AddInput('RebirthSayisiTextbox', {
-    Default = '27',  -- Varsayılan olarak 27 yazıyor
-    Text = 'Rebirth Sayısı',
-    Placeholder = 'Yazınız...',
-    Callback = function(v) 
-        -- Burada Textbox içindeki değeri alıyoruz ve sayıya dönüştürüyoruz
-        RebirthSayisi = tonumber(v) or 27  -- Eğer geçerli bir sayı değilse, varsayılan 27 kullanılır
-        print("Rebirth Sayısı Ayarlandı:", RebirthSayisi)
-    end
-})
-
--- Auto-Rebirth Toggle'ı ekliyoruz
-SolGrup:AddToggle('AutoRebirthToggle', {
-    Text = 'Auto Rebirth (Sürekli)',
-    Tooltip = 'Toggle açık olduğunda sürekli rebirth atılır.',
-    Default = false,  -- Başlangıçta kapalı
-    Callback = function(state) 
-        -- Toggle açıldığında aktif olacak fonksiyon
-        if state then
-            -- Burada sürekli rebirth tetikleme işlemi başlatılır
-            while Toggles.AutoRebirthToggle.Value do
-                -- Event'i tetikleyerek rebirth işlemini başlatıyoruz
-                local Event = game:GetService("ReplicatedStorage").Packages.Knit.Services:GetChildren()[6].RF["jag k\195\164nner en bot, hon heter anna, anna heter hon"]
-                Event:InvokeServer(RebirthSayisi)
-                wait(0.1)  -- Hızlı bir şekilde işlem yapılabilmesi için kısa bir bekleme süresi (0.1 saniye)
-            end
-        end
-    end
-})
-
--- Toggle'ın durumu değiştiğinde çalışacak fonksiyon (isteğe bağlı)
-Toggles.AutoRebirthToggle:OnChanged(function()
-    print("Auto Rebirth Toggle durumu:", Toggles.AutoRebirthToggle.Value)
 end)
