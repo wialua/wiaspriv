@@ -1,17 +1,3 @@
-local HttpService = game:GetService("HttpService")
-local Players = game:GetService("Players")
-
-local requestFunc = (syn and syn.request) or (http and http.request) or request
-if not requestFunc then
-    warn("Your executor does not support HTTP requests.")
-    return
-end
-
-local player = Players.LocalPlayer
-local userid = player.UserId
-local username = player.Name
-
-
 local Library = loadstring(game:HttpGetAsync("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/bigbeanscripts/Pet-Warriors/refs/heads/main/test"))()
 local InterfaceManager = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/InterfaceManager.luau"))()
@@ -65,17 +51,6 @@ end)
 
 BuildUI = function()
 
-    local EventSection = Tabs.Event:AddSection("Halloween Event")
-
-    EventSection:AddButton({
-        Title = "Load the Halloween Event Script",
-        Description = "Loads my Halloween Event script",
-        Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/bigbeanscripts/RCU./refs/heads/main/Halloween"))()
-        end
-    })
-
-
     local ClickSection = Tabs.Main:AddSection("Auto Click")
 
     local AutoClick =ClickSection:Toggle("AutoClick", {
@@ -88,7 +63,7 @@ BuildUI = function()
                 task.spawn(function()
                     while _G.AutoClicking do
                         ClickService.click._re:FireServer()
-                        task.wait(0.001)
+                        task.wait()
                     end
                 end)
             end
