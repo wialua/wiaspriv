@@ -1,0 +1,813 @@
+-- LinoriaLib yükleme
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+-- Ana pencere
+local Window = Library:CreateWindow({
+    Title = 'bequit army',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+-- Sekmeler
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    Eggs = Window:AddTab('Eggs'),
+    Craft = Window:AddTab('Craft'),
+    Claim = Window:AddTab('Claim'),
+}
+
+-- Gerekli bağımlılıklar
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Knit = require(ReplicatedStorage.Packages.Knit)
+Knit.OnStart():await()
+
+-- Servisler
+local ClickService = Knit.GetService("ClickService")
+
+-- UI Kısmı (LinoriaLib)
+local AutoClickGroup = Tabs.Main:AddLeftGroupbox('Auto Click')
+
+AutoClickGroup:AddToggle('AutoClick', {
+    Text = 'Auto Click',
+    Default = false,
+    Tooltip = 'Automatically clicks for you - Extremely fast!',
+    Callback = function(Value)
+        _G.AutoClicking = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoClicking do
+                    ClickService.click._re:FireServer()
+                    task.wait()
+                end
+            end)
+        end
+    end
+})
+
+-- Toggle değişimlerini dinleme (Linoria tarzı)
+Toggles.AutoClick:OnChanged(function(Value)
+    print('AutoClick state changed:', Value)
+end)
+
+
+-- Gerekli bağımlılıklar
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Knit = require(ReplicatedStorage.Packages.Knit)
+Knit.OnStart():await()
+
+-- Servisler
+local RebirthService = Knit.GetService("RebirthService")
+local DataController = Knit.GetController("DataController")
+
+-- Modüller
+local Functions = require(ReplicatedStorage.Shared.Functions) -- suffixes için gerekli
+
+-- Değişkenler
+local selectedRebirthIndex = "Max Unlocked"
+local rebirthOptions = {}
+local isMaxUnlockedSelected = true
+local autoRebirthRunning = false
+
+-- Fonksiyonlar
+local function getAllRebirthOptions()
+    local Rebirths = require(ReplicatedStorage.Shared.List.Rebirths)
+    local options = {}
+    for index, amount in pairs(Rebirths) do
+        table.insert(options, {
+            index = index,
+            amount = amount,
+            display = Functions.suffixes(amount) .. " Rebirths"
+        })
+    end
+    table.sort(options, function(a, b) return a.amount < b.amount end)
+    return options
+end
+
+local function GetBestRebirthOption()
+    local Rebirths = require(ReplicatedStorage.Shared.List.Rebirths)
+    local Upgrades = require(ReplicatedStorage.Shared.List.Upgrades)
+    local buttonUpgrade = Upgrades.rebirthButtons.upgrades[DataController.data.upgrades.rebirthButtons or 0]
+    local unlockedOptions = {}
+    for rebirthId, rebirthAmount in pairs(Rebirths) do
+        if buttonUpgrade.value >= rebirthId then
+            table.insert(unlockedOptions, {id = rebirthId, amount = rebirthAmount})
+        end
+    end
+    table.sort(unlockedOptions, function(a, b) return a.amount > b.amount end)
+    return #unlockedOptions > 0 and unlockedOptions[1].id or nil
+end
+
+local function updateRebirthDropdown()
+    pcall(function()
+        local options = getAllRebirthOptions()
+        rebirthOptions = options
+        local dropdownValues = {"Max Unlocked"}
+        for _, option in ipairs(options) do
+            table.insert(dropdownValues, option.display)
+        end
+        Options.RebirthDropdown:SetValues(dropdownValues)
+    end)
+end
+
+local function performRebirth()
+    local rebirthIndex
+    if isMaxUnlockedSelected then
+        rebirthIndex = GetBestRebirthOption()
+    elseif type(selectedRebirthIndex) == "number" and selectedRebirthIndex > 0 and selectedRebirthIndex <= #rebirthOptions then
+        rebirthIndex = rebirthOptions[selectedRebirthIndex].index
+    end
+    if rebirthIndex then
+        RebirthService:rebirth(rebirthIndex)
+        return true
+    end
+    return false
+end
+
+-- UI Kısmı (LinoriaLib)
+local RebirthGroup = Tabs.Main:AddRightGroupbox('Rebirths')
+
+RebirthGroup:AddDropdown('RebirthDropdown', {
+    Values = {"Max Unlocked"},
+    Default = "Max Unlocked",
+    Multi = false,
+    Text = 'Select Rebirth Amount',
+    Searchable = true,
+    Callback = function(selectedValue)
+        if selectedValue == "Max Unlocked" then
+            isMaxUnlockedSelected = true
+        else
+            isMaxUnlockedSelected = false
+            for i, option in ipairs(rebirthOptions) do
+                if option.display == selectedValue then
+                    selectedRebirthIndex = i
+                    break
+                end
+            end
+        end
+    end
+})
+
+RebirthGroup:AddToggle('AutoRebirth', {
+    Text = 'Auto Rebirth',
+    Default = false,
+    Tooltip = 'Automatically rebirths at the best option or selected amount',
+    Callback = function(Value)
+        autoRebirthRunning = Value
+        if Value then
+            task.spawn(function()
+                while autoRebirthRunning do
+                    pcall(performRebirth)
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
+})
+
+-- Dropdown’u ilk kez doldurmak için
+task.spawn(function()
+    DataController:waitForData()
+    task.wait(2)
+    pcall(updateRebirthDropdown)
+end)
+
+-- === Gerekli bağımlılıklar ===
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+local LocalPlayer = Players.LocalPlayer
+local Knit = require(ReplicatedStorage.Packages.Knit)
+Knit.OnStart():await()
+-- Servisler
+local EggService = Knit.GetService("EggService")
+local PetService = Knit.GetService("PetService")
+-- Controller'lar
+local DataController = Knit.GetController("DataController")
+local EggController = Knit.GetController("EggController")
+local HatchingController = require(LocalPlayer.PlayerScripts.Client.Controllers.HatchingController)
+local PetController = Knit.GetController("PetController")
+-- Modüller
+local EggsModule = require(ReplicatedStorage.Shared.List.Pets.Eggs)
+local EggUtils = require(ReplicatedStorage.Shared.Util.EggUtils)
+local Pets = require(ReplicatedStorage.Shared.List.Pets.Pets)
+local Tiers = require(ReplicatedStorage.Shared.List.Pets.Tiers)
+local Util = require(ReplicatedStorage.Shared.Util)
+-- === Değişkenler ===
+local selectedEgg, selectedAmount, useLuckyEggs
+local autoIndexRunning, autoIndexThread = false, nil
+local selectedVariants, selectedEggsForIndex, originalSettings = {}, {}, {}
+-- === Yardımcı Fonksiyonlar ===
+local function formatNumber(num)
+    local suffixes={{1e18,"Qi"},{1e21,"Sx"},{1e24,"Sp"},{1e27,"Oc"},{1e30,"No"},{1e33,"Dc"},{1e36,"Ud"},{1e39,"Dd"},{1e42,"Td"},{1e45,"Qd"},{1e48,"Qid"},{1e51,"Sxd"},{1e54,"Spd"},{1e57,"Ocd"},{1e60,"Nd"},{1e63,"Vg"}}
+    for i=#suffixes,1,-1 do local t,s=suffixes[i][1],suffixes[i][2] if num>=t then local v=num/t return string.format("%.2f%s",v,s):gsub("%.00","")end end
+    if num>=1e15 then return string.format("%.2fQa",num/1e15):gsub("%.00","")
+    elseif num>=1e12 then return string.format("%.2fT",num/1e12):gsub("%.00","")
+    elseif num>=1e9 then return string.format("%.2fB",num/1e9):gsub("%.00","")
+    elseif num>=1e6 then return string.format("%.2fM",num/1e6):gsub("%.00","")
+    elseif num>=1e3 then return string.format("%.2fK",num/1e3):gsub("%.00","")
+    else return tostring(math.floor(num)) end
+end
+-- === Egg listesi ===
+local eggsTable, displayToEggName = {}, {}
+for eggName, eggData in pairs(EggsModule) do
+    if typeof(eggData) == "table" and eggData.cost then
+        table.insert(eggsTable, {name = eggName, cost = eggData.cost, currency = EggUtils.getCurrency(eggName) or "clicks"})
+    end
+end
+table.sort(eggsTable, function(a, b) return a.cost < b.cost end)
+local eggOptions = {}
+for _, eggInfo in ipairs(eggsTable) do
+    local displayName = eggInfo.name .. " - " .. formatNumber(eggInfo.cost) .. " " .. eggInfo.currency
+    table.insert(eggOptions, displayName)
+    displayToEggName[displayName] = eggInfo.name
+end
+selectedEgg = eggsTable[1] and eggsTable[1].name or "Basic"
+local defaultEgg = eggOptions[1] or "Basic"
+-- Lucky Egg ID bulma
+local function getLuckyIdForEggName(eggName)
+    for _, eggModel in CollectionService:GetTagged("Egg") do
+        if eggModel.Name == eggName then return eggModel:GetAttribute("luckyEggId") end
+    end
+    return nil
+end
+-- Hatch delay dinamik
+_G.SmartHatchDelay = 4.11
+task.spawn(function()
+    local hatchTimeLabel = LocalPlayer.PlayerGui.MainUI.Menus.SettingsFrame.Main.List.Multipliers.HatchingSpeed.Main.Amount
+    while true do
+        local success, labelText = pcall(function() return hatchTimeLabel.Text end)
+        if success and labelText then
+            local numberString = string.match(labelText, "%d+%.?%d*")
+            if numberString then _G.SmartHatchDelay = (tonumber(numberString) or 4.01) + 0.1 end
+        end
+        task.wait(5)
+    end
+end)
+-- === UI (Linoria) ===
+local EggGroup = Tabs.Eggs:AddLeftGroupbox('Auto Hatch')
+EggGroup:AddDropdown('SelectEgg', {
+    Values = eggOptions,
+    Default = defaultEgg,
+    Multi = false,
+    Text = 'Select Egg',
+    Searchable = true,
+    Callback = function(Value)
+        selectedEgg = displayToEggName[Value] or (Value:match("^(.-) %-") or Value)
+    end
+})
+local hatchAmounts = {["1x"]=1, ["3x"]=3, ["Max"]=99}
+selectedAmount = hatchAmounts["Max"]
+EggGroup:AddDropdown('SelectHatchAmount', {
+    Values = {"1x","3x","Max"},
+    Default = "Max",
+    Multi = false,
+    Text = 'Select Hatch Amount',
+    Callback = function(Value) selectedAmount = hatchAmounts[Value] or 1 end
+})
+EggGroup:AddToggle('HatchLuckyEggs', {
+    Text = 'Use Lucky Eggs',
+    Default = false,
+    Callback = function(enabled) useLuckyEggs = enabled end
+})
+EggGroup:AddToggle('AutoHatch', {
+    Text = 'Auto Hatch Eggs',
+    Default = false,
+    Callback = function(Value)
+        _G.AutoHatchEnabled = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoHatchEnabled do
+                    local args = {selectedEgg, selectedAmount or 1}
+                    if useLuckyEggs then
+                        local anyAvailableLuckyId, _ = next(EggController._luckyEggs or {})
+                        if anyAvailableLuckyId then
+                            table.insert(args, {luckyEggId = anyAvailableLuckyId})
+                        end
+                    end
+                    EggService.openEgg._re:FireServer(unpack(args))
+                    task.wait(_G.SmartHatchDelay)
+                end
+            end)
+        end
+    end
+})
+EggGroup:AddToggle('HideHatchAnimation', {
+    Text = 'Hide Hatch Animation',
+    Default = false,
+    Callback = function(Value)
+        local function overrideFunctions(shouldHide)
+            if not HatchingController._originalFunctions and shouldHide then
+                HatchingController._originalFunctions = {
+                    playEggAnimation = HatchingController.playEggAnimation,
+                    playHatchingAnimation = HatchingController.playHatchingAnimation,
+                    animatePetIn = HatchingController.animatePetIn,
+                    animatePetOut = HatchingController.animatePetOut,
+                    dropEggs = HatchingController.dropEggs,
+                    shakeEggs = HatchingController.shakeEggs,
+                    scaleAndRemoveEggs = HatchingController.scaleAndRemoveEggs,
+                    playRevealSounds = HatchingController.playRevealSounds
+                }
+            end
+            local emptyFunc = function() return nil end
+            for funcName, originalFunc in pairs(HatchingController._originalFunctions or {}) do
+                HatchingController[funcName] = shouldHide and emptyFunc or originalFunc
+            end
+        end
+        overrideFunctions(Value)
+    end
+})
+-- === Craft Sekmesi: Pet Crafting (LinoriaLib) ===
+-- Varsayılan olarak Knit ve gerekli modüllerin yüklü olduğunu kabul eder.
+-- Bu bölüm, LinoriaLib Tabs.Craft altında sol grup kutusuna eklenir.
+-- Servisler / Controller / Modüller (çalışan ortamda hazır olmalı)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Knit = require(ReplicatedStorage.Packages.Knit)
+Knit.OnStart():await()
+local PetService = Knit.GetService("PetService")
+local DataController = Knit.GetController("DataController")
+local Util = require(ReplicatedStorage.Shared.Util)
+local Pets = require(ReplicatedStorage.Shared.List.Pets.Pets)
+-- Durum değişkenleri
+local petDisplayToId = {} -- [displayName] -> petId
+local selectedPetsMap = {} -- Linoria MultiDropdown value objesi (displayName -> true/false)
+local craftSelectedThread = nil
+local craftAllInventoryThread = nil
+-- Yardımcı: oyuncu pet seçenekleri (displayName listesi) ve map'i üretir
+local function getPlayerPetOptions()
+    local options = {}
+    petDisplayToId = {}
+    local success, err = pcall(function()
+        DataController:waitForData()
+        local data = DataController:getData()
+        if not data or not data.inventory or not data.inventory.pet then return end
+        for petId, petRaw in pairs(data.inventory.pet) do
+            local petObj = Util.itemUtils.createItemFromData(petRaw)
+            if petObj then
+                local petName = petObj:getName()
+                local displayName = petName
+                -- Tier etiketi
+                if petRaw.ti and petRaw.ti > 1 then
+                    local tierNames = { "Golden", "Toxic", "Galaxy" }
+                    displayName = tierNames[petRaw.ti - 1] .. " " .. displayName
+                end
+                -- Shiny etiketi
+                if petRaw.sh then
+                    displayName = "Shiny " .. displayName
+                end
+                -- Ek bilgiler: amount, multiplier, rarity
+                local amount = petRaw.am or 0
+                local multiplier = petObj:getMultiplier()
+                local def = Pets[petName]
+                if def and def.rarity then
+                    displayName = string.format("%s (%d, %.1f, %s)", displayName, amount, multiplier, def.rarity)
+                else
+                    displayName = string.format("%s (%d, %.1f)", displayName, amount, multiplier)
+                end
+                table.insert(options, displayName)
+                petDisplayToId[displayName] = petId
+            end
+        end
+    end)
+    if not success then warn("getPlayerPetOptions error: " .. tostring(err)) end
+    table.sort(options, function(a, b) return a < b end)
+    return options
+end
+-- Yardımcı: seçili petlerin envanter durumunu label’a yaz
+local function formatSelectedStatus(selectedMap)
+    local lines = {}
+    local success, err = pcall(function()
+        DataController:waitForData()
+        local data = DataController:getData()
+        if not data or not data.inventory or not data.inventory.pet then
+            table.insert(lines, "Inventory not available")
+            return
+        end
+        for displayName, isSelected in pairs(selectedMap or {}) do
+            if isSelected then
+                local petId = petDisplayToId[displayName]
+                local raw = petId and data.inventory.pet[petId]
+                local amt = (raw and raw.am) or 0
+                table.insert(lines, string.format("%s: %d available", displayName, amt))
+            end
+        end
+    end)
+    if not success then warn("formatSelectedStatus error: " .. tostring(err)) end
+    if #lines == 0 then return "No pets selected" end
+    return table.concat(lines, "\n")
+end
+-- İş mantığı: seçili petleri craftla (>=5 ise bir üst tier, batch olarak maksimum miktarda)
+local function runCraftSelectedLoop(getRunningFlag)
+    while getRunningFlag() do
+        local success, err = pcall(function()
+            DataController:waitForData()
+            local data = DataController:getData()
+            if not data or not data.inventory or not data.inventory.pet then return end
+            local craftedAny = false
+            for displayName, isSelected in pairs(selectedPetsMap) do
+                if not getRunningFlag() then break end
+                if isSelected then
+                    local petId = petDisplayToId[displayName]
+                    local raw = petId and data.inventory.pet[petId]
+                    if raw and (raw.am or 0) >= 5 then
+                        local craftAmount = math.floor(raw.am / 5)
+                        PetService:craft({[1] = petId}, false, craftAmount)
+                        craftedAny = true
+                        task.wait(0.1)  -- Kısa bekleme, rate limit için
+                    end
+                end
+            end
+            if craftedAny then
+                -- Listeyi tazele, seçim değerlerini koru
+                local vals = getPlayerPetOptions()
+                Options.SelectPet:SetValues(vals)
+                PetStatusLabel:SetText(formatSelectedStatus(selectedPetsMap))
+            end
+        end)
+        if not success then warn("runCraftSelectedLoop error: " .. tostring(err)) end
+        task.wait(0.5)  -- Döngü aralığını kısalttık, ama aşırı yüklenmemek için 0.5 sn
+    end
+end
+-- İş mantığı: envanterdeki tüm uygun petleri craftla (>=5, batch olarak maksimum miktarda)
+local function runCraftAllInventoryLoop(getRunningFlag)
+    while getRunningFlag() do
+        local success, err = pcall(function()
+            DataController:waitForData()
+            local data = DataController:getData()
+            if not data or not data.inventory or not data.inventory.pet then return end
+            -- Pet ID -> raw üzerinden tarama: >=5 olanları batch craftla
+            for petId, raw in pairs(data.inventory.pet) do
+                if not getRunningFlag() then break end
+                local amt = raw and raw.am or 0
+                if amt >= 5 then
+                    local craftAmount = math.floor(amt / 5)
+                    PetService:craft({[1] = petId}, false, craftAmount)
+                    task.wait(0.1)  -- Kısa bekleme, rate limit için
+                end
+            end
+            -- Dropdown değerlerini güncel tut
+            local vals = getPlayerPetOptions()
+            Options.SelectPet:SetValues(vals)
+            PetStatusLabel:SetText(formatSelectedStatus(selectedPetsMap))
+        end)
+        if not success then warn("runCraftAllInventoryLoop error: " .. tostring(err)) end
+        task.wait(0.5)  -- Döngü aralığını kısalttık
+    end
+end
+-- === UI: LinoriaLib ===
+local CraftGroup = Tabs.Craft:AddLeftGroupbox("Pet Crafting")
+-- Dropdown: Pet seçimi (Multi)
+CraftGroup:AddDropdown('SelectPet', {
+    Values = getPlayerPetOptions(),
+    Multi = true,
+    Searchable = true,
+    Default = {},
+    Text = 'Select pets to craft',
+    Callback = function(value)
+        selectedPetsMap = value
+        PetStatusLabel:SetText(formatSelectedStatus(selectedPetsMap))
+    end
+})
+-- Label: durum
+CraftGroup:AddLabel('Pet Status:').Addons = nil
+local PetStatusLabel = CraftGroup:AddLabel('Loading...')
+Options.PetStatusLabel = PetStatusLabel -- reuse handle
+-- Toggle: Seçili petleri otomatik craftla
+CraftGroup:AddToggle('AutoCraftSelected', {
+    Text = 'Auto craft selected pets',
+    Default = false,
+    Tooltip = 'Crafts one tier up when you own 5+ of a selected pet (batch processing for speed)'
+})
+-- Toggle: Envanterdeki tüm uygun petleri craftla
+CraftGroup:AddToggle('AutoCraftAllInventory', {
+    Text = 'Auto craft all eligible pets',
+    Default = false,
+    Tooltip = 'Crafts one tier up for any pet in inventory with 5+ amount (batch processing for speed)'
+})
+-- Öneri etiketi
+CraftGroup:AddLabel('Tip: Use only one auto-craft mode at a time for predictable results.')
+-- Event bağlama: dropdown değerlerini düzenli tazele
+task.spawn(function()
+    while true do
+        local text = formatSelectedStatus(Options.SelectPet.Value or {})
+        PetStatusLabel:SetText(text)
+        local vals = getPlayerPetOptions()
+        Options.SelectPet:SetValues(vals)
+        task.wait(5)
+    end
+end)
+-- OnChanged: AutoCraftSelected
+local function stopCraftSelected()
+    if craftSelectedThread then
+        task.cancel(craftSelectedThread)
+        craftSelectedThread = nil
+    end
+end
+Toggles.AutoCraftSelected:OnChanged(function()
+    stopCraftSelected()
+    if Toggles.AutoCraftSelected.Value then
+        craftSelectedThread = task.spawn(function()
+            runCraftSelectedLoop(function() return Toggles.AutoCraftSelected.Value end)
+        end)
+    end
+end)
+-- OnChanged: AutoCraftAllInventory
+local function stopCraftAllInventory()
+    if craftAllInventoryThread then
+        task.cancel(craftAllInventoryThread)
+        craftAllInventoryThread = nil
+    end
+end
+Toggles.AutoCraftAllInventory:OnChanged(function()
+    stopCraftAllInventory()
+    if Toggles.AutoCraftAllInventory.Value then
+        craftAllInventoryThread = task.spawn(function()
+            runCraftAllInventoryLoop(function() return Toggles.AutoCraftAllInventory.Value end)
+        end)
+    end
+end)
+-- Güvenli kapama: menü unload vs.
+local function cleanupPetCrafting()
+    stopCraftSelected()
+    stopCraftAllInventory()
+end
+
+-- === Claim Sekmesi ===
+local ClaimGroup = Tabs.Claim:AddLeftGroupbox("Claim / Collect")
+
+-- Auto Collect Mini-Chests
+ClaimGroup:AddToggle('AutoCollectMiniChests', {
+    Text = 'Auto Collect Mini-Chests',
+    Default = false,
+    Tooltip = 'Teleports through unlocked zones and collects all mini-chests',
+    Callback = function(enabled)
+        isAutoCollectEnabled = enabled
+        if enabled then
+            autoCollectThread = task.spawn(function()
+                while Toggles.AutoCollectMiniChests.Value do
+                    pcall(claimChestsInUnlockedMaps)
+                    task.wait(5)
+                end
+            end)
+        else
+            if autoCollectThread then task.cancel(autoCollectThread) autoCollectThread = nil end
+        end
+    end
+})
+
+-- Auto Pick Up Orbs
+ClaimGroup:AddToggle('AutoPickUp', {
+    Text = 'Auto Pick Up Orbs',
+    Default = false,
+    Callback = function(enabled)
+        _G.AutoPickUpEnabled = enabled
+        if _G.AutoPickUpThread then task.cancel(_G.AutoPickUpThread) _G.AutoPickUpThread = nil end
+        if enabled then
+            _G.AutoPickUpThread = task.spawn(function()
+                local orbsFolder = Workspace:FindFirstChild("Debris") and Workspace.Debris:FindFirstChild("Orbs")
+                if not orbsFolder then return end
+                while _G.AutoPickUpEnabled do
+                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local orbsToCollect = {}
+                        for _, orb in ipairs(orbsFolder:GetChildren()) do
+                            if orb:IsA("BasePart") then
+                                orb:SetAttribute("canCollect", true)
+                                orb.Anchored = true
+                                table.insert(orbsToCollect, orb.Name)
+                            end
+                        end
+                        if #orbsToCollect > 0 then
+                            pcall(function() OrbService.collectOrbs:Fire(orbsToCollect) end)
+                            for _, orbName in ipairs(orbsToCollect) do
+                                local orb = orbsFolder:FindFirstChild(orbName)
+                                if orb then orb:Destroy() end
+                            end
+                        end
+                    end
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
+})
+
+-- Pickup Stars
+ClaimGroup:AddToggle('PickupStars', {
+    Text = 'Pickup Falling Stars',
+    Default = false,
+    Callback = function(enabled)
+        if pickupStarsThread then task.cancel(pickupStarsThread) pickupStarsThread = nil end
+        if enabled then
+            pickupStarsThread = task.spawn(function()
+                while Toggles.PickupStars.Value do
+                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local debris = Workspace:FindFirstChild("Debris")
+                    if hrp and debris then
+                        for _, starModel in ipairs(debris:GetChildren()) do
+                            if starModel.Name == "FallingStar" and starModel.PrimaryPart then
+                                local hideFolder = starModel.PrimaryPart:FindFirstChild("hideAfterLanding")
+                                if hideFolder then
+                                    local stillFalling = false
+                                    for _, p in ipairs(hideFolder:GetChildren()) do
+                                        if p:IsA("ParticleEmitter") and p.Enabled then stillFalling = true break end
+                                    end
+                                    if not stillFalling then
+                                        pcall(firetouchinterest, hrp, starModel.PrimaryPart, 0)
+                                        pcall(firetouchinterest, hrp, starModel.PrimaryPart, 1)
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end
+})
+
+-- Auto Claim Achievements
+ClaimGroup:AddToggle('AutoClaimAchievements', {
+    Text = 'Auto Claim Achievements',
+    Default = false,
+    Callback = function(enabled)
+        if autoClaimThreads and autoClaimThreads["Achievements"] then
+            task.cancel(autoClaimThreads["Achievements"])
+            autoClaimThreads["Achievements"] = nil
+        end
+        if enabled then
+            autoClaimThreads["Achievements"] = task.spawn(function()
+                while Toggles.AutoClaimAchievements.Value do
+                    pcall(function()
+                        local Achievements = require(ReplicatedStorage.Shared.List.Achievements)
+                        DataController:waitForData()
+                        local playerData = DataController:getData()
+                        for achievementKey, achievementData in pairs(Achievements) do
+                            local currentLevel = 1
+                            for claimedId, _ in pairs(playerData.claimedAchievements) do
+                                if claimedId:find(achievementKey) then currentLevel += 1 end
+                            end
+                            if #achievementData.list >= currentLevel and achievementData.list[currentLevel].amount <= achievementData.getValue(playerData) then
+                                RewardService:claimAchievement(achievementKey)
+                                task.wait(1)
+                            end
+                        end
+                    end)
+                    task.wait(5)
+                end
+            end)
+        end
+    end
+})
+
+-- Auto Claim Daily
+ClaimGroup:AddToggle('AutoClaimDaily', {
+    Text = 'Auto Claim Daily Reward',
+    Default = false,
+    Callback = function(enabled)
+        if autoClaimThreads and autoClaimThreads["Daily"] then
+            task.cancel(autoClaimThreads["Daily"])
+            autoClaimThreads["Daily"] = nil
+        end
+        if enabled then
+            autoClaimThreads["Daily"] = task.spawn(function()
+                while Toggles.AutoClaimDaily.Value do
+                    pcall(function()
+                        DataController:waitForData()
+                        local playerData = DataController:getData()
+                        if workspace:GetServerTimeNow() - playerData.dayReset >= 86400 then
+                            RewardService:claimDailyReward()
+                        end
+                    end)
+                    task.wait(10)
+                end
+            end)
+        end
+    end
+})
+
+-- Auto Prestige
+ClaimGroup:AddToggle('AutoPrestige', {
+    Text = 'Auto Prestige',
+    Default = false,
+    Callback = function(enabled)
+        if autoClaimThreads and autoClaimThreads["Prestige"] then
+            task.cancel(autoClaimThreads["Prestige"])
+            autoClaimThreads["Prestige"] = nil
+        end
+        if enabled then
+            autoClaimThreads["Prestige"] = task.spawn(function()
+                local PrestigeService = Knit.GetService("PrestigeService")
+                local Prestiges = require(ReplicatedStorage.Shared.List.Prestige.Prestiges)
+                while Toggles.AutoPrestige.Value do
+                    pcall(function()
+                        DataController:waitForData()
+                        local playerData = DataController:getData()
+                        local currentPrestige = playerData.prestige
+                        local currentXP = playerData.prestigeXp
+                        local nextPrestige = Prestiges[currentPrestige + 1]
+                        if nextPrestige and currentXP >= nextPrestige.required then
+                            PrestigeService:claim()
+                        end
+                    end)
+                    task.wait(5)
+                end
+            end)
+        end
+    end
+})
+
+-- Auto Claim Index Rewards
+ClaimGroup:AddToggle('AutoClaimIndexRewards', {
+    Text = 'Auto Claim Index Rewards',
+    Default = false,
+    Callback = function(enabled)
+        if enabled then
+            task.spawn(function()
+                while Toggles.AutoClaimIndexRewards.Value do
+                    pcall(function()
+                        DataController:waitForData()
+                        local playerData = DataController:getData()
+                        local claimed = playerData.claimedIndexRewards or {}
+                        local existTable = Knit.GetController("PetController"):getExistTable()
+                        local indexedCount = Util.indexUtils.countIndex(playerData, existTable)
+                        local IndexRewards = require(ReplicatedStorage.Shared.List.IndexRewards)
+                        for rewardId, rewardData in pairs(IndexRewards) do
+                            if indexedCount >= (rewardData.required or 0) and not table.find(claimed, rewardId) then
+                                Knit.GetService("IndexService"):claimIndexReward(rewardId)
+                            end
+                        end
+                    end)
+                    task.wait(5)
+                end
+            end)
+        end
+    end
+})
+
+-- Auto Claim All Chests
+ClaimGroup:AddToggle('AutoClaimAllChests', {
+    Text = 'Auto Claim All Chests',
+    Default = false,
+    Callback = function(enabled)
+        isAutoClaimAllChestsEnabled = enabled
+    end
+})
+
+task.spawn(function()
+    DataController:waitForData()
+    local Chests = require(ReplicatedStorage.Shared.List.Chests)
+    while true do
+        if isAutoClaimAllChestsEnabled then
+            pcall(function()
+                for chestId, _ in pairs(Chests) do
+                    RewardService:claimChest(chestId)
+                    task.wait(0.2)
+                end
+            end)
+        end
+        task.wait(10)
+    end
+end)
+
+-- Open Supply Drops
+ClaimGroup:AddToggle('OpenSupplyDrops', {
+    Text = 'Open Supply Drops',
+    Default = false,
+    Callback = function(enabled)
+        if supplyDropThread then
+            task.cancel(supplyDropThread)
+            supplyDropThread = nil
+        end
+        if enabled then
+            supplyDropThread = task.spawn(function()
+                while Toggles.OpenSupplyDrops.Value do
+                    local debris = Workspace:FindFirstChild("Debris")
+                    if debris then
+                        for _, dropEvent in ipairs(debris:GetChildren()) do
+                            if dropEvent.Name:find("SupplyDropEvent") then
+                                for _, obj in ipairs(dropEvent:GetChildren()) do
+                                    local prompt = obj:FindFirstChild("ProximityPrompt")
+                                    if prompt then
+                                        pcall(fireproximityprompt, prompt)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
