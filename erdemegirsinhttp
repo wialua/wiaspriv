@@ -1,21 +1,134 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 
-local requestFunc = (syn and syn.request) or (http and http.request) or request
+-- Safe request detection (try syn, http, or built-in HttpGet)
+local requestFunc
+do
+    local ok, res = pcall(function()
+        return (syn and syn.request) or (http and http.request) or (request and request)
+    end)
+    if ok then requestFunc = res end
+end
+
+-- Fallback downloader that tries requestFunc first, then game:HttpGetAsync
+local function fetchUrl(url)
+    if requestFunc then
+        local ok, resp = pcall(function()
+            local r = requestFunc({Url = url, Method = "GET"})
+            return r and r.Body or nil
+        end)
+        if ok and resp then return resp end
+    end
+
+    local ok2, body = pcall(function()
+        if game.HttpGetAsync then return game:HttpGetAsync(url) end
+        if game.HttpGet then return game:HttpGet(url) end
+        return nil
+    end)
+    if ok2 and body then return body end
+    return nil, "Failed to fetch url: " .. tostring(url)
+end
+
+-- safeLoad: fetches a URL and loadstrings it inside pcall, returns result or nil,err
+local function safeLoad(url, description)
+    description = description or url
+    local body, err = fetchUrl(url)
+    if not body then
+        warn(("DEBUG: safeLoad: fetch failed for %s -> %s"):format(description, tostring(err)))
+        return nil, ("fetch failed: %s"):format(tostring(err))
+    end
+
+    local fn, loadErr = loadstring(body)
+    if not fn then
+        warn(("DEBUG: safeLoad: loadstring failed for %s -> %s"):format(description, tostring(loadErr)))
+        return nil, loadErr
+    end
+
+    local ok, result = pcall(fn)
+    if not ok then
+        warn(("DEBUG: safeLoad: executed chunk errored for %s -> %s"):format(description, tostring(result)))
+        return nil, result
+    end
+
+    return result
+end
+
+-- waitFor checks (wait for a global variable to be non-nil)
+local function waitForGlobal(name, timeout)
+    local start = os.time()
+    timeout = timeout or 10
+    while (os.time() - start) < timeout do
+        if _G[name] ~= nil then return true end
+        task.wait(0.2)
+    end
+    return false
+end
+
+-- Simple protected call to avoid nil indexing
+local function safeIndex(tbl, key)
+    if not tbl then return nil end
+    return tbl[key]
+end
+
+-- print basic executor info
+pcall(function()
+    warn("DEBUG: Executor HTTP available:", requestFunc ~= nil)
+end)
+
+-- ========== END SAFETY / DEBUG HELPERS ==========
+
+-- ORIGINAL/MAIN SCRIPT START (kept and minimally modified to use safe loaders)
+local requestFunc = requestFunc or ((syn and syn.request) or (http and http.request) or request)
 if not requestFunc then
     warn("Your executor does not support HTTP requests.")
-    return
+    -- We continue but some features that require remote libs will be disabled by checks below.
 end
 
 local player = Players.LocalPlayer
-local userid = player.UserId
-local username = player.Name
+local userid = player and player.UserId or 0
+local username = player and player.Name or "Unknown"
 
+-- Load remote libraries with safeLoad and fallback logging
+local Library = nil
+do
+    local url = "https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"
+    local lib, err = safeLoad(url, "Fluent UI")
+    if not lib then
+        warn("DEBUG: Fluent UI failed to load:", tostring(err))
+        -- keep Library nil; script will check for Window before using UI features
+    else
+        Library = lib
+    end
+end
 
-local Library = loadstring(game:HttpGetAsync("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/bigbeanscripts/Pet-Warriors/refs/heads/main/test"))()
-local InterfaceManager = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/InterfaceManager.luau"))()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/SenhorLDS/ProjectLDSHUB/refs/heads/main/Anti%20AFK"))()
+local SaveManager = nil
+do
+    local url = "https://raw.githubusercontent.com/bigbeanscripts/Pet-Warriors/refs/heads/main/test"
+    local sm, err = safeLoad(url, "SaveManager")
+    if not sm then
+        warn("DEBUG: SaveManager failed to load:", tostring(err))
+    else
+        SaveManager = sm
+    end
+end
+
+local InterfaceManager = nil
+do
+    local url = "https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/InterfaceManager.luau"
+    local im, err = safeLoad(url, "InterfaceManager")
+    if not im then
+        warn("DEBUG: InterfaceManager failed to load:", tostring(err))
+    else
+        InterfaceManager = im
+    end
+end
+
+-- optional anti-afk (safeLoad but we don't require it)
+do
+    local url = "https://raw.githubusercontent.com/SenhorLDS/ProjectLDSHUB/refs/heads/main/Anti%20AFK"
+    local _, err = safeLoad(url, "AntiAFK")
+    if err then warn("DEBUG: AntiAFK load:", tostring(err)) end
+end
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
