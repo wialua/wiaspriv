@@ -4485,13 +4485,13 @@ task.spawn(function()
     Values = require(ReplicatedStorage.Shared.Values)   
 
     Window = Library:Window{
-        Title = "RCU",
-        SubTitle = "By Duckie",
+        Title = "bequit army",
+        SubTitle = "🎃",
         TabWidth = 160,
         Size =  UDim2.fromOffset(580, 460),
         Resize = false,
         Theme = "Darker",
-        MinimizeKey = Enum.KeyCode.LeftShift
+        MinimizeKey = Enum.KeyCode.F4
     }
 
     Tabs = {
