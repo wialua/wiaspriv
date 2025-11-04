@@ -42,13 +42,6 @@ local BuildUI, getUnlockedRebirthOptions, GetBestRebirthOption, updateRebirthDro
       getPrerequisiteChain, getMissingResources, updateResourceStatus, mapWoodToTreeWorldForCraft, claimChestsInUnlockedMaps,
       createClaimToggle, getAllAncientMerchantItems, updateDiceStatus, storeAuraFuncs, hideAuraAnims, restoreAuraAnims
 
-spawn(function()
-    while wait(30) do 
-        pcall(function() collectgarbage("collect") end)
-        gcinfo()
-    end
-end)
-
 BuildUI = function()
 
     local ClickSection = Tabs.Main:AddSection("Auto Click")
