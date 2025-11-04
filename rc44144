@@ -55,7 +55,7 @@ BuildUI = function()
 
     local AutoClick =ClickSection:Toggle("AutoClick", {
         Title = "Auto Click",
-        Description = "Automatically clicks for you - Extremely fast!",
+        Description = "Sizin için otomatik olarak tıklar",
         Default = false,
         Callback = function(Value)
             _G.AutoClicking = Value
@@ -341,7 +341,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     local InstructionsParagraph = AutoIndexSection:Paragraph("AutoIndexInstructions", {
         Title = "Instructions",
-        Content = "Select pet variants to index. Eggs must be unlocked to work, so don't select an egg you haven't unlocked yet. Eggs that require being built WILL work, even without building them.",
+        Content = "İndekslenmesi için evcil hayvan varyantlarını seçin. Yumurtaların çalışabilmesi için açılmış olması gerekir, bu yüzden henüz açmadığınız bir yumurtayı seçmeyin. İnşa edilmesi gereken yumurtalar, inşa edilmemiş olsalar bile çalışacaktır.",
         TitleAlignment = "Middle"
     })
 
@@ -368,7 +368,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     -- --- UI Elements ---
     local VariantsDropdown = AutoIndexSection:Dropdown("SelectVariants", {
-        Title = "Select Variants to Index",
+        Title = "İndekslenmesi için Varyantları Seçin",
         Values = variantDisplayNames, Multi = true, Searchable = true, Default = {},
         Callback = function(value) selectedVariants = value end
     })
@@ -378,7 +378,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
     table.sort(allEggNamesForDropdown)
 
     local IndexEggDropdown = AutoIndexSection:Dropdown("SelectEggsToIndex", {
-        Title = "Select Eggs (leave empty for all)",
+        Title = "Yumurtaları Seçin (Hepsi için boş bırakın)",
         Values = allEggNamesForDropdown, Multi = true, Searchable = true, Default = {},
         Callback = function(value) selectedEggsForIndex = value end
     })
@@ -390,7 +390,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
     -- --- Main Toggle & Logic ---
     local AutoIndexToggle = AutoIndexSection:Toggle("AutoIndexToggle", {
         Title = "Auto Index",
-        Description = "Automatically works to complete your index based on the selected variants.",
+        Description = "Seçilen varyantlara göre indeksinizi tamamlamak için otomatik olarak çalışır.",
         Default = false,
         Callback = function(enabled)
             autoIndexRunning = enabled
@@ -523,7 +523,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     TreeSection:Paragraph("Tree",{
         Title = "Note",
-        Content = "If you have auto hatch enabled, the speed in which you can break trees will massively decline. For best results, disable auto hatch while using the auto cut trees toggle.",
+        Content = "Eğer otomatik yumurta açma (auto hatch) etkinse, ağaçları kesme hızınız büyük ölçüde azalacaktır. En iyi sonuçlar için, otomatik ağaç kesme (auto cut trees) özelliğini kullanırken otomatik yumurta açmayı devre dışı bırakın.",
         TitleAlignment = "Middle",
         ContentAlignment = Enum.TextXAlignment.Left
     })
@@ -921,8 +921,8 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
     })
 
     lowercooldown = TreeSection:Toggle("RemoveCooldown", {
-        Title = "Reduce Cutting Cooldown",
-        Description = "Reduces the cooldown between tree hits (about 1.5x faster). Already built in with the auto trees toggle.",
+        Title = "Balta Cooldown bypass",
+        Description = "Ağaçlara vuruşlar arasındaki bekleme süresini kısaltır (yaklaşık 1.5 kat daha hızlı). Zaten otomatik ağaç kesme (auto trees) özelliğiyle entegre edilmiştir.",
         Default = false,
         Callback = function(Value)
             if Value then
@@ -938,8 +938,8 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
     })
 
     BypassStrength = TreeSection:Toggle("BypassTreeStrength", {
-        Title = "Axe Strength Bypass",
-        Description = "Allows you to cut any tree regardless of your current axe strength",
+        Title = "Balta güç bypass",
+        Description = "Mevcut balta gücünüzden bağımsız olarak her türlü ağacı kesmenizi sağlar.",
         Default = false,
         Callback = function(Value)
             if Value then
@@ -957,8 +957,8 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     isAutoEquipAxeEnabled = false
     AutoEquip = TreeSection:Toggle("AutoEquipBestAxe", {
-        Title = "Auto Equip Best Axe",
-        Description = "Automatically equips the best axe you own.",
+        Title = "Oto En iyi baltayı kullanır",
+        Description = "Sahip olduğunuz en iyi baltayı otomatik olarak takar.",
         Default = false,
         Callback = function(enabled)
             isAutoEquipAxeEnabled = enabled
@@ -1022,8 +1022,8 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
     UpgradeAxe = Tabs.Tree:AddSection("Upgrade Axe")
     
     UpgradeAxe:Button({
-    Title = "Enable Recommended Settings",
-    Description = "Automatically enables: Auto Equip Best Axe, Reduce Cutting Cooldown, and Axe Strength Bypass",
+    Title = "Önerilen ayarları etkinleştir",
+    Description = "Otomatik olarak etkinleştirir: En İyi Balta Otomatik Ekipmanı, Kesim Bekleme Süresi Azaltma ve Balta Gücü Geçişi.",
     Callback = function()
         AutoEquip:SetValue(true)
         lowercooldown:SetValue(true) 
@@ -1500,7 +1500,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     AutoCritDamageSection:Toggle("AutoCriticalTap", {
         Title = "Auto Critical Tap",
-        Description = "You will always deal 1000x damage. Incredibly overpowered.",
+        Description = "Her zaman 1000 kat hasar vereceksiniz. Son derece güçlü.",
         Default = false,
         Callback = function(Value)
             autoCriticalTapEnabled = Value
@@ -1525,7 +1525,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     AutoPickupPowerups:Toggle("AutoPickupPowerups", {
         Title = "Auto Pickup Powerups",
-        Description = "Automatically picks up all available dungeon powerups.",
+        Description = "Mevcut tüm dungeon güçlendirmelerini otomatik olarak toplar.",
         Default = false,
         Callback = function(Value)
             autoPickupEnabled = Value
@@ -1593,7 +1593,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     EquipBest:Toggle("EquipBestDungeonPets", {
         Title = "Equip Best Dungeon Pets",
-        Description = "Automatically equips the best dungeon pets and removes weaker ones. Checks every 5 seconds.",
+        Description = "En iyi dungeon evcil hayvanlarını otomatik olarak takar ve daha zayıf olanları çıkarır. Her 5 saniyede bir kontrol eder.",
         Default = false,
         Callback = function(Value)
             equipBestPetsEnabled = Value
@@ -1733,7 +1733,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
     local autoJoinEnabled = false
     DungeonAutoJoinSection:Toggle("AutoJoinDungeon", {
         Title = "Auto Join Dungeon",
-        Description = "Automatically joins the selected dungeon gamemode. The game has no bosses in level 101, so if the script's aren't doing anything, it's because you will need to wait out the timer.",
+        Description = "Seçilen zindan oyun moduna otomatik olarak katılır. Oyun, 101. seviyede boss'lar içermez, bu yüzden eğer komut dosyaları bir şey yapmıyorsa, zamanlayıcıyı beklemeniz gerektiği içindir.",
         Default = false,
         Callback = function(Value)
             autoJoinEnabled = Value
@@ -1774,7 +1774,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     DungeonUISection:Toggle("KeepHUDVisible", {
         Title = "Keep HUD Visible",
-        Description = "Prevents the dungeon from hiding your HUD. This must be on before entering a dungeon to work.",
+        Description = "Dungeonun HUD'unuzu gizlemesini engeller. Bunun çalışabilmesi için zindana girmeden önce açık olmalıdır.",
         Default = false,
         Callback = function(enabled)
             isHUDOverrideEnabled = enabled
@@ -1797,7 +1797,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     DungeonUISection:Toggle("StopScreenShakes", {
         Title = "Stop Screen Shakes",
-        Description = "Prevents dungeon screen shakes and critical tap effects.",
+        Description = "Dungeon ekran sarsıntılarını ve kritik tıklama etkilerini engeller.",
         Default = false,
         Callback = function(enabled)
             isStopScreenShakeEnabled = enabled
@@ -1828,7 +1828,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     DungeonUISection:Toggle("PreventTeleport", {
         Title = "Prevent Teleport",
-        Description = "Prevents teleporting when the dungeon ends. DO NOT use this unless you are using the Auto Join Dungeon toggle, or you will be stuck.",
+        Description = "Dungeon bittiğinde teleport etmeyi engeller. Bunu otomatik zindana katılma (Auto Join Dungeon) özelliğini kullanmıyorsanız kullanmayın, aksi takdirde sıkışıp kalabilirsiniz.",
         Default = false,
         Callback = function(enabled)
             isPreventTeleportEnabled = enabled
@@ -1935,7 +1935,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
     local autoBuyShopEnabled = false
     DungeonMerchant:Toggle("AutoBuyShopItems", {
         Title = "Auto Buy Selected Items",
-        Description = "Automatically buys selected items when they appear in the dungeon shop",
+        Description = "Dungeon dükkanında beliren seçilen eşyaları otomatik olarak satın alır.",
         Default = false,
         Callback = function(Value)
             autoBuyShopEnabled = Value
@@ -2052,7 +2052,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
     local autoDungeonUpgradeEnabled = false
     DungeonUpgrades:Toggle("AutoUpgrade", {
         Title = "Auto Upgrade",
-        Description = "Automatically buys selected dungeon upgrades when you can afford them",
+        Description = "Alabilecek kadar paranız olduğunda, seçilen Dungeon yükseltmelerini otomatik olarak satın alır.",
         Default = false,
         Callback = function(Value)
             autoDungeonUpgradeEnabled = Value
@@ -2125,7 +2125,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     explorerroom:Button({
         Title = "Claim Hints",
-        Description = "Automatically claims all available explorer hints",
+        Description = "Mevcut tüm keşif ipuçlarını otomatik olarak talep eder.",
         Callback = function()
             pcall(function()
                 local Knit = require(ReplicatedStorage.Packages.Knit)
@@ -2165,7 +2165,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     explorerroom:Button({
         Title = "Get all Scattered Explorer Items",
-        Description = "Like the title says, you will get the scattered items - e.g globe",
+        Description = "Başlıkta belirtildiği gibi, dağılmış eşyaları alırsınız – örneğin, küre gibi.",
         Callback = function()
             pcall(function()
                 local explorerRoom = workspace.Game.Maps.Spaceship:FindFirstChild("extra explorer room")
@@ -2198,7 +2198,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
 
     ActivateLeversSection:Toggle("AutoActivateLevers", {
         Title = "Activate Light Switches",
-        Description = "Automatically activates built light switches that haven't been activated yet",
+        Description = "Henüz etkinleştirilmemiş olan inşa edilmiş ışık anahtarlarını otomatik olarak etkinleştirir.",
         Default = false,
         Callback = function(Value)
             local autoActivateEnabled = Value
@@ -2366,7 +2366,7 @@ local RebirthSection = Tabs.Main:AddSection("Rebirths")
     -- 💠 Toggle for Auto Chest Collection
     ClaimSection:Toggle("Auto Collect Mini-Chests", {
         Title = "Auto Collect Mini-Chests",
-        Description = "Automatically teleports through unlocked zones and collects all mini-chests until stopped.",
+        Description = "Kilidi açılmış bölgelerden otomatik olarak teleport olur ve durdurulana kadar tüm mini sandıkları toplar.",
         Default = false,
         Callback = function(enabled)
             isAutoCollectEnabled = enabled
