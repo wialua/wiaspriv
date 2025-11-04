@@ -13,7 +13,9 @@ local username = player.Name
 
 
 local Library = loadstring(game:HttpGetAsync("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/bigbeanscripts/Pet-Warriors/refs/heads/main/test"))()
 local InterfaceManager = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/InterfaceManager.luau"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/SenhorLDS/ProjectLDSHUB/refs/heads/main/Anti%20AFK"))()
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -4485,13 +4487,13 @@ task.spawn(function()
     Values = require(ReplicatedStorage.Shared.Values)   
 
     Window = Library:Window{
-        Title = "bequit army",
-        SubTitle = "🎃",
+        Title = "RCU",
+        SubTitle = "By Duckie",
         TabWidth = 160,
         Size =  UDim2.fromOffset(580, 460),
         Resize = false,
         Theme = "Darker",
-        MinimizeKey = Enum.KeyCode.F4
+        MinimizeKey = Enum.KeyCode.LeftShift
     }
 
     Tabs = {
