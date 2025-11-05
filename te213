@@ -1425,13 +1425,13 @@ task.spawn(function()
 
     -- Now that services are ready, build the UI
     Window = Library:Window{
-        Title = "be quit army",
+        Title = "bequit army",
         SubTitle = "🎃",
         TabWidth = 160,
         Size =  UDim2.fromOffset(580, 460),
         Resize = false,
         Theme = "Darker",
-        MinimizeKey = Enum.KeyCode.LeftShift
+        MinimizeKey = Enum.KeyCode.RightShift
     }
 
     Tabs = {
