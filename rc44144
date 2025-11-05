@@ -44,6 +44,16 @@ local BuildUI, getUnlockedRebirthOptions, GetBestRebirthOption, updateRebirthDro
 
 BuildUI = function()
 
+local EventSection = Tabs.Event:AddSection("Halloween Event")
+
+    EventSection:AddButton({
+        Title = "Halloween Scriptini açmak için bas!",
+        Description = "Halloween Scriptini açar",
+        Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/te213",true))()
+        end
+    })
+
     local ClickSection = Tabs.Main:AddSection("Auto Click")
 
     local AutoClick =ClickSection:Toggle("AutoClick", {
@@ -3133,6 +3143,7 @@ task.spawn(function()
 
     Tabs = {
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+        Event = Window:AddTab({ Title = "Event", Icon = "ghost" }),
         Main = Window:AddTab({ Title = "Auto Farm", Icon = "crown" }),
         Eggs = Window:AddTab({ Title = "Eggs", Icon = "egg" }),
         Tree = Window:AddTab({ Title = "Axe/Tree", Icon = "phosphor-tree-evergreen-duotone" }),
