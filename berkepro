@@ -1,0 +1,344 @@
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+local Window = Library:CreateWindow({
+    Title = 'Auto farm v1.0',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Tokens & MyCrops'),
+    Fields = Window:AddTab('Fields'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+local selectedToken = nil
+local selectedMyCrop = nil
+local selectedField = nil
+local tpDelayToken = 0  -- Token için ultra hızlı (0s)
+local tpDelayCrop = 0.1  -- Crop için biraz geride
+local tpHeight = 4
+
+local function deepScan(folderName)
+    local folder = workspace:FindFirstChild(folderName)
+    if not folder then return {} end
+    
+    local uniqueNames = {}
+    local seen = {}
+    
+    local function recurse(obj)
+        pcall(function()
+            for _, child in ipairs(obj:GetDescendants()) do
+                if child:IsA("BasePart") then
+                    local name = child.Name
+                    if not seen[name] then
+                        seen[name] = true
+                        table.insert(uniqueNames, name)
+                    end
+                end
+            end
+        end)
+    end
+    
+    recurse(folder)
+    table.sort(uniqueNames)
+    return uniqueNames
+end
+
+local function getTargets(folderName, targetName)
+    local folder = workspace:FindFirstChild(folderName)
+    if not folder then return {} end
+    
+    local targets = {}
+    
+    local function recurse(obj)
+        pcall(function()
+            for _, child in ipairs(obj:GetDescendants()) do
+                if child:IsA("BasePart") and child.Name == targetName and child.Parent then
+                    table.insert(targets, child)
+                end
+            end
+        end)
+    end
+    
+    recurse(folder)
+    return targets
+end
+
+local LeftMain = Tabs.Main:AddLeftGroupbox('Tokens Farm - PRIORITY ULTRA FAST')
+local RightMain = Tabs.Main:AddRightGroupbox('MyCrops Farm')
+
+local TokenDrop = LeftMain:AddDropdown('TokenDropdown', {
+    Values = deepScan("Tokens"),
+    Default = 1,
+    Multi = false,
+    Text = 'Tokens',
+    Callback = function(v) selectedToken = v end
+})
+
+local MyCropDrop = RightMain:AddDropdown('MyCropDropdown', {
+    Values = deepScan("MyCrops"),
+    Default = 1,
+    Multi = false,
+    Text = 'MyCrops',
+    Callback = function(v) selectedMyCrop = v end
+})
+
+LeftMain:AddSlider('TpHeightSlider', {
+    Text = 'TP Height',
+    Default = 4,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Callback = function(v) tpHeight = v end
+})
+
+LeftMain:AddToggle('TpTokensToggle', {
+    Text = 'Tokens TP - GOD SPEED',
+    Default = false,
+    Callback = function(v)
+        if v and selectedToken then
+            task.spawn(function()
+                local player = game.Players.LocalPlayer
+                while Toggles.TpTokensToggle.Value do
+                    pcall(function()
+                        local char = player.Character
+                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if not hrp then task.wait(0.05); return end
+                        
+                        local targets = getTargets("Tokens", selectedToken)
+                        if #targets == 0 then task.wait(0.03); return end
+                        
+                        table.sort(targets, function(a,b) return (hrp.Position - a.Position).Magnitude < (hrp.Position - b.Position).Magnitude end)
+                        
+                        for _, token in ipairs(targets) do
+                            if not Toggles.TpTokensToggle.Value then break end
+                            if token and token.Parent then
+                                hrp.AssemblyLinearVelocity = Vector3.zero
+                                hrp.AssemblyAngularVelocity = Vector3.zero
+                                hrp.Velocity = Vector3.zero
+                                hrp.RotVelocity = Vector3.zero
+                                hrp.CFrame = CFrame.new(token.Position + Vector3.new(0, tpHeight, 0))
+                                
+                                local start = tick()
+                                while token.Parent and tick() - start < 0.1 do task.wait(0.01) end
+                            end
+                            task.wait(tpDelayToken)
+                        end
+                    end)
+                    task.wait()
+                end
+            end)
+        end
+    end
+})
+
+RightMain:AddToggle('TpMyCropsToggle', {
+    Text = 'MyCrops TP',
+    Default = false,
+    Callback = function(v)
+        if v and selectedMyCrop then
+            task.spawn(function()
+                local player = game.Players.LocalPlayer
+                while Toggles.TpMyCropsToggle.Value do
+                    pcall(function()
+                        local char = player.Character
+                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if not hrp then task.wait(0.1); return end
+                        
+                        local targets = getTargets("MyCrops", selectedMyCrop)
+                        if #targets == 0 then task.wait(0.05); return end
+                        
+                        table.sort(targets, function(a,b) return (hrp.Position - a.Position).Magnitude < (hrp.Position - b.Position).Magnitude end)
+                        
+                        for _, crop in ipairs(targets) do
+                            if not Toggles.TpMyCropsToggle.Value then break end
+                            if crop and crop.Parent then
+                                hrp.AssemblyLinearVelocity = Vector3.zero
+                                hrp.AssemblyAngularVelocity = Vector3.zero
+                                hrp.Velocity = Vector3.zero
+                                hrp.RotVelocity = Vector3.zero
+                                hrp.CFrame = CFrame.new(crop.Position + Vector3.new(0, tpHeight, 0))
+                                
+                                local start = tick()
+                                while crop.Parent and tick() - start < 0.2 do task.wait(0.02) end
+                            end
+                            task.wait(tpDelayCrop)
+                        end
+                    end)
+                    task.wait()
+                end
+            end)
+        end
+    end
+})
+
+local FieldsLeft = Tabs.Fields:AddLeftGroupbox('Fields TP')
+
+local FieldDrop = FieldsLeft:AddDropdown('FieldDropdown', {
+    Values = deepScan("Fields"),
+    Default = 1,
+    Multi = false,
+    Text = 'Fields',
+    Callback = function(v) selectedField = v end
+})
+
+FieldsLeft:AddToggle('TpFieldsToggle', {
+    Text = 'Fields TP',
+    Default = false,
+    Callback = function(v)
+        if v and selectedField then
+            task.spawn(function()
+                local player = game.Players.LocalPlayer
+                while Toggles.TpFieldsToggle.Value do
+                    pcall(function()
+                        local char = player.Character
+                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if not hrp then task.wait(0.1); return end
+                        
+                        local targets = getTargets("Fields", selectedField)
+                        if #targets == 0 then task.wait(0.05); return end
+                        
+                        table.sort(targets, function(a,b) return (hrp.Position - a.Position).Magnitude < (hrp.Position - b.Position).Magnitude end)
+                        
+                        for _, field in ipairs(targets) do
+                            if not Toggles.TpFieldsToggle.Value then break end
+                            if field and field.Parent then
+                                hrp.AssemblyLinearVelocity = Vector3.zero
+                                hrp.AssemblyAngularVelocity = Vector3.zero
+                                hrp.Velocity = Vector3.zero
+                                hrp.RotVelocity = Vector3.zero
+                                hrp.CFrame = CFrame.new(field.Position + Vector3.new(0, tpHeight, 0))
+                                
+                                local start = tick()
+                                while field.Parent and tick() - start < 0.2 do task.wait(0.02) end
+                            end
+                            task.wait(tpDelayCrop)
+                        end
+                    end)
+                    task.wait()
+                end
+            end)
+        end
+    end
+})
+
+LeftMain:AddToggle('AutoSellToggle', {
+    Text = 'Auto Sell - 3sn',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local Event = game:GetService("ReplicatedStorage").Remotes.Purchase2
+                while Toggles.AutoSellToggle.Value do
+                    pcall(function()
+                        Event:FireServer("fgtiuyw4eror4tuyfd%HHHHHHHhddset678%iftes7%7w4ftr76st76fs")
+                    end)
+                    task.delay(3)  -- FPS-safe 3sn delay
+                end
+            end)
+        end
+    end
+})
+
+LeftMain:AddToggle('SpamToggle', {
+    Text = 'Harvest Swing - GOD SPEED',
+    Default = false,
+    Callback = function(v)
+        local rs = game:GetService("ReplicatedStorage")
+        local event = rs:FindFirstChild("HarvestSwing")
+        if not event then Library:Notify('No HarvestSwing'); Toggles.SpamToggle:SetValue(false); return end
+        
+        local conn
+        if v then
+            conn = game:GetService("RunService").Heartbeat:Connect(function()
+                if Toggles.SpamToggle.Value then pcall(event.FireServer, event) end
+            end)
+        else
+            if conn then conn:Disconnect() end
+        end
+    end
+})
+
+task.spawn(function()
+    while not Library.Unloaded do
+        task.wait(0.3)
+        local names = deepScan("Tokens")
+        if #names > 0 then
+            Options.TokenDropdown:SetValues(names)
+            if not selectedToken or not table.find(names, selectedToken) then
+                selectedToken = names[1]
+                Options.TokenDropdown:SetValue(selectedToken)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while not Library.Unloaded do
+        task.wait(0.3)
+        local names = deepScan("MyCrops")
+        if #names > 0 then
+            Options.MyCropDropdown:SetValues(names)
+            if not selectedMyCrop or not table.find(names, selectedMyCrop) then
+                selectedMyCrop = names[1]
+                Options.MyCropDropdown:SetValue(selectedMyCrop)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while not Library.Unloaded do
+        task.wait(0.3)
+        local names = deepScan("Fields")
+        if #names > 0 then
+            Options.FieldDropdown:SetValues(names)
+            if not selectedField or not table.find(names, selectedField) then
+                selectedField = names[1]
+                Options.FieldDropdown:SetValue(selectedField)
+            end
+        end
+    end
+end)
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+MenuGroup:AddButton('Unload', function() Library:Unload() end)
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true, Text = 'Menu keybind' })
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+ThemeManager:SetFolder('UltimateFarmV5')
+SaveManager:SetFolder('UltimateFarmV5/game')
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
+
+Library:SetWatermarkVisibility(true)
+local FrameTimer = tick()
+local FrameCounter = 0
+local FPS = 60
+local WatermarkConnection = game:GetService('RunService').RenderStepped:Connect(function()
+    FrameCounter += 1
+    if tick() - FrameTimer >= 1 then
+        FPS = FrameCounter
+        FrameTimer = tick()
+        FrameCounter = 0
+    end
+    Library:SetWatermark('v1.0 Berke veletlere abilik yapar | ' .. math.floor(FPS) .. ' FPS')
+end)
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    print('v5.0 Unloaded!')
+    Library.Unloaded = true
+end)
