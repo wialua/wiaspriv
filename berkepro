@@ -242,7 +242,6 @@ MainLeft:AddDropdown('TokenDropdown', {
     Tooltip = 'Name (Count) - Auto updates instantly',
     Callback = function(v)
         selectedToken = parseName(v)
-        Library:Notify('Selected: ' .. selectedToken)
     end
 })
 
@@ -284,7 +283,6 @@ MainRight:AddDropdown('CropDropdown', {
     Tooltip = 'Name (Count) - Auto updates instantly',
     Callback = function(v)
         selectedCrop = parseName(v)
-        Library:Notify('Selected: ' .. selectedCrop)
     end
 })
 
@@ -326,7 +324,6 @@ FieldsGroup:AddDropdown('FieldDropdown', {
     Tooltip = 'Name (Count) - Auto if folder exists',
     Callback = function(v)
         selectedField = parseName(v)
-        Library:Notify('Selected: ' .. selectedField)
     end
 })
 
@@ -491,21 +488,6 @@ UpgradesGroup:AddToggle('PumpkinUpgrade2', {
     end
 })
 
-UpgradesGroup:AddButton({
-    Text = 'All Once',
-    Func = function()
-        local event = ReplicatedStorage.Remotes:FindFirstChild("Upgrade")
-        if event then
-            pcall(function() event:FireServer("PassiveSkulls", "Pumpkin") end)
-            pcall(function() event:FireServer("PumkinUpgrade", "Pumpkin") end)
-            pcall(function() event:FireServer("PumkinUpgrade2", "Skull") end)
-            Library:Notify('Fired all!')
-        else
-            Library:Notify('Upgrade missing!')
-        end
-    end
-})
-
 -- ==================== LIVE DROPDOWN REFRESH ====================
 task.spawn(function()
     local lastKey = ''
@@ -576,7 +558,182 @@ task.spawn(function()
     end
 end)
 
--- ==================== WATERMARK ====================
+local tokenPartsByName = {}
+local cropPartsByName = {}
+local fieldPartsByName = {}
+local selectedToken = nil
+local selectedCrop = nil
+local selectedField = nil
+local tokenHeight = 4
+local cropHeight = 4
+local fieldHeight = 7
+local autoSellDelay = 1
+local upgradeDelay = 0.5
+local farmConn = nil
+local autoCollectConn = nil
+local autoCollectHeartbeat = nil
+local connections = {}
+local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or nil
+
+local function updateRootPart()
+    local char = LocalPlayer.Character
+    if char then
+        rootPart = char:FindFirstChild("HumanoidRootPart")
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    newChar.ChildAdded:Connect(updateRootPart)
+    task.wait(0.1)
+    updateRootPart()
+    if Toggles.AutoCollectV2Test and Toggles.AutoCollectV2Test.Value then
+        local fireAllExisting = function()
+            if not rootPart then return end
+            for _, descendant in pairs(tokensFolder:GetDescendants()) do
+                if descendant.Name == "TouchInterest" and descendant.Parent then
+                    firetouchinterest(rootPart, descendant.Parent, 0)
+                end
+            end
+        end
+        fireAllExisting()
+    end
+end)
+
+updateRootPart()
+
+local function fireAllExisting()
+    if not rootPart then return end
+    for _, descendant in pairs(tokensFolder:GetDescendants()) do
+        if descendant.Name == "TouchInterest" and descendant.Parent then
+            firetouchinterest(rootPart, descendant.Parent, 0)
+        end
+    end
+end
+
+local function startAutoCollect()
+    if autoCollectConn then return end
+    fireAllExisting()
+    autoCollectConn = tokensFolder.ChildAdded:Connect(function(newToken)
+        if not rootPart then return end
+        local touchInterest = newToken:WaitForChild("TouchInterest", 5)
+        if touchInterest then
+            firetouchinterest(rootPart, newToken, 0)
+        end
+    end)
+    autoCollectHeartbeat = RunService.Heartbeat:Connect(function()
+        if not Toggles.AutoCollectV2Test.Value or not rootPart then return end
+        for _, descendant in pairs(tokensFolder:GetDescendants()) do
+            if descendant.Name == "TouchInterest" and descendant.Parent then
+                firetouchinterest(rootPart, descendant.Parent, 0)
+            end
+        end
+    end)
+end
+
+local function stopAutoCollect()
+    if autoCollectConn then
+        autoCollectConn:Disconnect()
+        autoCollectConn = nil
+    end
+    if autoCollectHeartbeat then
+        autoCollectHeartbeat:Disconnect()
+        autoCollectHeartbeat = nil
+    end
+end
+
+MainLeft:AddToggle('AutoCollectV2Test', {
+    Text = 'Auto Collect v2 Test (Ultra Fast)',
+    Default = false,
+    Tooltip = 'Firetouch all tokens instantly + loop',
+    Callback = function(v)
+        if v then
+            startAutoCollect()
+        else
+            stopAutoCollect()
+        end
+    end
+})
+
+UpgradesGroup:AddToggle('CandyCornUpgrade', {
+    Text = 'Candy Corn Upgrade',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
+                if not event then
+                    Library:Notify('Upgrade not found!', 5)
+                    Toggles.CandyCornUpgrade:SetValue(false)
+                    return
+                end
+                while Toggles.CandyCornUpgrade.Value do
+                    pcall(function() event:FireServer("CandyCornUpgrade1", "Skull") end)
+                    task.wait(upgradeDelay)
+                end
+            end)
+        end
+    end
+})
+
+UpgradesGroup:AddToggle('CandyCornUpgrade2', {
+    Text = 'Candy Corn Upgrade 2',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
+                if not event then
+                    Library:Notify('Upgrade not found!', 5)
+                    Toggles.CandyCornUpgrade2:SetValue(false)
+                    return
+                end
+                while Toggles.CandyCornUpgrade2.Value do
+                    pcall(function() event:FireServer("CandyCornUpgrade2", "Pumpkin") end)
+                    task.wait(upgradeDelay)
+                end
+            end)
+        end
+    end
+})
+UpgradesGroup:AddToggle('CropsUpgrade1', {
+    Text = 'Crops Upgrade 1',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
+                if not event then
+                    Library:Notify('Upgrade not found!', 5)
+                    Toggles.CropsUpgrade1:SetValue(false)
+                    return
+                end
+                while Toggles.CropsUpgrade1.Value do
+                    pcall(function() event:FireServer("MuscleMultiUpgrade1", "Cash") end)
+                    task.wait(upgradeDelay)
+                end
+            end)
+        end
+    end
+})
+
+UpgradesGroup:AddButton({
+    Text = 'All Once',
+    Func = function()
+        local event = ReplicatedStorage.Remotes:FindFirstChild("Upgrade")
+        if event then
+            pcall(function() event:FireServer("PassiveSkulls", "Pumpkin") end)
+            pcall(function() event:FireServer("PumkinUpgrade", "Pumpkin") end)
+            pcall(function() event:FireServer("PumkinUpgrade2", "Skull") end)
+            pcall(function() event:FireServer("CandyCornUpgrade1", "Skull") end)
+            pcall(function() event:FireServer("CandyCornUpgrade2", "Pumpkin") end)
+            pcall(function() event:FireServer("MuscleMultiUpgrade1", "Cash") end)
+            Library:Notify('Fired all!')
+        else
+            Library:Notify('Upgrade missing!')
+        end
+    end
+})
+
 Library:SetWatermarkVisibility(true)
 local FrameTimer, FrameCounter, FPS = tick(), 0, 60
 local WatermarkConn = RunService.RenderStepped:Connect(function()
