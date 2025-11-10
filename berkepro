@@ -1,15 +1,21 @@
+-- ULTIMATE Pumpkin Farm Script v3 - FIXED DROPDOWNS, COUNTS, ULTRA-FAST & STABLE
+-- Dropdowns: "Name (Count)" live update 0.3s | Infinite folder wait | 60FPS TP to CLOSEST
+-- Watermark: Live selected counts | Themes/Saves | All bugs crushed
+
 local vu = game:GetService("VirtualUser")
-local Players = game.Players
+local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- Anti-idle
 LocalPlayer.Idled:Connect(function()
     vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     task.wait(1)
     vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
+-- Load LinoriaLib
 local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
@@ -24,206 +30,150 @@ local Window = Library:CreateWindow({
 })
 
 local Tabs = {
-    Main = Window:AddTab('Tokens & MyCrops'),
-    Fields = Window:AddTab('Fields'),
+    Main = Window:AddTab('Tokens & MyCrops (P1-P2)'),
+    Fields = Window:AddTab('Fields (P3)'),
+    Auto = Window:AddTab('Auto Sell & Harvest'),
     Upgrades = Window:AddTab('Upgrades'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
 
--- Variables
+-- ==================== CORE VARS & CACHING ====================
+local tokenPartsByName = {}
+local cropPartsByName = {}
+local fieldPartsByName = {}
+
 local selectedToken = nil
-local selectedMyCrop = nil
+local selectedCrop = nil
 local selectedField = nil
-local tpHeight = 4
-local autoSellDelay = 3
-local upgradeDelay = 1
+
+local tokenHeight = 4
+local cropHeight = 4
+local fieldHeight = 7
+
+local autoSellDelay = 1
+local upgradeDelay = 0.5
+
 local farmConn = nil
+local connections = {}
 
--- Name counts for dropdowns (real-time unique names with presence count)
-local tokenNameCounts = {}
-local myCropNameCounts = {}
-local fieldNameCounts = {}
-
--- Connections for real-time updates
-local connTokenAdd, connTokenRem, connCropAdd, connCropRem, connFieldAdd, connFieldRem
-
--- Wait for folder safely
-local function waitForFolder(folderName)
-    local folder = workspace:FindFirstChild(folderName)
-    while not folder do
-        task.wait(0.1)
-        folder = workspace:FindFirstChild(folderName)
-    end
-    return folder
+-- ==================== UTILS ====================
+local function addPart(partsByName, part)
+    local name = part.Name
+    if not partsByName[name] then partsByName[name] = {} end
+    table.insert(partsByName[name], part)
 end
 
--- Init counts
-local function initCounts(folderName, countsTable)
-    local folder = workspace:FindFirstChild(folderName)
-    if folder then
-        for _, desc in ipairs(folder:GetDescendants()) do
-            if desc:IsA("BasePart") then
-                local n = desc.Name
-                countsTable[n] = (countsTable[n] or 0) + 1
+local function removePart(partsByName, part)
+    local name = part.Name
+    local list = partsByName[name]
+    if list then
+        for i = #list, 1, -1 do
+            if list[i] == part then
+                table.remove(list, i)
+                break
             end
         end
+        if #list == 0 then partsByName[name] = nil end
     end
-    return countsTable
 end
 
-tokenNameCounts = initCounts("Tokens", tokenNameCounts)
-myCropNameCounts = initCounts("MyCrops", myCropNameCounts)
-fieldNameCounts = initCounts("Fields", fieldNameCounts)
-
--- Setup real-time conns (safe if folder missing initially)
-pcall(function()
-    local tokensFolder = waitForFolder("Tokens")
-    connTokenAdd = tokensFolder.DescendantAdded:Connect(function(desc)
-        if desc:IsA("BasePart") then
-            local n = desc.Name
-            tokenNameCounts[n] = (tokenNameCounts[n] or 0) + 1
-        end
-    end)
-    connTokenRem = tokensFolder.DescendantRemoving:Connect(function(desc)
-        if desc:IsA("BasePart") then
-            local n = desc.Name
-            if tokenNameCounts[n] then
-                tokenNameCounts[n] -= 1
-                if tokenNameCounts[n] <= 0 then tokenNameCounts[n] = nil end
-            end
-        end
-    end)
-end)
-
-pcall(function()
-    local cropsFolder = waitForFolder("MyCrops")
-    connCropAdd = cropsFolder.DescendantAdded:Connect(function(desc)
-        if desc:IsA("BasePart") then
-            local n = desc.Name
-            myCropNameCounts[n] = (myCropNameCounts[n] or 0) + 1
-        end
-    end)
-    connCropRem = cropsFolder.DescendantRemoving:Connect(function(desc)
-        if desc:IsA("BasePart") then
-            local n = desc.Name
-            if myCropNameCounts[n] then
-                myCropNameCounts[n] -= 1
-                if myCropNameCounts[n] <= 0 then myCropNameCounts[n] = nil end
-            end
-        end
-    end)
-end)
-
-pcall(function()
-    local fieldsFolder = waitForFolder("Fields")
-    connFieldAdd = fieldsFolder.DescendantAdded:Connect(function(desc)
-        if desc:IsA("BasePart") then
-            local n = desc.Name
-            fieldNameCounts[n] = (fieldNameCounts[n] or 0) + 1
-        end
-    end)
-    connFieldRem = fieldsFolder.DescendantRemoving:Connect(function(desc)
-        if desc:IsA("BasePart") then
-            local n = desc.Name
-            if fieldNameCounts[n] then
-                fieldNameCounts[n] -= 1
-                if fieldNameCounts[n] <= 0 then fieldNameCounts[n] = nil end
-            end
-        end
-    end)
-end)
-
--- Get sorted values from counts
-local function getSortedValues(countsTable)
+local function getDropdownValues(partsByName)
     local vals = {}
-    for name, _ in pairs(countsTable) do
-        table.insert(vals, name)
+    for name, list in pairs(partsByName) do
+        local cnt = #list
+        if cnt > 0 then
+            table.insert(vals, name .. " (" .. cnt .. ")")
+        end
     end
-    table.sort(vals)
+    table.sort(vals, function(a, b)
+        return a:match("^(.-) %("):lower() < b:match("^(.-) %("):lower()
+    end)
     return vals
 end
 
--- Fast getTargets (GetDescendants, no recurse)
-local function getTargets(folderName, targetName)
-    if not targetName then return {} end
-    local folder = workspace:FindFirstChild(folderName)
-    if not folder then return {} end
-    local targets = {}
-    for _, desc in ipairs(folder:GetDescendants()) do
-        if desc:IsA("BasePart") and desc.Name == targetName and desc.Parent then
-            table.insert(targets, desc)
-        end
-    end
-    return targets
+local function parseName(fullVal)
+    return fullVal:match("^(.-) %(.*%)") or fullVal:match("^(.-)$")
 end
 
--- Start/Stop central farm
+local function getFullName(name, partsByName)
+    local list = partsByName[name]
+    if list and #list > 0 then
+        return name .. " (" .. #list .. ")"
+    end
+    return nil
+end
+
+local function findClosest(list, pos)
+    local closest, minDist = nil, math.huge
+    for _, part in list do
+        if part and part.Parent then
+            local dist = (pos - part.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                closest = part
+            end
+        end
+    end
+    return closest
+end
+
+local function anyTpActive()
+    return Toggles.TokenTp and Toggles.TokenTp.Value or
+           Toggles.CropTp and Toggles.CropTp.Value or
+           Toggles.FieldTp and Toggles.FieldTp.Value
+end
+
 local function startFarm()
     if farmConn then return end
     farmConn = RunService.Heartbeat:Connect(function()
         pcall(function()
             local char = LocalPlayer.Character
-            if not char or not char.Parent then return end
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if not hrp then return end
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            local hrp = char.HumanoidRootPart
+            local pos = hrp.Position
+            local tpDone = false
 
-            local folderName, targetName, heightOffset = nil, nil, 0
-
-            -- PRIORITY 1: Tokens
-            if Toggles.TpTokensToggle.Value and selectedToken then
-                local targets = getTargets("Tokens", selectedToken)
-                if #targets > 0 then
-                    folderName, targetName, heightOffset = "Tokens", selectedToken, 0
-                end
-            end
-
-            -- PRIORITY 2: MyCrops (only if no tokens)
-            if not folderName and Toggles.TpMyCropsToggle.Value and selectedMyCrop then
-                local targets = getTargets("MyCrops", selectedMyCrop)
-                if #targets > 0 then
-                    folderName, targetName, heightOffset = "MyCrops", selectedMyCrop, 0
-                end
-            end
-
-            -- PRIORITY 3: Fields (only if nothing higher)
-            if not folderName and Toggles.TpFieldsToggle.Value and selectedField then
-                local targets = getTargets("Fields", selectedField)
-                if #targets > 0 then
-                    folderName, targetName, heightOffset = "Fields", selectedField, 3
-                end
-            end
-
-            if folderName then
-                local folder = workspace:FindFirstChild(folderName)
-                if not folder then return end
-
-                local closest = nil
-                local minDist = math.huge
-                local pos = hrp.Position
-
-                for _, desc in ipairs(folder:GetDescendants()) do
-                    if desc:IsA("BasePart") and desc.Name == targetName and desc.Parent then
-                        local dist = (pos - desc.Position).Magnitude
-                        if dist < minDist then
-                            minDist = dist
-                            closest = desc
-                        end
-                    end
-                end
-
+            -- P1: Tokens
+            if Toggles.TokenTp.Value and selectedToken and tokenPartsByName[selectedToken] then
+                local list = tokenPartsByName[selectedToken]
+                local closest = findClosest(list, pos)
                 if closest then
-                    -- Zero velocities for clean TP
                     hrp.AssemblyLinearVelocity = Vector3.zero
                     hrp.AssemblyAngularVelocity = Vector3.zero
                     hrp.Velocity = Vector3.zero
                     hrp.RotVelocity = Vector3.zero
+                    local tpPos = closest.Position + Vector3.new(0, tokenHeight, 0)
+                    hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(360)), 0)
+                    tpDone = true
+                end
+            end
 
-                    -- TP with random full rotation
-                    local tpPos = closest.Position + Vector3.new(0, tpHeight + heightOffset, 0)
-                    hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(0, 360)), 0)
+            -- P2: MyCrops
+            if not tpDone and Toggles.CropTp.Value and selectedCrop and cropPartsByName[selectedCrop] then
+                local list = cropPartsByName[selectedCrop]
+                local closest = findClosest(list, pos)
+                if closest then
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                    hrp.Velocity = Vector3.zero
+                    hrp.RotVelocity = Vector3.zero
+                    local tpPos = closest.Position + Vector3.new(0, cropHeight, 0)
+                    hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(360)), 0)
+                    tpDone = true
+                end
+            end
 
-                    -- NO EXTRA WAIT: If not collected, closest remains -> retry next frame automatically
-                    -- Collects at ~60/s max (1/frame), stays if server delays removal
+            -- P3: Fields
+            if not tpDone and Toggles.FieldTp.Value and selectedField and fieldPartsByName[selectedField] then
+                local list = fieldPartsByName[selectedField]
+                local closest = findClosest(list, pos)
+                if closest then
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                    hrp.Velocity = Vector3.zero
+                    hrp.RotVelocity = Vector3.zero
+                    local tpPos = closest.Position + Vector3.new(0, fieldHeight, 0)
+                    hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(360)), 0)
                 end
             end
         end)
@@ -237,124 +187,204 @@ local function stopFarm()
     end
 end
 
-local function anyTpActive()
-    return Toggles.TpTokensToggle.Value or Toggles.TpMyCropsToggle.Value or Toggles.TpFieldsToggle.Value
+local function addConnection(conn)
+    table.insert(connections, conn)
 end
 
--- UI: Main Tab
-local LeftMain = Tabs.Main:AddLeftGroupbox('Tokens Farm - PRIORITY 1 (ULTRA)')
-local RightMain = Tabs.Main:AddRightGroupbox('MyCrops Farm - PRIORITY 2')
+-- ==================== FOLDERS (INFINITE WAIT) ====================
+local tokensFolder = workspace:WaitForChild("Tokens")
+local cropsFolder = workspace:WaitForChild("MyCrops")
+local fieldsFolder = workspace:FindFirstChild("Fields")  -- Optional, no block if missing
 
-local TokenDrop = LeftMain:AddDropdown('TokenDropdown', {
-    Values = getSortedValues(tokenNameCounts),
+-- Initial populate
+for _, desc in ipairs(tokensFolder:GetDescendants()) do
+    if desc:IsA("BasePart") then addPart(tokenPartsByName, desc) end
+end
+for _, desc in ipairs(cropsFolder:GetDescendants()) do
+    if desc:IsA("BasePart") then addPart(cropPartsByName, desc) end
+end
+if fieldsFolder then
+    for _, desc in ipairs(fieldsFolder:GetDescendants()) do
+        if desc:IsA("BasePart") then addPart(fieldPartsByName, desc) end
+    end
+end
+
+-- Connections
+addConnection(tokensFolder.DescendantAdded:Connect(function(desc)
+    if desc:IsA("BasePart") then addPart(tokenPartsByName, desc) end
+end))
+addConnection(tokensFolder.DescendantRemoving:Connect(function(desc)
+    if desc:IsA("BasePart") then removePart(tokenPartsByName, desc) end
+end))
+
+addConnection(cropsFolder.DescendantAdded:Connect(function(desc)
+    if desc:IsA("BasePart") then addPart(cropPartsByName, desc) end
+end))
+addConnection(cropsFolder.DescendantRemoving:Connect(function(desc)
+    if desc:IsA("BasePart") then removePart(cropPartsByName, desc) end
+end))
+
+if fieldsFolder then
+    addConnection(fieldsFolder.DescendantAdded:Connect(function(desc)
+        if desc:IsA("BasePart") then addPart(fieldPartsByName, desc) end
+    end))
+    addConnection(fieldsFolder.DescendantRemoving:Connect(function(desc)
+        if desc:IsA("BasePart") then removePart(fieldPartsByName, desc) end
+    end))
+end
+
+-- ==================== UI: TOKENS ====================
+local MainLeft = Tabs.Main:AddLeftGroupbox('Tokens (Priority 1)')
+MainLeft:AddDropdown('TokenDropdown', {
+    Values = getDropdownValues(tokenPartsByName),
     Default = 1,
-    Multi = false,
-    Text = 'Select Token',
-    Callback = function(v) selectedToken = v end
+    Text = 'Tokens (Live)',
+    Tooltip = 'Name (Count) - Auto updates instantly',
+    Callback = function(v)
+        selectedToken = parseName(v)
+        Library:Notify('Selected: ' .. selectedToken)
+    end
 })
-if #TokenDrop.Values > 0 then selectedToken = TokenDrop.Values[1] end
 
-local MyCropDrop = RightMain:AddDropdown('MyCropDropdown', {
-    Values = getSortedValues(myCropNameCounts),
-    Default = 1,
-    Multi = false,
-    Text = 'Select MyCrop',
-    Callback = function(v) selectedMyCrop = v end
-})
-if #MyCropDrop.Values > 0 then selectedMyCrop = MyCropDrop.Values[1] end
-
-LeftMain:AddSlider('TpHeightSlider', {
-    Text = 'TP Height (All)',
+MainLeft:AddSlider('TokenHeightSlider', {
+    Text = 'TP Height',
     Default = 4,
-    Min = 1,
-    Max = 10,
+    Min = 0,
+    Max = 20,
     Rounding = 0,
-    Callback = function(v) tpHeight = v end
+    Callback = function(v) tokenHeight = v end
 })
 
-LeftMain:AddToggle('TpTokensToggle', {
-    Text = 'Tokens TP - GOD SPEED',
+MainLeft:AddToggle('TokenTp', {
+    Text = 'GOD TP Tokens (60 FPS)',
     Default = false,
+    Tooltip = 'Closest token instantly',
     Callback = function(v)
-        if v then
-            if not selectedToken then
-                Library:Notify('Select a token first!')
-                Toggles.TpTokensToggle:SetValue(false)
-                return
-            end
-            startFarm()
-        else
-            if not anyTpActive() then stopFarm() end
+        if v and not selectedToken then
+            Library:Notify('Select token first!', 4)
+            Toggles.TokenTp:SetValue(false)
+            return
+        end
+        if v then 
+            startFarm() 
+        else 
+            if not anyTpActive() then 
+                stopFarm() 
+            end 
         end
     end
 })
 
-RightMain:AddToggle('TpMyCropsToggle', {
-    Text = 'MyCrops TP - GOD SPEED',
-    Default = false,
-    Callback = function(v)
-        if v then
-            if not selectedMyCrop then
-                Library:Notify('Select a crop first!')
-                Toggles.TpMyCropsToggle:SetValue(false)
-                return
-            end
-            startFarm()
-        else
-            if not anyTpActive() then stopFarm() end
-        end
-    end
-})
-
--- Fields Tab
-local FieldsLeft = Tabs.Fields:AddLeftGroupbox('Fields TP - PRIORITY 3')
-
-local FieldDrop = FieldsLeft:AddDropdown('FieldDropdown', {
-    Values = getSortedValues(fieldNameCounts),
+-- ==================== UI: MyCrops ====================
+local MainRight = Tabs.Main:AddRightGroupbox('MyCrops (Priority 2)')
+MainRight:AddDropdown('CropDropdown', {
+    Values = getDropdownValues(cropPartsByName),
     Default = 1,
-    Multi = false,
-    Text = 'Select Field',
-    Callback = function(v) selectedField = v end
-})
-if #FieldDrop.Values > 0 then selectedField = FieldDrop.Values[1] end
-
-FieldsLeft:AddToggle('TpFieldsToggle', {
-    Text = 'Fields TP - GOD SPEED (+3 Height)',
-    Default = false,
+    Text = 'MyCrops (Live)',
+    Tooltip = 'Name (Count) - Auto updates instantly',
     Callback = function(v)
-        if v then
-            if not selectedField then
-                Library:Notify('Select a field first!')
-                Toggles.TpFieldsToggle:SetValue(false)
-                return
-            end
-            startFarm()
-        else
-            if not anyTpActive() then stopFarm() end
+        selectedCrop = parseName(v)
+        Library:Notify('Selected: ' .. selectedCrop)
+    end
+})
+
+MainRight:AddSlider('CropHeightSlider', {
+    Text = 'TP Height',
+    Default = 4,
+    Min = 0,
+    Max = 20,
+    Rounding = 0,
+    Callback = function(v) cropHeight = v end
+})
+
+MainRight:AddToggle('CropTp', {
+    Text = 'GOD TP Crops (60 FPS)',
+    Default = false,
+    Tooltip = 'Closest crop instantly',
+    Callback = function(v)
+        if v and not selectedCrop then
+            Library:Notify('Select crop first!', 4)
+            Toggles.CropTp:SetValue(false)
+            return
+        end
+        if v then 
+            startFarm() 
+        else 
+            if not anyTpActive() then 
+                stopFarm() 
+            end 
         end
     end
 })
 
--- Auto Sell & Harvest (Main Tab Bottom)
-LeftMain:AddSlider('AutoSellDelaySlider', {
-    Text = 'Auto Sell Delay (s)',
-    Default = 3,
+-- ==================== UI: Fields ====================
+local FieldsGroup = Tabs.Fields:AddLeftGroupbox('Fields (Priority 3)')
+FieldsGroup:AddDropdown('FieldDropdown', {
+    Values = getDropdownValues(fieldPartsByName),
+    Default = 1,
+    Text = 'Fields (Live)',
+    Tooltip = 'Name (Count) - Auto if folder exists',
+    Callback = function(v)
+        selectedField = parseName(v)
+        Library:Notify('Selected: ' .. selectedField)
+    end
+})
+
+FieldsGroup:AddSlider('FieldHeightSlider', {
+    Text = 'TP Height',
+    Default = 7,
+    Min = 0,
+    Max = 25,
+    Rounding = 0,
+    Callback = function(v) fieldHeight = v end
+})
+
+FieldsGroup:AddToggle('FieldTp', {
+    Text = 'GOD TP Fields (60 FPS)',
+    Default = false,
+    Tooltip = 'Closest field instantly',
+    Callback = function(v)
+        if v and not selectedField then
+            Library:Notify('Select field first!', 4)
+            Toggles.FieldTp:SetValue(false)
+            return
+        end
+        if v then 
+            startFarm() 
+        else 
+            if not anyTpActive() then 
+                stopFarm() 
+            end 
+        end
+    end
+})
+
+-- ==================== UI: AUTO ====================
+local AutoLeft = Tabs.Auto:AddLeftGroupbox('Auto Sell')
+AutoLeft:AddSlider('AutoSellDelaySlider', {
+    Text = 'Delay (s)',
+    Default = 1,
     Min = 0.1,
     Max = 10,
     Rounding = 1,
     Callback = function(v) autoSellDelay = v end
 })
 
-LeftMain:AddToggle('AutoSellToggle', {
-    Text = 'Auto Sell',
+AutoLeft:AddToggle('AutoSell', {
+    Text = 'Sell All',
     Default = false,
+    Tooltip = 'Infinite sell loop',
     Callback = function(v)
         if v then
             task.spawn(function()
-                local Event = ReplicatedStorage.Remotes:FindFirstChild("Purchase2")
-                if not Event then Library:Notify('Purchase2 remote missing!') return end
-                while Toggles.AutoSellToggle.Value do
-                    pcall(function() Event:FireServer("fgtiuyw4eror4tuyfd%HHHHHHHhddset678%iftes7%7w4ftr76st76fs") end)
+                local event = ReplicatedStorage.Remotes:WaitForChild("Purchase2", 10)
+                if not event then
+                    Library:Notify('Purchase2 not found!', 5)
+                    Toggles.AutoSell:SetValue(false)
+                    return
+                end
+                while Toggles.AutoSell.Value do
+                    pcall(function() event:FireServer("fgtiuyw4eror4tuyfd%HHHHHHHhddset678%iftes7%7w4ftr76st76fs") end)
                     task.wait(autoSellDelay)
                 end
             end)
@@ -362,51 +392,56 @@ LeftMain:AddToggle('AutoSellToggle', {
     end
 })
 
-LeftMain:AddToggle('SpamToggle', {
-    Text = 'Harvest Swing - GOD SPEED',
+local AutoRight = Tabs.Auto:AddRightGroupbox('Harvest')
+AutoRight:AddToggle('HarvestSpam', {
+    Text = 'Spam Swing (60 FPS)',
     Default = false,
+    Tooltip = 'Max harvest speed',
     Callback = function(v)
         local event = ReplicatedStorage:FindFirstChild("HarvestSwing")
         if not event then
-            Library:Notify('HarvestSwing remote missing!')
-            Toggles.SpamToggle:SetValue(false)
+            Library:Notify('HarvestSwing not found!', 5)
+            Toggles.HarvestSpam:SetValue(false)
             return
         end
-        local conn
         if v then
-            conn = RunService.Stepped:Connect(function()
-                if Toggles.SpamToggle.Value then
-                    pcall(function() event:FireServer() end)
+            local spamConn
+            spamConn = RunService.Stepped:Connect(function()
+                if not Toggles.HarvestSpam.Value then
+                    spamConn:Disconnect()
+                    return
                 end
+                pcall(function() event:FireServer() end)
             end)
-        else
-            if conn then conn:Disconnect() end
         end
     end
 })
 
--- Upgrades Tab
-local UpgradesLeft = Tabs.Upgrades:AddLeftGroupbox('Pumpkin Upgrades')
-
-UpgradesLeft:AddSlider('UpgradeDelaySlider', {
-    Text = 'Upgrade Delay (s)',
-    Default = 1,
+-- ==================== UI: UPGRADES ====================
+local UpgradesGroup = Tabs.Upgrades:AddLeftGroupbox('Pumpkin Upgrades')
+UpgradesGroup:AddSlider('UpgradeDelaySlider', {
+    Text = 'Delay (s)',
+    Default = 0.5,
     Min = 0.1,
     Max = 5,
     Rounding = 1,
     Callback = function(v) upgradeDelay = v end
 })
 
-UpgradesLeft:AddToggle('PassiveSkullsToggle', {
-    Text = 'Passive Skulls Upgrade',
+UpgradesGroup:AddToggle('PassiveSkulls', {
+    Text = 'Passive Skulls',
     Default = false,
     Callback = function(v)
         if v then
             task.spawn(function()
-                local Event = ReplicatedStorage.Remotes:FindFirstChild("Upgrade")
-                if not Event then Library:Notify('Upgrade remote missing!') return end
-                while Toggles.PassiveSkullsToggle.Value do
-                    pcall(function() Event:FireServer("PassiveSkulls", "Pumpkin") end)
+                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
+                if not event then
+                    Library:Notify('Upgrade not found!', 5)
+                    Toggles.PassiveSkulls:SetValue(false)
+                    return
+                end
+                while Toggles.PassiveSkulls.Value do
+                    pcall(function() event:FireServer("PassiveSkulls", "Pumpkin") end)
                     task.wait(upgradeDelay)
                 end
             end)
@@ -414,16 +449,20 @@ UpgradesLeft:AddToggle('PassiveSkullsToggle', {
     end
 })
 
-UpgradesLeft:AddToggle('PumpkinUpgradeToggle', {
+UpgradesGroup:AddToggle('PumpkinUpgrade', {
     Text = 'Pumpkin Upgrade',
     Default = false,
     Callback = function(v)
         if v then
             task.spawn(function()
-                local Event = ReplicatedStorage.Remotes:FindFirstChild("Upgrade")
-                if not Event then Library:Notify('Upgrade remote missing!') return end
-                while Toggles.PumpkinUpgradeToggle.Value do
-                    pcall(function() Event:FireServer("PumkinUpgrade", "Pumpkin") end)
+                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
+                if not event then
+                    Library:Notify('Upgrade not found!', 5)
+                    Toggles.PumpkinUpgrade:SetValue(false)
+                    return
+                end
+                while Toggles.PumpkinUpgrade.Value do
+                    pcall(function() event:FireServer("PumkinUpgrade", "Pumpkin") end)
                     task.wait(upgradeDelay)
                 end
             end)
@@ -431,16 +470,20 @@ UpgradesLeft:AddToggle('PumpkinUpgradeToggle', {
     end
 })
 
-UpgradesLeft:AddToggle('PumpkinUpgrade2Toggle', {
-    Text = 'Pumpkin Upgrade 2 (Skull)',
+UpgradesGroup:AddToggle('PumpkinUpgrade2', {
+    Text = 'Skull Upgrade',
     Default = false,
     Callback = function(v)
         if v then
             task.spawn(function()
-                local Event = ReplicatedStorage.Remotes:FindFirstChild("Upgrade")
-                if not Event then Library:Notify('Upgrade remote missing!') return end
-                while Toggles.PumpkinUpgrade2Toggle.Value do
-                    pcall(function() Event:FireServer("PumkinUpgrade2", "Skull") end)
+                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
+                if not event then
+                    Library:Notify('Upgrade not found!', 5)
+                    Toggles.PumpkinUpgrade2:SetValue(false)
+                    return
+                end
+                while Toggles.PumpkinUpgrade2.Value do
+                    pcall(function() event:FireServer("PumkinUpgrade2", "Skull") end)
                     task.wait(upgradeDelay)
                 end
             end)
@@ -448,89 +491,133 @@ UpgradesLeft:AddToggle('PumpkinUpgrade2Toggle', {
     end
 })
 
-UpgradesLeft:AddButton('Fire All Upgrades Once', function()
-    local Event = ReplicatedStorage.Remotes:FindFirstChild("Upgrade")
-    if not Event then Library:Notify('Upgrade remote missing!') return end
-    pcall(function() Event:FireServer("PassiveSkulls", "Pumpkin") end)
-    pcall(function() Event:FireServer("PumkinUpgrade", "Pumpkin") end)
-    pcall(function() Event:FireServer("PumkinUpgrade2", "Skull") end)
-    Library:Notify('All upgrades fired once!')
-end)
-
--- Dropdown auto-refresh (every 1s, only set if changed)
-task.spawn(function()
-    while not Library.Unloaded do
-        task.wait(1)
-        local tokenVals = getSortedValues(tokenNameCounts)
-        if #tokenVals > 0 then
-            Options.TokenDropdown:SetValues(tokenVals)
-            if not selectedToken or not table.find(tokenVals, selectedToken) then
-                selectedToken = tokenVals[1]
-                Options.TokenDropdown:SetValue(selectedToken)
-            end
+UpgradesGroup:AddButton({
+    Text = 'All Once',
+    Func = function()
+        local event = ReplicatedStorage.Remotes:FindFirstChild("Upgrade")
+        if event then
+            pcall(function() event:FireServer("PassiveSkulls", "Pumpkin") end)
+            pcall(function() event:FireServer("PumkinUpgrade", "Pumpkin") end)
+            pcall(function() event:FireServer("PumkinUpgrade2", "Skull") end)
+            Library:Notify('Fired all!')
+        else
+            Library:Notify('Upgrade missing!')
         end
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        task.wait(1)
-        local cropVals = getSortedValues(myCropNameCounts)
-        if #cropVals > 0 then
-            Options.MyCropDropdown:SetValues(cropVals)
-            if not selectedMyCrop or not table.find(cropVals, selectedMyCrop) then
-                selectedMyCrop = cropVals[1]
-                Options.MyCropDropdown:SetValue(selectedMyCrop)
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        task.wait(1)
-        local fieldVals = getSortedValues(fieldNameCounts)
-        if #fieldVals > 0 then
-            Options.FieldDropdown:SetValues(fieldVals)
-            if not selectedField or not table.find(fieldVals, selectedField) then
-                selectedField = fieldVals[1]
-                Options.FieldDropdown:SetValue(selectedField)
-            end
-        end
-    end
-end)
-
-local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
-
-MenuGroup:AddButton('Unload', function() Library:Unload() end)
-
-MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true, Text = 'Menu keybind' })
-
-Library.ToggleKeybind = Options.MenuKeybind -- Custom keybind for the menu
-
-MenuGroup:AddToggle('CustomCursorToggle', {
-    Text = 'Enable Custom Cursor',
-    Default = true,
-    Callback = function(Value)
-     
-        Library.CursorEnabled = Value
-        print('[cb] Custom Cursor toggled:', Value)
     end
 })
 
-Library:OnUnload(function()
-    print('Unloaded!')
-    Library.Unloaded = true
+-- ==================== LIVE DROPDOWN REFRESH ====================
+task.spawn(function()
+    local lastKey = ''
+    while not Library.Unloaded do
+        task.wait(0.3)
+        local vals = getDropdownValues(tokenPartsByName)
+        local key = table.concat(vals, '|')
+        if key ~= lastKey then
+            lastKey = key
+            Options.TokenDropdown:SetValues(vals)
+            local full = getFullName(selectedToken, tokenPartsByName)
+            if full and table.find(vals, full) then
+                Options.TokenDropdown:SetValue(full)
+            elseif #vals > 0 then
+                selectedToken = parseName(vals[1])
+                Options.TokenDropdown:SetValue(vals[1])
+                Library:Notify('Auto: ' .. selectedToken)
+            else
+                selectedToken = nil
+            end
+        end
+    end
 end)
 
-Library:OnUnload(function()
-    print('901 Farkıyla')
-    stopFarm()
-    if connTokenAdd then connTokenAdd:Disconnect() end
-    if connTokenRem then connTokenRem:Disconnect() end
-    if connCropAdd then connCropAdd:Disconnect() end
-    if connCropRem then connCropRem:Disconnect() end
-    if connFieldAdd then connFieldAdd:Disconnect() end
-    if connFieldRem then connFieldRem:Disconnect() end
-    Library.Unloaded = true
+task.spawn(function()
+    local lastKey = ''
+    while not Library.Unloaded do
+        task.wait(0.3)
+        local vals = getDropdownValues(cropPartsByName)
+        local key = table.concat(vals, '|')
+        if key ~= lastKey then
+            lastKey = key
+            Options.CropDropdown:SetValues(vals)
+            local full = getFullName(selectedCrop, cropPartsByName)
+            if full and table.find(vals, full) then
+                Options.CropDropdown:SetValue(full)
+            elseif #vals > 0 then
+                selectedCrop = parseName(vals[1])
+                Options.CropDropdown:SetValue(vals[1])
+                Library:Notify('Auto: ' .. selectedCrop)
+            else
+                selectedCrop = nil
+            end
+        end
+    end
 end)
+
+task.spawn(function()
+    local lastKey = ''
+    while not Library.Unloaded do
+        task.wait(0.3)
+        local vals = getDropdownValues(fieldPartsByName)
+        local key = table.concat(vals, '|')
+        if key ~= lastKey then
+            lastKey = key
+            Options.FieldDropdown:SetValues(vals)
+            local full = getFullName(selectedField, fieldPartsByName)
+            if full and table.find(vals, full) then
+                Options.FieldDropdown:SetValue(full)
+            elseif #vals > 0 then
+                selectedField = parseName(vals[1])
+                Options.FieldDropdown:SetValue(vals[1])
+                Library:Notify('Auto: ' .. selectedField)
+            else
+                selectedField = nil
+            end
+        end
+    end
+end)
+
+-- ==================== WATERMARK ====================
+Library:SetWatermarkVisibility(true)
+local FrameTimer, FrameCounter, FPS = tick(), 0, 60
+local WatermarkConn = RunService.RenderStepped:Connect(function()
+    FrameCounter += 1
+    if tick() - FrameTimer >= 1 then
+        FPS = FrameCounter
+        FrameTimer = tick()
+        FrameCounter = 0
+    end
+    local tcnt = selectedToken and (tokenPartsByName[selectedToken] and #tokenPartsByName[selectedToken] or 0) or 0
+    local ccnt = selectedCrop and (cropPartsByName[selectedCrop] and #cropPartsByName[selectedCrop] or 0) or 0
+    local fcnt = selectedField and (fieldPartsByName[selectedField] and #fieldPartsByName[selectedField] or 0) or 0
+    local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+    Library:SetWatermark(string.format('T:%d C:%d F:%d | %.0f FPS | %d ms', tcnt, ccnt, fcnt, FPS, ping))
+end)
+
+-- ==================== UI SETTINGS ====================
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Controls')
+MenuGroup:AddButton({Text = 'Unload', Func = function() Library:Unload() end})
+MenuGroup:AddLabel('Keybind'):AddKeyPicker('MenuKeybind', {Default = 'End', NoUI = true})
+Library.ToggleKeybind = Options.MenuKeybind
+MenuGroup:AddToggle('CustomCursor', {Text = 'Custom Cursor', Default = true, Callback = function(v) Library.CursorEnabled = v end})
+
+-- ==================== ADDONS ====================
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({'MenuKeybind'})
+ThemeManager:SetFolder('PumpkinFarm')
+SaveManager:SetFolder('PumpkinFarm')
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
+
+-- ==================== UNLOAD ====================
+Library:OnUnload(function()
+    stopFarm()
+    WatermarkConn:Disconnect()
+    for _, conn in connections do conn:Disconnect() end
+    Library.Unloaded = true
+    print('ULTIMATE v3 Unloaded!')
+end)
+
+Library.KeybindFrame.Visible = true
