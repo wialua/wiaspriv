@@ -366,6 +366,71 @@ task.spawn(function()
         end
     end
 end)
+
+-- Add this after the existing toggles in LeftMain or RightMain, e.g., after SpamToggle
+LeftMain:AddToggle('PassiveSkullsToggle', {
+    Text = 'Passive Skulls Upgrade',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local Event = game:GetService("ReplicatedStorage").Remotes.Upgrade
+                while Toggles.PassiveSkullsToggle.Value do
+                    pcall(function()
+                        Event:FireServer("PassiveSkulls", "Pumpkin")
+                    end)
+                    task.wait(1) -- Adjust delay as needed
+                end
+            end)
+        end
+    end
+})
+
+LeftMain:AddToggle('PumpkinUpgradeToggle', {
+    Text = 'Pumpkin Upgrade',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local Event = game:GetService("ReplicatedStorage").Remotes.Upgrade
+                while Toggles.PumpkinUpgradeToggle.Value do
+                    pcall(function()
+                        Event:FireServer("PumkinUpgrade", "Pumpkin")
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+LeftMain:AddToggle('PumpkinUpgrade2Toggle', {
+    Text = 'Pumpkin Upgrade 2 (Skull)',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local Event = game:GetService("ReplicatedStorage").Remotes.Upgrade
+                while Toggles.PumpkinUpgrade2Toggle.Value do
+                    pcall(function()
+                        Event:FireServer("PumkinUpgrade2", "Skull")
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+-- Optional: Button to fire all at once
+LeftMain:AddButton('Fire All Upgrades Once', function()
+    local Event = game:GetService("ReplicatedStorage").Remotes.Upgrade
+    pcall(function() Event:FireServer("PassiveSkulls", "Pumpkin") end)
+    pcall(function() Event:FireServer("PumkinUpgrade", "Pumpkin") end)
+    pcall(function() Event:FireServer("PumkinUpgrade2", "Skull") end)
+    Library:Notify('All upgrades fired!')
+end)
+
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 MenuGroup:AddButton('Unload', function() Library:Unload() end)
 MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true, Text = 'Menu keybind' })
