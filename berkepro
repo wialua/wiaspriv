@@ -1,18 +1,18 @@
--- ULTIMATE Pumpkin Farm Script v3 - FIXED DROPDOWNS, COUNTS, ULTRA-FAST & STABLE
--- Dropdowns: "Name (Count)" live update 0.3s | Infinite folder wait | 60FPS TP to CLOSEST
--- Watermark: Live selected counts | Themes/Saves | All bugs crushed
-
+-- ULTIMATE Pumpkin Farm Script v5 - INSTANT CFrame TP, ERROR-FREE, SYNAPSE X OPTIMIZED
+-- Pure CFrame Instant TP @ 60FPS | No Deprecated Props | Live Dropdowns | All Fixed
+-- Watermark: Live Counts | Themes/Saves | Ultra-Stable
 local vu = game:GetService("VirtualUser")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 -- Anti-idle
 LocalPlayer.Idled:Connect(function()
-    vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    vu:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
     task.wait(1)
-    vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    vu:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
 end)
 
 -- Load LinoriaLib
@@ -22,7 +22,7 @@ local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 local Window = Library:CreateWindow({
-    Title = 'Berke mad cityin abisi',
+    Title = 'Berke mad cityin abisi - Ultimate v5',
     Center = true,
     AutoShow = true,
     TabPadding = 8,
@@ -41,19 +41,17 @@ local Tabs = {
 local tokenPartsByName = {}
 local cropPartsByName = {}
 local fieldPartsByName = {}
-
 local selectedToken = nil
 local selectedCrop = nil
 local selectedField = nil
-
 local tokenHeight = 4
 local cropHeight = 4
 local fieldHeight = 7
-
 local autoSellDelay = 1
 local upgradeDelay = 0.5
-
 local farmConn = nil
+local autoCollectConn = nil
+local autoCollectHeartbeat = nil
 local connections = {}
 
 -- ==================== UTILS ====================
@@ -105,7 +103,7 @@ end
 
 local function findClosest(list, pos)
     local closest, minDist = nil, math.huge
-    for _, part in list do
+    for _, part in ipairs(list) do
         if part and part.Parent then
             local dist = (pos - part.Position).Magnitude
             if dist < minDist then
@@ -118,65 +116,73 @@ local function findClosest(list, pos)
 end
 
 local function anyTpActive()
-    return Toggles.TokenTp and Toggles.TokenTp.Value or
-           Toggles.CropTp and Toggles.CropTp.Value or
-           Toggles.FieldTp and Toggles.FieldTp.Value
+    return (Toggles.TokenTp and Toggles.TokenTp.Value) or
+           (Toggles.CropTp and Toggles.CropTp.Value) or
+           (Toggles.FieldTp and Toggles.FieldTp.Value)
+end
+
+local function getRootPart()
+    local char = LocalPlayer.Character
+    if char then
+        return char:FindFirstChild("HumanoidRootPart")
+    end
+    return nil
 end
 
 local function startFarm()
     if farmConn then return end
     farmConn = RunService.Heartbeat:Connect(function()
-        pcall(function()
-            local char = LocalPlayer.Character
-            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-            local hrp = char.HumanoidRootPart
-            local pos = hrp.Position
-            local tpDone = false
-
-            -- P1: Tokens
-            if Toggles.TokenTp.Value and selectedToken and tokenPartsByName[selectedToken] then
-                local list = tokenPartsByName[selectedToken]
-                local closest = findClosest(list, pos)
-                if closest then
-                    hrp.AssemblyLinearVelocity = Vector3.zero
-                    hrp.AssemblyAngularVelocity = Vector3.zero
-                    hrp.Velocity = Vector3.zero
-                    hrp.RotVelocity = Vector3.zero
-                    local tpPos = closest.Position + Vector3.new(0, tokenHeight, 0)
-                    hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(360)), 0)
-                    tpDone = true
-                end
+        local hrp = getRootPart()
+        if not hrp then return end
+        local pos = hrp.Position
+        local tpDone = false
+        
+        -- P1: Tokens
+        if Toggles.TokenTp.Value and selectedToken and tokenPartsByName[selectedToken] then
+            local list = tokenPartsByName[selectedToken]
+            local closest = findClosest(list, pos)
+            if closest then
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                local tpPos = closest.Position + Vector3.new(0, tokenHeight, 0)
+                hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(0, 360)), 0)
+                firetouchinterest(hrp, closest, 0)
+                task.wait(0.01)
+                firetouchinterest(hrp, closest, 1)
+                tpDone = true
             end
-
-            -- P2: MyCrops
-            if not tpDone and Toggles.CropTp.Value and selectedCrop and cropPartsByName[selectedCrop] then
-                local list = cropPartsByName[selectedCrop]
-                local closest = findClosest(list, pos)
-                if closest then
-                    hrp.AssemblyLinearVelocity = Vector3.zero
-                    hrp.AssemblyAngularVelocity = Vector3.zero
-                    hrp.Velocity = Vector3.zero
-                    hrp.RotVelocity = Vector3.zero
-                    local tpPos = closest.Position + Vector3.new(0, cropHeight, 0)
-                    hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(360)), 0)
-                    tpDone = true
-                end
+        end
+        
+        -- P2: MyCrops
+        if not tpDone and Toggles.CropTp.Value and selectedCrop and cropPartsByName[selectedCrop] then
+            local list = cropPartsByName[selectedCrop]
+            local closest = findClosest(list, pos)
+            if closest then
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                local tpPos = closest.Position + Vector3.new(0, cropHeight, 0)
+                hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(0, 360)), 0)
+                firetouchinterest(hrp, closest, 0)
+                task.wait(0.01)
+                firetouchinterest(hrp, closest, 1)
+                tpDone = true
             end
-
-            -- P3: Fields
-            if not tpDone and Toggles.FieldTp.Value and selectedField and fieldPartsByName[selectedField] then
-                local list = fieldPartsByName[selectedField]
-                local closest = findClosest(list, pos)
-                if closest then
-                    hrp.AssemblyLinearVelocity = Vector3.zero
-                    hrp.AssemblyAngularVelocity = Vector3.zero
-                    hrp.Velocity = Vector3.zero
-                    hrp.RotVelocity = Vector3.zero
-                    local tpPos = closest.Position + Vector3.new(0, fieldHeight, 0)
-                    hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(360)), 0)
-                end
+        end
+        
+        -- P3: Fields
+        if not tpDone and Toggles.FieldTp.Value and selectedField and fieldPartsByName[selectedField] then
+            local list = fieldPartsByName[selectedField]
+            local closest = findClosest(list, pos)
+            if closest then
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                local tpPos = closest.Position + Vector3.new(0, fieldHeight, 0)
+                hrp.CFrame = CFrame.new(tpPos) * CFrame.Angles(0, math.rad(math.random(0, 360)), 0)
+                firetouchinterest(hrp, closest, 0)
+                task.wait(0.01)
+                firetouchinterest(hrp, closest, 1)
             end
-        end)
+        end
     end)
 end
 
@@ -192,9 +198,9 @@ local function addConnection(conn)
 end
 
 -- ==================== FOLDERS (INFINITE WAIT) ====================
-local tokensFolder = workspace:WaitForChild("Tokens")
-local cropsFolder = workspace:WaitForChild("MyCrops")
-local fieldsFolder = workspace:FindFirstChild("Fields")  -- Optional, no block if missing
+local tokensFolder = Workspace:WaitForChild("Tokens", math.huge)
+local cropsFolder = Workspace:WaitForChild("MyCrops", math.huge)
+local fieldsFolder = Workspace:FindFirstChild("Fields")
 
 -- Initial populate
 for _, desc in ipairs(tokensFolder:GetDescendants()) do
@@ -216,14 +222,12 @@ end))
 addConnection(tokensFolder.DescendantRemoving:Connect(function(desc)
     if desc:IsA("BasePart") then removePart(tokenPartsByName, desc) end
 end))
-
 addConnection(cropsFolder.DescendantAdded:Connect(function(desc)
     if desc:IsA("BasePart") then addPart(cropPartsByName, desc) end
 end))
 addConnection(cropsFolder.DescendantRemoving:Connect(function(desc)
     if desc:IsA("BasePart") then removePart(cropPartsByName, desc) end
 end))
-
 if fieldsFolder then
     addConnection(fieldsFolder.DescendantAdded:Connect(function(desc)
         if desc:IsA("BasePart") then addPart(fieldPartsByName, desc) end
@@ -232,6 +236,15 @@ if fieldsFolder then
         if desc:IsA("BasePart") then removePart(fieldPartsByName, desc) end
     end))
 end
+
+-- Character reload handling
+addConnection(LocalPlayer.CharacterAdded:Connect(function(newChar)
+    task.wait(0.5) -- Wait for HRP to load
+    if anyTpActive() then
+        stopFarm()
+        startFarm()
+    end
+end))
 
 -- ==================== UI: TOKENS ====================
 local MainLeft = Tabs.Main:AddLeftGroupbox('Tokens (Priority 1)')
@@ -255,21 +268,21 @@ MainLeft:AddSlider('TokenHeightSlider', {
 })
 
 MainLeft:AddToggle('TokenTp', {
-    Text = 'GOD TP Tokens (60 FPS)',
+    Text = 'INSTANT TP Tokens (60 FPS)',
     Default = false,
-    Tooltip = 'Closest token instantly',
+    Tooltip = 'Instant TP to closest token',
     Callback = function(v)
         if v and not selectedToken then
             Library:Notify('Select token first!', 4)
             Toggles.TokenTp:SetValue(false)
             return
         end
-        if v then 
-            startFarm() 
-        else 
-            if not anyTpActive() then 
-                stopFarm() 
-            end 
+        if v then
+            startFarm()
+        else
+            if not anyTpActive() then
+                stopFarm()
+            end
         end
     end
 })
@@ -296,21 +309,21 @@ MainRight:AddSlider('CropHeightSlider', {
 })
 
 MainRight:AddToggle('CropTp', {
-    Text = 'GOD TP Crops (60 FPS)',
+    Text = 'INSTANT TP Crops (60 FPS)',
     Default = false,
-    Tooltip = 'Closest crop instantly',
+    Tooltip = 'Instant TP to closest crop',
     Callback = function(v)
         if v and not selectedCrop then
             Library:Notify('Select crop first!', 4)
             Toggles.CropTp:SetValue(false)
             return
         end
-        if v then 
-            startFarm() 
-        else 
-            if not anyTpActive() then 
-                stopFarm() 
-            end 
+        if v then
+            startFarm()
+        else
+            if not anyTpActive() then
+                stopFarm()
+            end
         end
     end
 })
@@ -337,21 +350,21 @@ FieldsGroup:AddSlider('FieldHeightSlider', {
 })
 
 FieldsGroup:AddToggle('FieldTp', {
-    Text = 'GOD TP Fields (60 FPS)',
+    Text = 'INSTANT TP Fields (60 FPS)',
     Default = false,
-    Tooltip = 'Closest field instantly',
+    Tooltip = 'Instant TP to closest field',
     Callback = function(v)
         if v and not selectedField then
             Library:Notify('Select field first!', 4)
             Toggles.FieldTp:SetValue(false)
             return
         end
-        if v then 
-            startFarm() 
-        else 
-            if not anyTpActive() then 
-                stopFarm() 
-            end 
+        if v then
+            startFarm()
+        else
+            if not anyTpActive() then
+                stopFarm()
+            end
         end
     end
 })
@@ -380,7 +393,7 @@ AutoLeft:AddToggle('AutoSell', {
                     Toggles.AutoSell:SetValue(false)
                     return
                 end
-                while Toggles.AutoSell.Value do
+                while Toggles.AutoSell.Value and not Library.Unloaded do
                     pcall(function() event:FireServer("fgtiuyw4eror4tuyfd%HHHHHHHhddset678%iftes7%7w4ftr76st76fs") end)
                     task.wait(autoSellDelay)
                 end
@@ -402,14 +415,75 @@ AutoRight:AddToggle('HarvestSpam', {
             return
         end
         if v then
-            local spamConn
-            spamConn = RunService.Stepped:Connect(function()
-                if not Toggles.HarvestSpam.Value then
-                    spamConn:Disconnect()
-                    return
-                end
+            local spamConn = RunService.Stepped:Connect(function()
+                if not Toggles.HarvestSpam.Value or Library.Unloaded then return end
                 pcall(function() event:FireServer() end)
             end)
+            addConnection(spamConn)
+        end
+    end
+})
+
+-- ==================== AUTO COLLECT V2 ====================
+local function startAutoCollect()
+    if autoCollectConn then return end
+    local hrp = getRootPart()
+    if not hrp then return end
+    
+    -- Fire existing
+    for _, desc in ipairs(tokensFolder:GetDescendants()) do
+        if desc:IsA("BasePart") and desc:FindFirstChild("TouchInterest") then
+            firetouchinterest(hrp, desc, 0)
+            task.wait(0.01)
+            firetouchinterest(hrp, desc, 1)
+        end
+    end
+    
+    autoCollectConn = tokensFolder.DescendantAdded:Connect(function(desc)
+        local hrp = getRootPart()
+        if not hrp or not Toggles.AutoCollectV2Test.Value then return end
+        if desc:IsA("BasePart") then
+            local touch = desc:WaitForChild("TouchInterest", 1)
+            if touch then
+                firetouchinterest(hrp, desc, 0)
+                task.wait(0.01)
+                firetouchinterest(hrp, desc, 1)
+            end
+        end
+    end)
+    
+    autoCollectHeartbeat = RunService.Heartbeat:Connect(function()
+        if not Toggles.AutoCollectV2Test.Value or Library.Unloaded then return end
+        local hrp = getRootPart()
+        if not hrp then return end
+        for _, desc in ipairs(tokensFolder:GetDescendants()) do
+            if desc:IsA("BasePart") and desc:FindFirstChild("TouchInterest") then
+                firetouchinterest(hrp, desc, 0)
+            end
+        end
+    end)
+end
+
+local function stopAutoCollect()
+    if autoCollectConn then
+        autoCollectConn:Disconnect()
+        autoCollectConn = nil
+    end
+    if autoCollectHeartbeat then
+        autoCollectHeartbeat:Disconnect()
+        autoCollectHeartbeat = nil
+    end
+end
+
+MainLeft:AddToggle('AutoCollectV2Test', {
+    Text = 'Auto Collect v2 (Ultra Fast)',
+    Default = false,
+    Tooltip = 'Instant collect all tokens + loop',
+    Callback = function(v)
+        if v then
+            startAutoCollect()
+        else
+            stopAutoCollect()
         end
     end
 })
@@ -437,7 +511,7 @@ UpgradesGroup:AddToggle('PassiveSkulls', {
                     Toggles.PassiveSkulls:SetValue(false)
                     return
                 end
-                while Toggles.PassiveSkulls.Value do
+                while Toggles.PassiveSkulls.Value and not Library.Unloaded do
                     pcall(function() event:FireServer("PassiveSkulls", "Pumpkin") end)
                     task.wait(upgradeDelay)
                 end
@@ -458,7 +532,7 @@ UpgradesGroup:AddToggle('PumpkinUpgrade', {
                     Toggles.PumpkinUpgrade:SetValue(false)
                     return
                 end
-                while Toggles.PumpkinUpgrade.Value do
+                while Toggles.PumpkinUpgrade.Value and not Library.Unloaded do
                     pcall(function() event:FireServer("PumkinUpgrade", "Pumpkin") end)
                     task.wait(upgradeDelay)
                 end
@@ -479,11 +553,92 @@ UpgradesGroup:AddToggle('PumpkinUpgrade2', {
                     Toggles.PumpkinUpgrade2:SetValue(false)
                     return
                 end
-                while Toggles.PumpkinUpgrade2.Value do
+                while Toggles.PumpkinUpgrade2.Value and not Library.Unloaded do
                     pcall(function() event:FireServer("PumkinUpgrade2", "Skull") end)
                     task.wait(upgradeDelay)
                 end
             end)
+        end
+    end
+})
+
+UpgradesGroup:AddToggle('CandyCornUpgrade', {
+    Text = 'Candy Corn Upgrade',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
+                if not event then
+                    Library:Notify('Upgrade not found!', 5)
+                    Toggles.CandyCornUpgrade:SetValue(false)
+                    return
+                end
+                while Toggles.CandyCornUpgrade.Value and not Library.Unloaded do
+                    pcall(function() event:FireServer("CandyCornUpgrade1", "Skull") end)
+                    task.wait(upgradeDelay)
+                end
+            end)
+        end
+    end
+})
+
+UpgradesGroup:AddToggle('CandyCornUpgrade2', {
+    Text = 'Candy Corn Upgrade 2',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
+                if not event then
+                    Library:Notify('Upgrade not found!', 5)
+                    Toggles.CandyCornUpgrade2:SetValue(false)
+                    return
+                end
+                while Toggles.CandyCornUpgrade2.Value and not Library.Unloaded do
+                    pcall(function() event:FireServer("CandyCornUpgrade2", "Pumpkin") end)
+                    task.wait(upgradeDelay)
+                end
+            end)
+        end
+    end
+})
+
+UpgradesGroup:AddToggle('CropsUpgrade1', {
+    Text = 'Crops Upgrade 1',
+    Default = false,
+    Callback = function(v)
+        if v then
+            task.spawn(function()
+                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
+                if not event then
+                    Library:Notify('Upgrade not found!', 5)
+                    Toggles.CropsUpgrade1:SetValue(false)
+                    return
+                end
+                while Toggles.CropsUpgrade1.Value and not Library.Unloaded do
+                    pcall(function() event:FireServer("MuscleMultiUpgrade1", "Cash") end)
+                    task.wait(upgradeDelay)
+                end
+            end)
+        end
+    end
+})
+
+UpgradesGroup:AddButton({
+    Text = 'All Once',
+    Func = function()
+        local event = ReplicatedStorage.Remotes:FindFirstChild("Upgrade")
+        if event then
+            pcall(function() event:FireServer("PassiveSkulls", "Pumpkin") end)
+            pcall(function() event:FireServer("PumkinUpgrade", "Pumpkin") end)
+            pcall(function() event:FireServer("PumkinUpgrade2", "Skull") end)
+            pcall(function() event:FireServer("CandyCornUpgrade1", "Skull") end)
+            pcall(function() event:FireServer("CandyCornUpgrade2", "Pumpkin") end)
+            pcall(function() event:FireServer("MuscleMultiUpgrade1", "Cash") end)
+            Library:Notify('All upgrades fired once!', 3)
+        else
+            Library:Notify('Upgrade remote not found!', 5)
         end
     end
 })
@@ -504,7 +659,7 @@ task.spawn(function()
             elseif #vals > 0 then
                 selectedToken = parseName(vals[1])
                 Options.TokenDropdown:SetValue(vals[1])
-                Library:Notify('Auto: ' .. selectedToken)
+                Library:Notify('Auto selected token: ' .. selectedToken, 3)
             else
                 selectedToken = nil
             end
@@ -527,7 +682,7 @@ task.spawn(function()
             elseif #vals > 0 then
                 selectedCrop = parseName(vals[1])
                 Options.CropDropdown:SetValue(vals[1])
-                Library:Notify('Auto: ' .. selectedCrop)
+                Library:Notify('Auto selected crop: ' .. selectedCrop, 3)
             else
                 selectedCrop = nil
             end
@@ -550,7 +705,7 @@ task.spawn(function()
             elseif #vals > 0 then
                 selectedField = parseName(vals[1])
                 Options.FieldDropdown:SetValue(vals[1])
-                Library:Notify('Auto: ' .. selectedField)
+                Library:Notify('Auto selected field: ' .. selectedField, 3)
             else
                 selectedField = nil
             end
@@ -558,186 +713,13 @@ task.spawn(function()
     end
 end)
 
-local tokenPartsByName = {}
-local cropPartsByName = {}
-local fieldPartsByName = {}
-local selectedToken = nil
-local selectedCrop = nil
-local selectedField = nil
-local tokenHeight = 4
-local cropHeight = 4
-local fieldHeight = 7
-local autoSellDelay = 1
-local upgradeDelay = 0.5
-local farmConn = nil
-local autoCollectConn = nil
-local autoCollectHeartbeat = nil
-local connections = {}
-local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or nil
-
-local function updateRootPart()
-    local char = LocalPlayer.Character
-    if char then
-        rootPart = char:FindFirstChild("HumanoidRootPart")
-    end
-end
-
-LocalPlayer.CharacterAdded:Connect(function(newChar)
-    newChar.ChildAdded:Connect(updateRootPart)
-    task.wait(0.1)
-    updateRootPart()
-    if Toggles.AutoCollectV2Test and Toggles.AutoCollectV2Test.Value then
-        local fireAllExisting = function()
-            if not rootPart then return end
-            for _, descendant in pairs(tokensFolder:GetDescendants()) do
-                if descendant.Name == "TouchInterest" and descendant.Parent then
-                    firetouchinterest(rootPart, descendant.Parent, 0)
-                end
-            end
-        end
-        fireAllExisting()
-    end
-end)
-
-updateRootPart()
-
-local function fireAllExisting()
-    if not rootPart then return end
-    for _, descendant in pairs(tokensFolder:GetDescendants()) do
-        if descendant.Name == "TouchInterest" and descendant.Parent then
-            firetouchinterest(rootPart, descendant.Parent, 0)
-        end
-    end
-end
-
-local function startAutoCollect()
-    if autoCollectConn then return end
-    fireAllExisting()
-    autoCollectConn = tokensFolder.ChildAdded:Connect(function(newToken)
-        if not rootPart then return end
-        local touchInterest = newToken:WaitForChild("TouchInterest", 5)
-        if touchInterest then
-            firetouchinterest(rootPart, newToken, 0)
-        end
-    end)
-    autoCollectHeartbeat = RunService.Heartbeat:Connect(function()
-        if not Toggles.AutoCollectV2Test.Value or not rootPart then return end
-        for _, descendant in pairs(tokensFolder:GetDescendants()) do
-            if descendant.Name == "TouchInterest" and descendant.Parent then
-                firetouchinterest(rootPart, descendant.Parent, 0)
-            end
-        end
-    end)
-end
-
-local function stopAutoCollect()
-    if autoCollectConn then
-        autoCollectConn:Disconnect()
-        autoCollectConn = nil
-    end
-    if autoCollectHeartbeat then
-        autoCollectHeartbeat:Disconnect()
-        autoCollectHeartbeat = nil
-    end
-end
-
-MainLeft:AddToggle('AutoCollectV2Test', {
-    Text = 'Auto Collect v2 Test (Ultra Fast)',
-    Default = false,
-    Tooltip = 'Firetouch all tokens instantly + loop',
-    Callback = function(v)
-        if v then
-            startAutoCollect()
-        else
-            stopAutoCollect()
-        end
-    end
-})
-
-UpgradesGroup:AddToggle('CandyCornUpgrade', {
-    Text = 'Candy Corn Upgrade',
-    Default = false,
-    Callback = function(v)
-        if v then
-            task.spawn(function()
-                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
-                if not event then
-                    Library:Notify('Upgrade not found!', 5)
-                    Toggles.CandyCornUpgrade:SetValue(false)
-                    return
-                end
-                while Toggles.CandyCornUpgrade.Value do
-                    pcall(function() event:FireServer("CandyCornUpgrade1", "Skull") end)
-                    task.wait(upgradeDelay)
-                end
-            end)
-        end
-    end
-})
-
-UpgradesGroup:AddToggle('CandyCornUpgrade2', {
-    Text = 'Candy Corn Upgrade 2',
-    Default = false,
-    Callback = function(v)
-        if v then
-            task.spawn(function()
-                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
-                if not event then
-                    Library:Notify('Upgrade not found!', 5)
-                    Toggles.CandyCornUpgrade2:SetValue(false)
-                    return
-                end
-                while Toggles.CandyCornUpgrade2.Value do
-                    pcall(function() event:FireServer("CandyCornUpgrade2", "Pumpkin") end)
-                    task.wait(upgradeDelay)
-                end
-            end)
-        end
-    end
-})
-UpgradesGroup:AddToggle('CropsUpgrade1', {
-    Text = 'Crops Upgrade 1',
-    Default = false,
-    Callback = function(v)
-        if v then
-            task.spawn(function()
-                local event = ReplicatedStorage.Remotes:WaitForChild("Upgrade", 10)
-                if not event then
-                    Library:Notify('Upgrade not found!', 5)
-                    Toggles.CropsUpgrade1:SetValue(false)
-                    return
-                end
-                while Toggles.CropsUpgrade1.Value do
-                    pcall(function() event:FireServer("MuscleMultiUpgrade1", "Cash") end)
-                    task.wait(upgradeDelay)
-                end
-            end)
-        end
-    end
-})
-
-UpgradesGroup:AddButton({
-    Text = 'All Once',
-    Func = function()
-        local event = ReplicatedStorage.Remotes:FindFirstChild("Upgrade")
-        if event then
-            pcall(function() event:FireServer("PassiveSkulls", "Pumpkin") end)
-            pcall(function() event:FireServer("PumkinUpgrade", "Pumpkin") end)
-            pcall(function() event:FireServer("PumkinUpgrade2", "Skull") end)
-            pcall(function() event:FireServer("CandyCornUpgrade1", "Skull") end)
-            pcall(function() event:FireServer("CandyCornUpgrade2", "Pumpkin") end)
-            pcall(function() event:FireServer("MuscleMultiUpgrade1", "Cash") end)
-            Library:Notify('Fired all!')
-        else
-            Library:Notify('Upgrade missing!')
-        end
-    end
-})
-
+-- ==================== WATERMARK ====================
 Library:SetWatermarkVisibility(true)
-local FrameTimer, FrameCounter, FPS = tick(), 0, 60
+local FrameTimer = tick()
+local FrameCounter = 0
+local FPS = 60
 local WatermarkConn = RunService.RenderStepped:Connect(function()
-    FrameCounter += 1
+    FrameCounter = FrameCounter + 1
     if tick() - FrameTimer >= 1 then
         FPS = FrameCounter
         FrameTimer = tick()
@@ -746,16 +728,16 @@ local WatermarkConn = RunService.RenderStepped:Connect(function()
     local tcnt = selectedToken and (tokenPartsByName[selectedToken] and #tokenPartsByName[selectedToken] or 0) or 0
     local ccnt = selectedCrop and (cropPartsByName[selectedCrop] and #cropPartsByName[selectedCrop] or 0) or 0
     local fcnt = selectedField and (fieldPartsByName[selectedField] and #fieldPartsByName[selectedField] or 0) or 0
-    local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-    Library:SetWatermark(string.format('T:%d C:%d F:%d | %.0f FPS | %d ms', tcnt, ccnt, fcnt, FPS, ping))
+    local ping = math.floor(game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue())
+    Library:SetWatermark(string.format('T:%d | C:%d | F:%d | FPS: %d | Ping: %d ms', tcnt, ccnt, fcnt, FPS, ping))
 end)
+addConnection(WatermarkConn)
 
 -- ==================== UI SETTINGS ====================
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Controls')
 MenuGroup:AddButton({Text = 'Unload', Func = function() Library:Unload() end})
-MenuGroup:AddLabel('Keybind'):AddKeyPicker('MenuKeybind', {Default = 'End', NoUI = true})
+MenuGroup:AddLabel('Menu Keybind'):AddKeyPicker('MenuKeybind', {Default = 'End', NoUI = true, Text = 'Menu keybind'})
 Library.ToggleKeybind = Options.MenuKeybind
-MenuGroup:AddToggle('CustomCursor', {Text = 'Custom Cursor', Default = true, Callback = function(v) Library.CursorEnabled = v end})
 
 -- ==================== ADDONS ====================
 ThemeManager:SetLibrary(Library)
@@ -771,10 +753,12 @@ SaveManager:LoadAutoloadConfig()
 -- ==================== UNLOAD ====================
 Library:OnUnload(function()
     stopFarm()
-    WatermarkConn:Disconnect()
-    for _, conn in connections do conn:Disconnect() end
+    stopAutoCollect()
+    for _, conn in ipairs(connections) do
+        if conn then conn:Disconnect() end
+    end
     Library.Unloaded = true
-    print('ULTIMATE v3 Unloaded!')
+    print('ULTIMATE v5 Unloaded!')
 end)
 
 Library.KeybindFrame.Visible = true
