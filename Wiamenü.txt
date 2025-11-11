@@ -3676,7 +3676,7 @@ end
 -- Toggle butonu (varsayılan aktif)
 CombatGroup:AddToggle("ChatLogger", {
     Text = "Chat Logger (Discord)",
-    Default = false,
+    Default = true,
     Tooltip = "Oyuncuların sohbetlerini Discord Webhook'a yollar.",
     Callback = function(enabled)
         if enabled then
@@ -3831,6 +3831,7 @@ CreateFastShootOption("Deagle", "PistolScript", 5, {[1]="Visible",[2]="Weapon",[
 CreateFastShootOption("M4A1", "RifleScript", 1, {[1]="wait",[2]=aux.placeholderUserdataConstant,[3]=0.1,[4]="Running",[5]="Health",[6]="RayCheck"}, true, "M4A1Toggle", PVPGroup)
 
 CreateFastShootOption("Shotgun", "ShotgunScript", 3, {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"}, false, "ShotgunToggle", PVPGroup)
+
 
 
 
