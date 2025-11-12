@@ -1,0 +1,326 @@
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+local Window = Library:CreateWindow({
+    Title = '31 çekmekten çıldırdım',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+local Event = ReplicatedStorage.Packages._Index["sleitnick_knit@1.4.7"].knit.Services.WeaponService.RE.MeleeAttackEnemy
+local EnemiesFolder = Workspace:WaitForChild("Enemies")
+
+local selectedTargetName = nil
+local currentTarget = nil
+local attackConnection = nil
+local refreshConnection = nil
+local isAttacking = false
+local stats = { hits = 0, tps = 0, instanceSwitches = 0 }
+local lastSwitch = 0
+local lastRefresh = 0
+local instanceCache = {}
+
+local function updateCharacter()
+    Character = LocalPlayer.Character
+    if Character then
+        HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(updateCharacter)
+
+local function getEnemyNames()
+    return {"Ace", "Astro Enforcer", "Auric Guardian", "Blaze Seraph", "Bones McSkull", "Celestial Watcher", "Crazy King", "Crime Boss", "Crimson Phantom", "Cyber Sentinel", "Dark Invader", "Dread Captain Murkbeard", "First Mate Pumpkinpatch", "Heart Cleric", "Heart General", "Heart Thief", "Henchman", "Hippi", "Inferno Warden", "Kraken's Bane", "Mafioso", "Psycho", "Red Knight", "Thug"}
+end
+
+local function isTargetAlive(target)
+    if not target or not target.Parent then return false end
+    local humanoid = target:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health > 0
+end
+
+local function refreshInstanceCache(name)
+    if not name then return end
+    local instances = {}
+    local function scan(parent)
+        for _, child in ipairs(parent:GetChildren()) do
+            if child.Name == name and isTargetAlive(child) then
+                table.insert(instances, child)
+            end
+            if child:IsA("Folder") or child:IsA("Model") then
+                scan(child)
+            end
+        end
+    end
+    scan(EnemiesFolder)
+    instanceCache[name] = instances
+end
+
+local function getCurrentTarget()
+    local instances = instanceCache[selectedTargetName] or {}
+    for _, inst in ipairs(instances) do
+        if isTargetAlive(inst) then
+            return inst
+        end
+    end
+    return nil
+end
+
+local function getNextTarget(current)
+    local instances = instanceCache[selectedTargetName] or {}
+    local foundCurrent = false
+    for _, inst in ipairs(instances) do
+        if inst == current then
+            foundCurrent = true
+        elseif foundCurrent and isTargetAlive(inst) then
+            return inst
+        end
+    end
+    for _, inst in ipairs(instances) do
+        if isTargetAlive(inst) then
+            return inst
+        end
+    end
+    return nil
+end
+
+local function instantTPToTarget(target)
+    if not target or not isTargetAlive(target) or not HumanoidRootPart then return end
+    local targetHRP = target:FindFirstChild("HumanoidRootPart") or target.PrimaryPart
+    if not targetHRP then return end
+    local offset = Vector3.new(0, 0, -3)
+    HumanoidRootPart.CFrame = CFrame.new(targetHRP.Position + offset, targetHRP.Position)
+    stats.tps = stats.tps + 1
+end
+
+local function startAttackLoop()
+    if isAttacking then return end
+    isAttacking = true
+    local lastFire = 0
+    local fireDelay = 0.00005
+
+    attackConnection = RunService.Heartbeat:Connect(function()
+        if not Toggles.RapidAttack.Value then
+            stopAttackLoop()
+            return
+        end
+
+        updateCharacter()
+
+        if not currentTarget or not isTargetAlive(currentTarget) then
+            if tick() - lastSwitch > 0.05 then
+                local oldTarget = currentTarget
+                currentTarget = getNextTarget(oldTarget)
+                if currentTarget then
+                    lastSwitch = tick()
+                    stats.instanceSwitches = stats.instanceSwitches + 1
+                    instantTPToTarget(currentTarget)
+                else
+                    currentTarget = getCurrentTarget()
+                    if currentTarget then
+                        lastSwitch = tick()
+                        stats.instanceSwitches = stats.instanceSwitches + 1
+                        instantTPToTarget(currentTarget)
+                    else
+                        Toggles.RapidAttack:SetValue(false)
+                        return
+                    end
+                end
+            end
+            return
+        end
+
+        local now = tick()
+        if now - lastFire >= fireDelay then
+            pcall(function()
+                Event:FireServer(currentTarget)
+                stats.hits = stats.hits + 1
+            end)
+            lastFire = now
+        end
+
+        if Toggles.Teleport.Value then
+            local targetHRP = currentTarget:FindFirstChild("HumanoidRootPart") or currentTarget.PrimaryPart
+            if targetHRP then
+                local dist = (HumanoidRootPart.Position - targetHRP.Position).Magnitude
+                if dist > 4 then
+                    instantTPToTarget(currentTarget)
+                end
+            end
+        end
+    end)
+end
+
+local function stopAttackLoop()
+    if attackConnection then
+        attackConnection:Disconnect()
+        attackConnection = nil
+    end
+    isAttacking = false
+    currentTarget = nil
+end
+
+local function startAutoRefresh()
+    if refreshConnection then return end
+    refreshConnection = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        if now - lastRefresh > 0.5 then
+            if selectedTargetName then
+                refreshInstanceCache(selectedTargetName)
+            end
+            lastRefresh = now
+        end
+    end)
+end
+
+local MainGroupBox = Tabs.Main:AddLeftGroupbox('Infinite Controls')
+
+local enemyDropdown = MainGroupBox:AddDropdown('EnemySelect', {
+    Values = getEnemyNames(),
+    Default = 1,
+    Multi = false,
+    Text = 'Fixed Target Name (Sequential Instances)',
+    Tooltip = 'Select name; attacks one instance at a time until death, then next. Fixed dropdown.',
+    Callback = function(Value)
+        selectedTargetName = Value
+        refreshInstanceCache(Value)
+        currentTarget = getCurrentTarget()
+        if currentTarget and Toggles.RapidAttack.Value then
+            instantTPToTarget(currentTarget)
+            if not isAttacking then
+                startAttackLoop()
+            end
+        end
+    end
+})
+
+local attackToggle = MainGroupBox:AddToggle('RapidAttack', {
+    Text = 'Infinite Rapid Fire + Sequential TP & Switch',
+    Default = false,
+    Tooltip = 'Locks on one instance; TP & fire until dead, then next instance of same name.',
+    Callback = function(Value)
+        if Value then
+            if not selectedTargetName then
+                Toggles.RapidAttack:SetValue(false)
+                return
+            end
+            refreshInstanceCache(selectedTargetName)
+            currentTarget = getCurrentTarget()
+            if currentTarget then
+                instantTPToTarget(currentTarget)
+            end
+            startAttackLoop()
+            startAutoRefresh()
+        else
+            stopAttackLoop()
+        end
+    end
+})
+
+local tpOnlyToggle = MainGroupBox:AddToggle('Teleport', {
+    Text = 'Enable TP (With Attacks)',
+    Default = true,
+    Tooltip = 'Instant TP to current instance if distanced.',
+})
+
+local statsLabel = MainGroupBox:AddLabel('Stats: Hits: 0 | TPs: 0 | Switches: 0')
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if statsLabel then
+            statsLabel:SetText('Stats: Hits: ' .. stats.hits .. ' | TPs: ' .. stats.tps .. ' | Instance Switches: ' .. stats.instanceSwitches)
+        end
+        if Library.Unloaded then break end
+    end
+end)
+
+MainGroupBox:AddButton({
+    Text = 'Rescan Instances',
+    Func = function()
+        if selectedTargetName then
+            refreshInstanceCache(selectedTargetName)
+            currentTarget = getCurrentTarget()
+            print('Rescanned ' .. #instanceCache[selectedTargetName] .. ' instances of ' .. selectedTargetName)
+        end
+    end,
+    Tooltip = 'Refresh cache and reset to first valid instance (fast scan).'
+})
+
+Options.EnemySelect:OnChanged(function()
+    selectedTargetName = Options.EnemySelect.Value
+    refreshInstanceCache(selectedTargetName)
+    currentTarget = getCurrentTarget()
+    if currentTarget and Toggles.RapidAttack.Value then
+        instantTPToTarget(currentTarget)
+    end
+end)
+
+Toggles.RapidAttack:OnChanged(function(Value)
+    if Value and selectedTargetName then
+        refreshInstanceCache(selectedTargetName)
+        currentTarget = getCurrentTarget()
+        if currentTarget then
+            instantTPToTarget(currentTarget)
+            startAttackLoop()
+        end
+    elseif not Value then
+        stopAttackLoop()
+    end
+end)
+
+Library.KeybindFrame.Visible = true
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    stopAttackLoop()
+    if refreshConnection then refreshConnection:Disconnect() end
+    Library.Unloaded = true
+end)
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+MenuGroup:AddButton('Unload', function() Library:Unload() end)
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true, Text = 'Menu keybind' })
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind', 'RapidAttack', 'Teleport', 'EnemySelect' })
+
+ThemeManager:SetFolder('InfiniteMelee')
+SaveManager:SetFolder('InfiniteMelee')
+
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+
+SaveManager:LoadAutoloadConfig()
+
+task.spawn(function()
+    task.wait(0.5)
+    local initialNames = getEnemyNames()
+    Options.EnemySelect:SetValues(initialNames)
+    if #initialNames > 0 then
+        Options.EnemySelect:SetValue(initialNames[1])
+    end
+end)
