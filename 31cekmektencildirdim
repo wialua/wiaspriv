@@ -297,119 +297,205 @@ Toggles.RapidAttack:OnChanged(function(Value)
     end
 end)
 
--- ==== YENİ SEKME: Eggs ==================================================
-local EggsTab = Window:AddTab('Eggs')
+-- ==== YENİ SEKME: Auto ==================================================
+local AutoTab = Window:AddTab('Auto')
 
--- Egg listesi (dropdown’da görünecek)
-local EggList = {
-    'City Egg',       'Atomic Egg',    'Angelic Egg',
-    'Golden Egg',     'Treasure Egg',  'Chest Egg',
-    'Spiky Egg',      'Neon Egg',      'Basic Egg',
-    'Poker Egg',      'Skull Egg',     'Royal Egg',
-    'Cupid Egg'
-}
+-- Sol grup kutusu
+local AutoGroup = AutoTab:AddLeftGroupbox('Auto Swing')
 
--- Sol tarafta bir grup kutusu
-local EggGroup = EggsTab:AddLeftGroupbox('Egg Opener')
-
--- Dropdown – hangi egg’i açacağımızı seçiyoruz
-EggGroup:AddDropdown('SelectedEgg', {
-    Values = EggList,
-    Default = 1,                 -- ilk değer: City Egg
-    Text = 'Select Egg',
-    Tooltip = 'Açmak istediğin yumurtayı seç',
-    Callback = function(val)
-        print('[Egg] Seçilen yumurta:', val)
-    end
-})
-
--- Açma hızı (saniyede kaç kez invoke edilecek)
-EggGroup:AddSlider('OpenSpeed', {
-    Text = 'Open Speed (per sec)',
-    Default = 5,
-    Min = 1,
-    Max = 20,
-    Rounding = 0,
-    Compact = false,
-    Callback = function(val)
-        print('[Egg] Hız değiştirildi:', val)
-    end
-})
-
--- Toggle – sürekli açma
-EggGroup:AddToggle('AutoOpen', {
-    Text = 'Auto Open',
+-- Toggle: Sürekli swing
+AutoGroup:AddToggle('AutoSwing', {
+    Text = 'Auto Swing',
     Default = false,
-    Tooltip = 'Açıkken seçili yumurtayı sürekli açar',
-    Callback = function(state)
-        print('[Egg] AutoOpen:', state)
-    end
+    Tooltip = 'Açıkken silahı maksimum hızda sallar (delaysiz, stabil)',
 })
 
--- Event referansı (tek seferde alıyoruz, her invoke’da tekrar aramıyoruz)
-local Event = game:GetService("ReplicatedStorage")
+-- Event referansı (tek seferde alınıyor)
+local SwingEvent = game:GetService("ReplicatedStorage")
     .Packages._Index["sleitnick_knit@1.4.7"]
-    .knit.Services.EggService.RF.RequestEggOpen
+    .knit.Services.WeaponService.RE.OnWeaponSwing
 
--- ==== SÜREKLİ AÇMA LOOPU =================================================
-local autoOpenConnection
+-- ==== MAKSİMUM HIZDA, DELAYSİZ LOOP =====================================
+local swingConnection
 
-Toggles.AutoOpen:OnChanged(function()
-    local enabled = Toggles.AutoOpen.Value
+Toggles.AutoSwing:OnChanged(function()
+    local enabled = Toggles.AutoSwing.Value
 
     if enabled then
-        -- Loop başlat
-        autoOpenConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
-            if not Toggles.AutoOpen.Value then return end
-
-            local eggName = Options.SelectedEgg.Value
-            local eggObj  = workspace.Maps.Hub.Eggs:FindFirstChild(eggName)
-            if not eggObj then
-                warn("[Egg] Yumurta bulunamadı: " .. eggName)
-                return
-            end
-
-            -- Hız kontrolü (saniyede N kez)
-            local speed = Options.OpenSpeed.Value
-            if speed <= 0 then return end
-
-            -- Heartbeat bazlı zamanlama → 1 saniyede tam `speed` kez invoke
-            local invokesPerFrame = speed * dt
-            local whole = math.floor(invokesPerFrame)
-            local frac  = invokesPerFrame - whole
-
-            for i = 1, whole do
-                Event:InvokeServer(eggObj, 1)
-            end
-
-            -- Kalan kısım için olasılıksal invoke (daha stabil)
-            if math.random() < frac then
-                Event:InvokeServer(eggObj, 1)
-            end
+        -- RunService.RenderStepped → en yüksek öncelik, 0 gecikme
+        -- Heartbeat yerine RenderStepped: daha erken tetiklenir, daha hızlı
+        swingConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            if not Toggles.AutoSwing.Value then return end
+            SwingEvent:FireServer()
         end)
     else
-        -- Loop durdur
-        if autoOpenConnection then
-            autoOpenConnection:Disconnect()
-            autoOpenConnection = nil
+        if swingConnection then
+            swingConnection:Disconnect()
+            swingConnection = nil
         end
     end
 end)
 
--- ==== TEK SEFERDE AÇMA (isteğe bağlı) =====================================
+-- ==== TEK SEFERDE TEST (isteğe bağlı) ===================================
+AutoGroup:AddButton({
+    Text = 'Swing Once',
+    Func = function()
+        SwingEvent:FireServer()
+        print("[Auto] Tek swing atıldı.")
+    end,
+    Tooltip = 'Tek bir swing testi'
+})
+
+-- ==== EGGS SEKME (YUMURTA BULUNAMADI HATASI DÜZELTİLDİ) =================
+local EggsTab = Window:AddTab('Eggs')
+
+-- Tüm olası egg isimleri
+local EggList = {
+    'City Egg', 'Atomic Egg', 'Angelic Egg',
+    'Golden Egg', 'Treasure Egg', 'Chest Egg',
+    'Spiky Egg', 'Neon Egg', 'Basic Egg',
+    'Poker Egg', 'Skull Egg', 'Royal Egg',
+    'Cupid Egg'
+}
+
+local EggGroup = EggsTab:AddLeftGroupbox('Egg Opener')
+
+-- Dropdown
+EggGroup:AddDropdown('SelectedEgg', {
+    Values = EggList,
+    Default = 1,
+    Text = 'Select Egg',
+    Tooltip = 'Yumurta seç'
+})
+
+-- Hız slider
+EggGroup:AddSlider('OpenSpeed', {
+    Text = 'Speed (eggs/sec)',
+    Default = 10,
+    Min = 1,
+    Max = 50,
+    Rounding = 0
+})
+
+-- Auto toggle
+EggGroup:AddToggle('AutoOpen', {
+    Text = 'Auto Open',
+    Default = false,
+    Tooltip = 'Otomatik açar'
+})
+
+-- STATUS LABEL (kritik!)
+EggGroup:AddLabel('Status: Scanning eggs...')
+
+-- Event
+local Event = game:GetService("ReplicatedStorage")
+    .Packages._Index["sleitnick_knit@1.4.7"]
+    .knit.Services.EggService.RF.RequestEggOpen
+
+-- ==== AKILLı EGG BULUCU (Otomatik path tarar) ========================
+local function findEggObject(eggName)
+    -- 1. Standart path dene
+    local eggsFolder = workspace:FindFirstChild("Maps") and workspace.Maps:FindFirstChild("Hub") and workspace.Maps.Hub:FindFirstChild("Eggs")
+    if eggsFolder and eggsFolder:FindFirstChild(eggName) then
+        return eggsFolder[eggName]
+    end
+    
+    -- 2. Workspace'de direkt ara
+    local egg = workspace:FindFirstChild(eggName, true)
+    if egg then return egg end
+    
+    -- 3. Tüm workspace'i tara (exact match)
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj.Name == eggName and obj.Parent then
+            print("[Egg Finder] Bulundu:", obj:GetFullName())
+            return obj
+        end
+    end
+    
+    return nil
+end
+
+-- ==== AUTO SCAN BUTTON (GERÇEK EGG'LERİ BULUR!) ======================
 EggGroup:AddButton({
-    Text = 'Open Once',
+    Text = '🔍 SCAN EGGS',
+    Func = function()
+        EggGroup:FindFirstChild("Status"):SetText("Status: Tarama...")
+        
+        local foundEggs = {}
+        for _, eggName in ipairs(EggList) do
+            local egg = findEggObject(eggName)
+            if egg then
+                table.insert(foundEggs, eggName .. " ✅")
+                print("[SCAN] Bulundu:", eggName, "→", egg:GetFullName())
+            else
+                table.insert(foundEggs, eggName .. " ❌")
+            end
+        end
+        
+        -- Status'a sonuçları yaz
+        EggGroup:FindFirstChild("Status"):SetText("Scan: " .. table.concat(foundEggs, ", "))
+    end,
+    Tooltip = 'Gerçek egg pathlerini bul'
+})
+
+-- ==== SÜPER STABİL LOOP (spawn + pcall) ===============================
+local autoLoop
+
+Toggles.AutoOpen:OnChanged(function()
+    if Toggles.AutoOpen.Value then
+        spawn(function()
+            autoLoop = true
+            while autoLoop and Toggles.AutoOpen.Value do
+                local eggName = Options.SelectedEgg.Value
+                local eggObj = findEggObject(eggName)
+                
+                if eggObj then
+                    local success, err = pcall(function()
+                        Event:InvokeServer(eggObj, 1)
+                    end)
+                    
+                    if success then
+                        EggGroup:FindFirstChild("Status"):SetText("Status: Açılıyor... " .. eggName)
+                    else
+                        EggGroup:FindFirstChild("Status"):SetText("Status: Event hata: " .. tostring(err))
+                    end
+                else
+                    EggGroup:FindFirstChild("Status"):SetText("Status: ❌ " .. eggName .. " BULUNAMADI! SCAN yap!")
+                end
+                
+                task.wait(1 / Options.OpenSpeed.Value)
+            end
+        end)
+    else
+        autoLoop = false
+    end
+end)
+
+-- ==== TEST BUTTON (5x hızlı test) =====================================
+EggGroup:AddButton({
+    Text = 'Test 5x',
     Func = function()
         local eggName = Options.SelectedEgg.Value
-        local eggObj  = workspace.Maps.Hub.Eggs:FindFirstChild(eggName)
+        local eggObj = findEggObject(eggName)
         if eggObj then
-            Event:InvokeServer(eggObj, 1)
-            print("[Egg] Tek sefer açıldı:", eggName)
+            for i = 1, 5 do
+                pcall(function() Event:InvokeServer(eggObj, 1) end)
+                task.wait(0.05)
+            end
+            print("[TEST] 5x açıldı:", eggName)
         else
-            warn("[Egg] Yumurta bulunamadı:", eggName)
+            warn("[TEST] Bulunamadı:", eggName)
         end
-    end,
-    Tooltip = 'Seçili yumurtayı bir kez aç'
+    end
+})
+
+-- ==== EMERGENCY STOP ==================================================
+EggGroup:AddButton({
+    Text = '🛑 STOP',
+    Func = function()
+        Toggles.AutoOpen:SetValue(false)
+        autoLoop = false
+    end
 })
 
 Library.KeybindFrame.Visible = true
