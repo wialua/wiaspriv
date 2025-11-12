@@ -38,6 +38,7 @@ local stats = { hits = 0, tps = 0, instanceSwitches = 0 }
 local lastSwitch = 0
 local lastRefresh = 0
 local instanceCache = {}
+local noTargetWait = 0
 
 local function updateCharacter()
     Character = LocalPlayer.Character
@@ -62,14 +63,16 @@ local function refreshInstanceCache(name)
     if not name then return end
     local instances = {}
     local function scan(parent)
-        for _, child in ipairs(parent:GetChildren()) do
-            if child.Name == name and isTargetAlive(child) then
-                table.insert(instances, child)
+        pcall(function()
+            for _, child in ipairs(parent:GetChildren()) do
+                if child.Name == name and isTargetAlive(child) then
+                    table.insert(instances, child)
+                end
+                if child:IsA("Folder") or child:IsA("Model") then
+                    scan(child)
+                end
             end
-            if child:IsA("Folder") or child:IsA("Model") then
-                scan(child)
-            end
-        end
+        end)
     end
     scan(EnemiesFolder)
     instanceCache[name] = instances
@@ -126,30 +129,36 @@ local function startAttackLoop()
 
         updateCharacter()
 
+        local now = tick()
         if not currentTarget or not isTargetAlive(currentTarget) then
-            if tick() - lastSwitch > 0.05 then
+            if now - lastSwitch > 0.05 then
                 local oldTarget = currentTarget
                 currentTarget = getNextTarget(oldTarget)
+                if not currentTarget then
+                    currentTarget = getCurrentTarget()
+                end
                 if currentTarget then
-                    lastSwitch = tick()
+                    lastSwitch = now
                     stats.instanceSwitches = stats.instanceSwitches + 1
                     instantTPToTarget(currentTarget)
+                    noTargetWait = 0
                 else
-                    currentTarget = getCurrentTarget()
-                    if currentTarget then
-                        lastSwitch = tick()
-                        stats.instanceSwitches = stats.instanceSwitches + 1
-                        instantTPToTarget(currentTarget)
-                    else
-                        Toggles.RapidAttack:SetValue(false)
-                        return
+                    noTargetWait = noTargetWait + 1
+                    if noTargetWait > 200 then
+                        refreshInstanceCache(selectedTargetName)
+                        currentTarget = getCurrentTarget()
+                        if currentTarget then
+                            lastSwitch = now
+                            stats.instanceSwitches = stats.instanceSwitches + 1
+                            instantTPToTarget(currentTarget)
+                            noTargetWait = 0
+                        end
                     end
                 end
             end
             return
         end
 
-        local now = tick()
         if now - lastFire >= fireDelay then
             pcall(function()
                 Event:FireServer(currentTarget)
@@ -177,13 +186,14 @@ local function stopAttackLoop()
     end
     isAttacking = false
     currentTarget = nil
+    noTargetWait = 0
 end
 
 local function startAutoRefresh()
     if refreshConnection then return end
     refreshConnection = RunService.Heartbeat:Connect(function()
         local now = tick()
-        if now - lastRefresh > 0.5 then
+        if now - lastRefresh > 0.3 then
             if selectedTargetName then
                 refreshInstanceCache(selectedTargetName)
             end
@@ -198,8 +208,8 @@ local enemyDropdown = MainGroupBox:AddDropdown('EnemySelect', {
     Values = getEnemyNames(),
     Default = 1,
     Multi = false,
-    Text = 'Fixed Target Name (Sequential Instances)',
-    Tooltip = 'Select name; attacks one instance at a time until death, then next. Fixed dropdown.',
+    Text = 'Fixed Target Name (Continuous Cycle)',
+    Tooltip = 'Select name; sequential attack on instances, continuous loop/rescans if all dead. Toggle stays on.',
     Callback = function(Value)
         selectedTargetName = Value
         refreshInstanceCache(Value)
@@ -214,9 +224,9 @@ local enemyDropdown = MainGroupBox:AddDropdown('EnemySelect', {
 })
 
 local attackToggle = MainGroupBox:AddToggle('RapidAttack', {
-    Text = 'Infinite Rapid Fire + Sequential TP & Switch',
+    Text = 'Infinite Rapid Fire + Sequential TP & Continuous Loop',
     Default = false,
-    Tooltip = 'Locks on one instance; TP & fire until dead, then next instance of same name.',
+    Tooltip = 'One instance at a time; TP & fire; cycles/rescan endlessly while toggle on.',
     Callback = function(Value)
         if Value then
             if not selectedTargetName then
@@ -245,7 +255,7 @@ local tpOnlyToggle = MainGroupBox:AddToggle('Teleport', {
 local statsLabel = MainGroupBox:AddLabel('Stats: Hits: 0 | TPs: 0 | Switches: 0')
 task.spawn(function()
     while true do
-        task.wait(0.2)
+        task.wait(0.1)
         if statsLabel then
             statsLabel:SetText('Stats: Hits: ' .. stats.hits .. ' | TPs: ' .. stats.tps .. ' | Instance Switches: ' .. stats.instanceSwitches)
         end
@@ -254,15 +264,15 @@ task.spawn(function()
 end)
 
 MainGroupBox:AddButton({
-    Text = 'Rescan Instances',
+    Text = 'Force Rescan',
     Func = function()
         if selectedTargetName then
             refreshInstanceCache(selectedTargetName)
             currentTarget = getCurrentTarget()
-            print('Rescanned ' .. #instanceCache[selectedTargetName] .. ' instances of ' .. selectedTargetName)
+            print('Forced rescan: ' .. #instanceCache[selectedTargetName] .. ' instances')
         end
     end,
-    Tooltip = 'Refresh cache and reset to first valid instance (fast scan).'
+    Tooltip = 'Immediate full rescan for current name.'
 })
 
 Options.EnemySelect:OnChanged(function()
