@@ -297,6 +297,121 @@ Toggles.RapidAttack:OnChanged(function(Value)
     end
 end)
 
+-- ==== YENİ SEKME: Eggs ==================================================
+local EggsTab = Window:AddTab('Eggs')
+
+-- Egg listesi (dropdown’da görünecek)
+local EggList = {
+    'City Egg',       'Atomic Egg',    'Angelic Egg',
+    'Golden Egg',     'Treasure Egg',  'Chest Egg',
+    'Spiky Egg',      'Neon Egg',      'Basic Egg',
+    'Poker Egg',      'Skull Egg',     'Royal Egg',
+    'Cupid Egg'
+}
+
+-- Sol tarafta bir grup kutusu
+local EggGroup = EggsTab:AddLeftGroupbox('Egg Opener')
+
+-- Dropdown – hangi egg’i açacağımızı seçiyoruz
+EggGroup:AddDropdown('SelectedEgg', {
+    Values = EggList,
+    Default = 1,                 -- ilk değer: City Egg
+    Text = 'Select Egg',
+    Tooltip = 'Açmak istediğin yumurtayı seç',
+    Callback = function(val)
+        print('[Egg] Seçilen yumurta:', val)
+    end
+})
+
+-- Açma hızı (saniyede kaç kez invoke edilecek)
+EggGroup:AddSlider('OpenSpeed', {
+    Text = 'Open Speed (per sec)',
+    Default = 5,
+    Min = 1,
+    Max = 20,
+    Rounding = 0,
+    Compact = false,
+    Callback = function(val)
+        print('[Egg] Hız değiştirildi:', val)
+    end
+})
+
+-- Toggle – sürekli açma
+EggGroup:AddToggle('AutoOpen', {
+    Text = 'Auto Open',
+    Default = false,
+    Tooltip = 'Açıkken seçili yumurtayı sürekli açar',
+    Callback = function(state)
+        print('[Egg] AutoOpen:', state)
+    end
+})
+
+-- Event referansı (tek seferde alıyoruz, her invoke’da tekrar aramıyoruz)
+local Event = game:GetService("ReplicatedStorage")
+    .Packages._Index["sleitnick_knit@1.4.7"]
+    .knit.Services.EggService.RF.RequestEggOpen
+
+-- ==== SÜREKLİ AÇMA LOOPU =================================================
+local autoOpenConnection
+
+Toggles.AutoOpen:OnChanged(function()
+    local enabled = Toggles.AutoOpen.Value
+
+    if enabled then
+        -- Loop başlat
+        autoOpenConnection = game:GetService("RunService").Heartbeat:Connect(function(dt)
+            if not Toggles.AutoOpen.Value then return end
+
+            local eggName = Options.SelectedEgg.Value
+            local eggObj  = workspace.Maps.Hub.Eggs:FindFirstChild(eggName)
+            if not eggObj then
+                warn("[Egg] Yumurta bulunamadı: " .. eggName)
+                return
+            end
+
+            -- Hız kontrolü (saniyede N kez)
+            local speed = Options.OpenSpeed.Value
+            if speed <= 0 then return end
+
+            -- Heartbeat bazlı zamanlama → 1 saniyede tam `speed` kez invoke
+            local invokesPerFrame = speed * dt
+            local whole = math.floor(invokesPerFrame)
+            local frac  = invokesPerFrame - whole
+
+            for i = 1, whole do
+                Event:InvokeServer(eggObj, 1)
+            end
+
+            -- Kalan kısım için olasılıksal invoke (daha stabil)
+            if math.random() < frac then
+                Event:InvokeServer(eggObj, 1)
+            end
+        end)
+    else
+        -- Loop durdur
+        if autoOpenConnection then
+            autoOpenConnection:Disconnect()
+            autoOpenConnection = nil
+        end
+    end
+end)
+
+-- ==== TEK SEFERDE AÇMA (isteğe bağlı) =====================================
+EggGroup:AddButton({
+    Text = 'Open Once',
+    Func = function()
+        local eggName = Options.SelectedEgg.Value
+        local eggObj  = workspace.Maps.Hub.Eggs:FindFirstChild(eggName)
+        if eggObj then
+            Event:InvokeServer(eggObj, 1)
+            print("[Egg] Tek sefer açıldı:", eggName)
+        else
+            warn("[Egg] Yumurta bulunamadı:", eggName)
+        end
+    end,
+    Tooltip = 'Seçili yumurtayı bir kez aç'
+})
+
 Library.KeybindFrame.Visible = true
 
 Library:OnUnload(function()
