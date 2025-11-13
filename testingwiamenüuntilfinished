@@ -1,0 +1,1885 @@
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
+local Event = ReplicatedStorage:WaitForChild("Event")
+
+local LocalPlayer = Players.LocalPlayer
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = true
+Library.NotifySide = "Left"
+
+local gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
+local Window = Library:CreateWindow({
+    Title = '🔥 ' .. gameName .. ' 🔥',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = false,
+    UnlockMouseWhileOpen = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0,
+})
+
+local Tabs = {
+    Hitbox = Window:AddTab('Hitbox'),
+    Aimbot = Window:AddTab('Aimbot'),
+    Security = Window:AddTab('Güvenlik'),
+    Main = Window:AddTab('Combat'),
+    ['UI Ayarları'] = Window:AddTab('UI Ayarları'),
+}
+
+local HitboxSettings = {
+    Enabled = false,
+    Size = 8,
+    Transparency = 0.7,
+    BodyPart = "Head",
+    Optimized = false,
+    TeamCheck = true,  -- Yeni: Team check toggle'ı için varsayılan true
+    RigSupport = true,  -- Otomatik R6/R15 desteği
+}
+
+local ActiveHitboxes = {}  -- Oyuncu bazında aktif hitbox verileri
+local IgnoredPlayerName = "MAD_CITYAIMBOTLOL"
+local Connections = {}  -- Tüm bağlantıları sakla
+local HitboxTag = "UltimateHitboxExpanded"
+local OptimizedConn = nil
+local WatchdogConn = nil
+
+-- Desteklenen vücut parçaları (R6 ve R15 için dinamik mapping ile)
+local BodyParts = {
+    "Head",
+    "HumanoidRootPart",
+    "Torso",  -- R6
+    "UpperTorso",  -- R15
+    "LowerTorso",  -- R15
+    "Left Arm",  -- R6
+    "Right Arm",  -- R6
+    "Left Leg",  -- R6
+    "Right Leg",  -- R6
+    "LeftUpperArm",  -- R15
+    "LeftLowerArm",  -- R15
+    "LeftHand",  -- R15
+    "RightUpperArm",  -- R15
+    "RightLowerArm",  -- R15
+    "RightHand",  -- R15
+    "LeftUpperLeg",  -- R15
+    "LeftLowerLeg",  -- R15
+    "LeftFoot",  -- R15
+    "RightUpperLeg",  -- R15
+    "RightLowerLeg",  -- R15
+    "RightFoot",  -- R15
+}
+
+-- Karakter rig tipini al (R6/R15)
+local function GetRigType(character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        return humanoid.RigType
+    end
+    return nil
+end
+
+-- Seçilen vücut parçası için doğru parçayı bul (R6/R15 uyumlu)
+local function GetBodyPart(character, partName)
+    local rigType = GetRigType(character)
+    if rigType == Enum.HumanoidRigType.R6 then
+        if partName == "UpperTorso" or partName == "LowerTorso" then
+            partName = "Torso"
+        elseif partName:match("UpperArm") or partName:match("LowerArm") or partName:match("Hand") then
+            partName = partName:gsub("Upper", ""):gsub("Lower", ""):gsub("Hand", " Arm")
+        elseif partName:match("UpperLeg") or partName:match("LowerLeg") or partName:match("Foot") then
+            partName = partName:gsub("Upper", ""):gsub("Lower", ""):gsub("Foot", " Leg")
+        end
+    elseif rigType == Enum.HumanoidRigType.R15 then
+        if partName == "Torso" then
+            return character:FindFirstChild("UpperTorso") or character:FindFirstChild("LowerTorso")
+        elseif partName == "Left Arm" then
+            return character:FindFirstChild("LeftUpperArm") or character:FindFirstChild("LeftLowerArm") or character:FindFirstChild("LeftHand")
+        elseif partName == "Right Arm" then
+            return character:FindFirstChild("RightUpperArm") or character:FindFirstChild("RightLowerArm") or character:FindFirstChild("RightHand")
+        elseif partName == "Left Leg" then
+            return character:FindFirstChild("LeftUpperLeg") or character:FindFirstChild("LeftLowerLeg") or character:FindFirstChild("LeftFoot")
+        elseif partName == "Right Leg" then
+            return character:FindFirstChild("RightUpperLeg") or character:FindFirstChild("RightLowerLeg") or character:FindFirstChild("RightFoot")
+        end
+    end
+    return character:FindFirstChild(partName)
+end
+
+-- Team check fonksiyonu (geliştirilmiş, çeşitli oyunlar için)
+local function ShouldExpandHitbox(player)
+    if not player or player == LocalPlayer or player.Name == IgnoredPlayerName then
+        return false
+    end
+    if not HitboxSettings.TeamCheck then
+        return true  -- Team check kapalıysa herkese uygula
+    end
+    if not player.Team or not LocalPlayer.Team then
+        return true  -- Team yoksa uygula
+    end
+    local playerTeam = player.Team.Name:lower()
+    local localTeam = LocalPlayer.Team.Name:lower()
+    -- Çeşitli oyun team'leri için geniş destek
+    local enemyTeams = {
+        prisoners = {"police", "heroes"},
+        criminals = {"police", "heroes"},
+        villains = {"police", "heroes"},
+        police = {"prisoners", "criminals", "villains"},
+        heroes = {"prisoners", "criminals", "villains"},
+    }
+    local enemies = enemyTeams[localTeam] or {}
+    for _, enemy in ipairs(enemies) do
+        if playerTeam == enemy then
+            return true
+        end
+    end
+    return false
+end
+
+-- Oyuncunun kamerada olup olmadığını kontrol et (optimizasyon için)
+local function IsInView(player)
+    if not player or not player.Character then return false end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    local part = GetBodyPart(player.Character, HitboxSettings.BodyPart)
+    if not humanoid or humanoid.Health <= 0 or not part then return false end
+    local screenPos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(part.Position)
+    return onScreen
+end
+
+-- Hitbox uygula (geliştirilmiş, fizik buglarını önle)
+local function ApplyHitbox(player)
+    if not HitboxSettings.Enabled or not ShouldExpandHitbox(player) or not player then
+        return
+    end
+    local character = player.Character
+    if not character or not character:IsDescendantOf(Workspace) then
+        return
+    end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        return
+    end
+    local part = GetBodyPart(character, HitboxSettings.BodyPart)
+    if part and part:IsA("BasePart") and not ActiveHitboxes[player] then
+        -- Fizik buglarını önle: RootPart için özel handling
+        local isRootPart = part.Name == "HumanoidRootPart"
+        ActiveHitboxes[player] = {
+            part = part,
+            originalSize = part.Size,
+            originalMassless = part.Massless,
+            originalTransparency = part.Transparency,
+            originalCanCollide = part.CanCollide,
+            originalAnchored = part.Anchored,  -- Ekstra stabilite
+            originalCanQuery = part.CanQuery,  -- Raycast buglarını önle
+        }
+        part.Size = Vector3.new(HitboxSettings.Size, HitboxSettings.Size, HitboxSettings.Size)
+        part.Transparency = HitboxSettings.Transparency
+        part.CanCollide = false
+        part.Massless = true
+        part.Anchored = isRootPart and false or part.Anchored  -- RootPart anchored olmasın
+        part.CanQuery = true  -- Hit detection'ı koru
+        CollectionService:AddTag(part, HitboxTag)
+    end
+end
+
+-- Hitbox'ı eski haline getir (titiz temizlik)
+local function RestoreHitbox(player)
+    if ActiveHitboxes[player] then
+        local data = ActiveHitboxes[player]
+        local part = data.part
+        if part and part:IsA("BasePart") and part:IsDescendantOf(Workspace) then
+            part.Size = data.originalSize
+            part.Transparency = data.originalTransparency
+            part.CanCollide = data.originalCanCollide
+            part.Massless = data.originalMassless
+            part.Anchored = data.originalAnchored
+            part.CanQuery = data.originalCanQuery
+            CollectionService:RemoveTag(part, HitboxTag)
+        end
+        ActiveHitboxes[player] = nil
+    end
+end
+
+-- Tüm hitbox'ları güncelle (hızlı ve stabil)
+local function UpdateAllHitboxes()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName then
+            RestoreHitbox(player)
+            if HitboxSettings.Enabled and ShouldExpandHitbox(player) then
+                task.defer(ApplyHitbox, player)
+            end
+        end
+    end
+end
+
+-- Görünür hitbox'ları güncelle (optimizasyon modu)
+local function UpdateVisibleHitboxes()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Name ~= IgnoredPlayerName then
+            if HitboxSettings.Enabled and ShouldExpandHitbox(player) and IsInView(player) then
+                task.defer(ApplyHitbox, player)
+            else
+                RestoreHitbox(player)
+            end
+        end
+    end
+end
+
+-- Optimizasyon modu toggle'ı
+local function ToggleOptimized(value)
+    HitboxSettings.Optimized = value
+    if value then
+        if OptimizedConn then OptimizedConn:Disconnect() end
+        OptimizedConn = RunService.Heartbeat:Connect(UpdateVisibleHitboxes)
+        Library:Notify("Optimized Hitbox Modu Etkinleştirildi (Yalnızca Görünür Oyuncular)", 3)
+    else
+        if OptimizedConn then
+            OptimizedConn:Disconnect()
+            OptimizedConn = nil
+        end
+        UpdateAllHitboxes()
+        Library:Notify("Optimized Hitbox Modu Devre Dışı Bırakıldı (Tüm Oyuncular)", 3)
+    end
+end
+
+-- Oyuncu kurulum (geliştirilmiş bağlantılar, stabilite)
+local function SetupPlayer(player)
+    if not player or player == LocalPlayer or player.Name == IgnoredPlayerName then
+        return
+    end
+    Connections[player] = Connections[player] or {}
+
+    -- Karakter eklendiğinde
+    local charAddedConn = player.CharacterAdded:Connect(function(character)
+        if not HitboxSettings.Enabled or not ShouldExpandHitbox(player) then
+            return
+        end
+        task.spawn(function()
+            local timeout = tick() + 3  -- Timeout artırıldı
+            while not character:IsDescendantOf(Workspace) or not GetBodyPart(character, HitboxSettings.BodyPart) or not character:FindFirstChildOfClass("Humanoid") do
+                if tick() > timeout then
+                    return
+                end
+                task.wait(0.05)  -- Daha hızlı döngü
+            end
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                if not HitboxSettings.Optimized or IsInView(player) then
+                    ApplyHitbox(player)
+                end
+            end
+        end)
+    end)
+    table.insert(Connections[player], charAddedConn)
+
+    -- Mevcut karakter için bağlantılar
+    if player.Character then
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            -- Sağlık değişimi
+            local healthConn = humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+                local health = humanoid.Health
+                if health > 0 and HitboxSettings.Enabled and ShouldExpandHitbox(player) then
+                    if not HitboxSettings.Optimized or IsInView(player) then
+                        ApplyHitbox(player)
+                    end
+                else
+                    RestoreHitbox(player)
+                end
+            end)
+            table.insert(Connections[player], healthConn)
+
+            -- Ölüm
+            local diedConn = humanoid.Died:Connect(function()
+                RestoreHitbox(player)
+            end)
+            table.insert(Connections[player], diedConn)
+
+            -- Durum değişimi
+            local stateConn = humanoid.StateChanged:Connect(function(_, newState)
+                if newState == Enum.HumanoidStateType.Running and HitboxSettings.Enabled and ShouldExpandHitbox(player) then
+                    if not HitboxSettings.Optimized or IsInView(player) then
+                        ApplyHitbox(player)
+                    end
+                end
+            end)
+            table.insert(Connections[player], stateConn)
+        end
+
+        -- Ancestry değişimi (karakter workspace'te mi)
+        local ancestryConn = player.Character.AncestryChanged:Connect(function(_, parent)
+            if parent == nil then
+                RestoreHitbox(player)
+            elseif HitboxSettings.Enabled and ShouldExpandHitbox(player) then
+                if not HitboxSettings.Optimized or IsInView(player) then
+                    ApplyHitbox(player)
+                end
+            end
+        end)
+        table.insert(Connections[player], ancestryConn)
+    end
+
+    -- Watchdog: Her frame kontrol (ama optimize edilmiş)
+    local watchdogConn = RunService.Heartbeat:Connect(function()
+        if not HitboxSettings.Enabled or not ShouldExpandHitbox(player) or not player:IsDescendantOf(game) then
+            return
+        end
+        local character = player.Character
+        if character and character:IsDescendantOf(Workspace) and character:FindFirstChildOfClass("Humanoid") and not ActiveHitboxes[player] then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                if not HitboxSettings.Optimized or IsInView(player) then
+                    ApplyHitbox(player)
+                end
+            end
+        end
+    end)
+    table.insert(Connections[player], watchdogConn)
+end
+
+-- Oyuncu eklendiğinde kur
+Players.PlayerAdded:Connect(function(player)
+    SetupPlayer(player)
+end)
+
+-- Oyuncu çıktığında temizle
+Players.PlayerRemoving:Connect(function(player)
+    RestoreHitbox(player)
+    if Connections[player] then
+        for _, conn in ipairs(Connections[player]) do
+            if conn then conn:Disconnect() end
+        end
+        Connections[player] = nil
+    end
+end)
+
+-- Workspace çocuk eklendiğinde
+Workspace.ChildAdded:Connect(function(child)
+    if child:IsA("Model") and child:FindFirstChildOfClass("Humanoid") then
+        local player = Players:GetPlayerFromCharacter(child)
+        if player and player ~= LocalPlayer and player.Name ~= IgnoredPlayerName and HitboxSettings.Enabled and ShouldExpandHitbox(player) then
+            if not HitboxSettings.Optimized or IsInView(player) then
+                ApplyHitbox(player)
+            end
+        end
+    end
+end)
+
+-- Workspace çocuk kaldırıldığında
+Workspace.ChildRemoved:Connect(function(child)
+    if child:IsA("Model") then
+        local player = Players:GetPlayerFromCharacter(child)
+        if player then
+            RestoreHitbox(player)
+        end
+    end
+end)
+
+-- Local team değişimi
+local teamConn = LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+    task.defer(function()
+        if HitboxSettings.Optimized then
+            UpdateVisibleHitboxes()
+        else
+            UpdateAllHitboxes()
+        end
+        Library:Notify("Takım değiştirildi: " .. (LocalPlayer.Team and LocalPlayer.Team.Name or "Yok") .. ", hitbox'lar güncellendi!", 3)
+    end)
+end)
+table.insert(Connections, teamConn)
+
+-- Mevcut oyuncuları kur
+for _, player in ipairs(Players:GetPlayers()) do
+    SetupPlayer(player)
+end
+
+-- UI Elemanları
+local LeftGroupBox = Tabs.Hitbox:AddLeftGroupbox('Hitbox Kontrolleri')
+
+LeftGroupBox:AddToggle('HitboxToggle', {
+    Text = 'Hitbox Genişleticiyi Etkinleştir',
+    Default = false,
+    Tooltip = 'Hitbox genişletmeyi aç/kapat (En stabil ve güçlü versiyon)',
+    Risky = true,
+    Callback = function(Value)
+        HitboxSettings.Enabled = Value
+        if Value then
+            if HitboxSettings.Optimized then
+                ToggleOptimized(true)
+            else
+                UpdateAllHitboxes()
+            end
+        else
+            for _, p in ipairs(Players:GetPlayers()) do
+                RestoreHitbox(p)
+            end
+        end
+        
+    end
+})
+
+LeftGroupBox:AddToggle('TeamCheckToggle', {
+    Text = 'Team Check Etkinleştir',
+    Default = true,
+    Tooltip = 'Team check\'i aç/kapat (Kapalıysa herkese uygula)',
+    Callback = function(Value)
+        HitboxSettings.TeamCheck = Value
+        if HitboxSettings.Optimized then
+            UpdateVisibleHitboxes()
+        else
+            UpdateAllHitboxes()
+        end
+        Library:Notify("Team Check " .. (Value and "Etkinleştirildi" or "Devre Dışı Bırakıldı"), 3)
+    end
+})
+
+LeftGroupBox:AddToggle('OptimizedHitboxToggle', {
+    Text = 'Optimized Mod (FPS Dostu)',
+    Default = false,
+    Tooltip = 'Yalnızca kameradaki oyunculara uygula (Hızlı ve stabil)',
+    Callback = function(Value)
+        ToggleOptimized(Value)
+    end
+})
+
+LeftGroupBox:AddDropdown('BodyPartDropdown', {
+    Values = BodyParts,
+    Default = 'Head',
+    Text = 'Vücut Parçası Seç',
+    Tooltip = 'Genişletilecek parça (R6/R15 tam destek, bugsız)',
+    Callback = function(Value)
+        for player, _ in pairs(ActiveHitboxes) do
+            RestoreHitbox(player)
+        end
+        HitboxSettings.BodyPart = Value
+        if HitboxSettings.Optimized then
+            UpdateVisibleHitboxes()
+        else
+            UpdateAllHitboxes()
+        end
+        Library:Notify("Vücut Parçası " .. Value .. " olarak ayarlandı (Bugsız)", 3)
+    end
+})
+
+LeftGroupBox:AddSlider('HitboxSizeSlider', {
+    Text = 'Hitbox Boyutu',
+    Default = 8,
+    Min = 1,
+    Max = 50,  -- Daha yüksek max için blatant
+    Rounding = 1,
+    Tooltip = 'Boyut ayarı (Fizik bugsız, ne olursa olsun stabil)',
+    Callback = function(Value)
+        HitboxSettings.Size = Value
+        if HitboxSettings.Optimized then
+            UpdateVisibleHitboxes()
+        else
+            UpdateAllHitboxes()
+        end
+
+    end
+})
+
+LeftGroupBox:AddSlider('HitboxTransparencySlider', {
+    Text = 'Hitbox Şeffaflığı',
+    Default = 0.7,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Tooltip = 'Şeffaflık ayarı (0 = görünmez)',
+    Callback = function(Value)
+        HitboxSettings.Transparency = Value
+        if HitboxSettings.Optimized then
+            UpdateVisibleHitboxes()
+        else
+            UpdateAllHitboxes()
+        end
+
+    end
+})
+
+-- UI Ayarları
+local MenuGroup = Tabs['UI Ayarları']:AddLeftGroupbox('Menü')
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default = Library.KeybindFrame.Visible,
+    Text = "Tuş Menüsünü Aç",
+    Callback = function(value) Library.KeybindFrame.Visible = value end
+})
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Özel İmleç",
+    Default = true,
+    Callback = function(Value) Library.ShowCustomCursor = Value end
+})
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menü Tuşu"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift",
+    NoUI = true,
+    Text = "Menü tuşu"
+})
+MenuGroup:AddButton("Kapat", function() Library:Unload() end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+ThemeManager:SetFolder('MyScriptHub')
+SaveManager:SetFolder('MyScriptHub/specific-game')
+SaveManager:BuildConfigSection(Tabs['UI Ayarları'])
+ThemeManager:ApplyToTab(Tabs['UI Ayarları'])
+SaveManager:LoadAutoloadConfig()
+
+-- Unload fonksiyonu (titiz temizlik)
+Library:OnUnload(function()
+    for player, _ in pairs(ActiveHitboxes) do
+        RestoreHitbox(player)
+    end
+    if OptimizedConn then OptimizedConn:Disconnect() end
+    for _, conns in pairs(Connections) do
+        if typeof(conns) == "table" then
+            for _, conn in ipairs(conns) do
+                if conn then conn:Disconnect() end
+            end
+        else
+            if conns then conns:Disconnect() end
+        end
+    end
+    Connections = {}
+    CollectionService:RemoveAllTags(HitboxTag)  -- Tüm tag'leri temizle
+    print('Hitbox Expander Kapatıldı!')
+    Library.Unloaded = true
+end)
+
+local AimbotSettings = {
+    Enabled = false,
+    Mode = "Always",
+    Keybind = Enum.UserInputType.MouseButton2,
+    SilentAimEnabled = true,
+    SilentAimKeybind = Enum.UserInputType.MouseButton1,
+    FOV = 0,
+    FOVVisible = false,
+    FOVTransparency = 0.1,
+    FOVColor = Color3.fromRGB(255, 0, 0),
+    FOVThickness = 2,
+    FOVNumSides = 60,
+    MaxDistance = math.huge,
+    WallCheck = false,
+    VisibleCheck = false,
+    TeamCheck = false,
+    TargetAimbot = false,
+    TargetPlayer = nil,
+    Triggerbot = true,
+    AimbotBodyPart = "Head",
+    AimbotPriority = "ClosestToCrosshair",
+    HitChance = 100,
+    AntiRecoil = true,
+}
+
+-- Ultra Optimize Değişkenler - Cache Heavy, Synapse Stabilite
+local AimbotLocked = false
+local AimbotTarget = nil
+local FixedTargetPart = nil
+local FixedTargetPlayer = nil
+local TriggerbotFiring = false
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Radius = AimbotSettings.FOV
+FOVCircle.Thickness = AimbotSettings.FOVThickness
+FOVCircle.Color = AimbotSettings.FOVColor
+FOVCircle.Transparency = AimbotSettings.FOVTransparency
+FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+FOVCircle.NumSides = AimbotSettings.FOVNumSides
+FOVCircle.Filled = false
+
+local Connections = {}
+local PlayerCache = {}
+local PartCache = {}
+local LastCacheUpdate = 0
+local CacheThrottle = 0.03 -- 30+ FPS Update, Ultra Hızlı & Stabil
+
+-- Expert No Recoil - Erken Load, Pcall Stabil
+local function ApplyNoRecoil()
+    if AimbotSettings.AntiRecoil then
+        local success = pcall(function()
+            local cameraShaker = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("CameraShaker"))
+            local noop = function() end
+            cameraShaker.StartShake = noop
+            cameraShaker.ShakeOnce = noop
+            cameraShaker.ShakeSustain = noop
+            cameraShaker.CameraShakeInstance = noop
+            cameraShaker.Shake = noop
+            cameraShaker.Start = noop
+        end)
+    end
+end
+
+-- Expert Team Check - Hız Etkilemez, Titiz Grup Logic
+local function IsEnemy(player)
+    local localTeamName = LocalPlayer.Team and LocalPlayer.Team.Name or ""
+    local playerTeamName = player.Team and player.Team.Name or ""
+    local localIsLaw = localTeamName == "Police" or localTeamName == "Heroes"
+    local playerIsLaw = playerTeamName == "Police" or playerTeamName == "Heroes"
+    return localIsLaw ~= playerIsLaw
+end
+
+local function ShouldTargetPlayer(player)
+    return player ~= LocalPlayer and (not AimbotSettings.TeamCheck or IsEnemy(player))
+end
+
+-- Ultra Cache - Per Player Random Part Once, Stabil Lock
+local possibleParts = {"Head", "HumanoidRootPart", "Torso", "UpperTorso", "LowerTorso"}
+local function UpdatePlayerCache(force)
+    if force or (tick() - LastCacheUpdate >= CacheThrottle) then
+        PlayerCache = {}
+        PartCache = {}
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character.Parent == Workspace then
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid and humanoid.Health > 0 then
+                    local parts = {
+                        Head = player.Character:FindFirstChild("Head"),
+                        HumanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart"),
+                        Torso = player.Character:FindFirstChild("Torso") or player.Character:FindFirstChild("UpperTorso"),
+                        UpperTorso = player.Character:FindFirstChild("UpperTorso"),
+                        LowerTorso = player.Character:FindFirstChild("LowerTorso"),
+                    }
+                    local targetPartName = AimbotSettings.AimbotBodyPart == "Random" 
+                        and possibleParts[math.random(1, #possibleParts)] 
+                        or AimbotSettings.AimbotBodyPart
+                    local targetPart = parts[targetPartName]
+                    if targetPart then
+                        PlayerCache[player] = {
+                            Character = player.Character,
+                            Humanoid = humanoid,
+                            Parts = parts,
+                            TargetPart = targetPart
+                        }
+                        for _, part in pairs(parts) do
+                            if part then
+                                PartCache[part] = player
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        LastCacheUpdate = tick()
+    end
+end
+
+-- Raycast Stabil - Exclude Local Only
+local function IsPlayerVisible(player, part)
+    if not AimbotSettings.VisibleCheck or not part then return true end
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.IgnoreWater = true
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin)
+    local result = Workspace:Raycast(origin, direction, raycastParams)
+    return result and result.Instance and result.Instance:IsDescendantOf(player.Character)
+end
+
+local function IsPlayerBehindWall(player, part)
+    if not AimbotSettings.WallCheck or not part then return false end
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.IgnoreWater = true
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin)
+    local result = Workspace:Raycast(origin, direction, raycastParams)
+    return not (result and result.Instance and result.Instance:IsDescendantOf(player.Character))
+end
+
+local function IsWithinFOV(part)
+    if AimbotSettings.FOV == 0 or not part then return true end
+    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+    if not onScreen then return false end
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    return (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude <= AimbotSettings.FOV
+end
+
+-- En Hızlı Closest - Priority Expert, 0 Delay Lock
+local function GetClosestPlayer()
+    UpdatePlayerCache()
+    local targetPlayer = AimbotSettings.TargetPlayer
+    if AimbotSettings.TargetAimbot and targetPlayer and PlayerCache[targetPlayer] then
+        local data = PlayerCache[targetPlayer]
+        local part = data.TargetPart
+        if ShouldTargetPlayer(targetPlayer) and IsWithinFOV(part) and not IsPlayerBehindWall(targetPlayer, part) and IsPlayerVisible(targetPlayer, part) then
+            return targetPlayer, part
+        end
+    end
+    local closestPlayer, closestPart, closestMetric = nil, nil, math.huge
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local priority = AimbotSettings.AimbotPriority
+    for player, data in pairs(PlayerCache) do
+        local part = data.TargetPart
+        if part then
+            local worldDist = (Camera.CFrame.Position - part.Position).Magnitude
+            if worldDist > AimbotSettings.MaxDistance then continue end
+            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            local metric = math.huge
+            if priority == "ClosestToCrosshair" then
+                if onScreen then
+                    metric = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                else
+                    continue
+                end
+            elseif priority == "ClosestDistance" then
+                metric = worldDist
+            elseif priority == "LowestHealth" then
+                metric = data.Humanoid.Health
+            end
+            if metric < closestMetric and ShouldTargetPlayer(player) and IsWithinFOV(part) and not IsPlayerBehindWall(player, part) and IsPlayerVisible(player, part) then
+                closestPlayer, closestPart, closestMetric = player, part, metric
+            end
+        end
+    end
+    return closestPlayer, closestPart
+end
+
+-- Agresif Silent Aim - VR Event Instant
+local function TriggerSilentAim()
+    if not AimbotSettings.SilentAimEnabled then return end
+    local targetPlayer, targetPart = GetClosestPlayer()
+    if targetPlayer and targetPart and math.random(1, 100) <= AimbotSettings.HitChance then
+        pcall(function()
+            ReplicatedStorage:FindFirstChild("Event"):FireServer("VR", targetPart)
+        end)
+    end
+end
+
+-- Ultra Blatant RenderStepped - Instant Snap, 0 Smooth, En Hızlı Kitlenme
+local aimbotConn = RunService.RenderStepped:Connect(function()
+    if not AimbotSettings.Enabled then
+        AimbotTarget = nil
+        FixedTargetPart = nil
+        FixedTargetPlayer = nil
+        TriggerbotFiring = false
+        FOVCircle.Visible = false
+        return
+    end
+
+    -- FOV Instant Update
+    FOVCircle.Radius = math.max(AimbotSettings.FOV, 0)
+    FOVCircle.Color = AimbotSettings.FOVColor
+    FOVCircle.Transparency = AimbotSettings.FOVTransparency
+    FOVCircle.Thickness = AimbotSettings.FOVThickness
+    FOVCircle.NumSides = AimbotSettings.FOVNumSides
+    FOVCircle.Visible = AimbotSettings.FOVVisible
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    if not AimbotLocked then
+        AimbotTarget = nil
+        return
+    end
+
+    local targetPlayer, targetPart
+    if AimbotSettings.Mode == "Toggle" then
+        if not FixedTargetPart or not FixedTargetPart.Parent or not FixedTargetPlayer or not PlayerCache[FixedTargetPlayer] then
+            targetPlayer, targetPart = GetClosestPlayer()
+            FixedTargetPart = targetPart
+            FixedTargetPlayer = targetPlayer
+        else
+            targetPart = FixedTargetPart
+            targetPlayer = FixedTargetPlayer
+        end
+        AimbotTarget = targetPart
+    else
+        targetPlayer, targetPart = GetClosestPlayer()
+        AimbotTarget = targetPart
+    end
+
+    if AimbotTarget and targetPlayer then
+        local data = PlayerCache[targetPlayer]
+        if data and data.Humanoid.Health > 0 and IsWithinFOV(AimbotTarget) and not IsPlayerBehindWall(targetPlayer, AimbotTarget) and IsPlayerVisible(targetPlayer, AimbotTarget) then
+            -- 0 Delay Instant Blatant Snap - En Hızlı Kitlenme
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, AimbotTarget.Position)
+        else
+            AimbotLocked = false
+            FixedTargetPart = nil
+            FixedTargetPlayer = nil
+            AimbotTarget = nil
+        end
+    end
+
+    -- Ultra Triggerbot - Hold Fire, Instant, Blatant No Checks
+    if AimbotSettings.Triggerbot then
+        local mousePos = UserInputService:GetMouseLocation()
+        local unitRay = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+        raycastParams.IgnoreWater = true
+        local result = Workspace:Raycast(unitRay.Origin, unitRay.Direction * 5000, raycastParams)
+        local shouldFire = false
+        if result and result.Instance then
+            local hitPlayer = Players:GetPlayerFromCharacter(result.Instance.Parent) or PartCache[result.Instance]
+            if hitPlayer and ShouldTargetPlayer(hitPlayer) and math.random(1, 100) <= AimbotSettings.HitChance then
+                shouldFire = true
+            end
+        end
+        if shouldFire ~= TriggerbotFiring then
+            if shouldFire then
+                mouse1press()
+            else
+                mouse1release()
+            end
+            TriggerbotFiring = shouldFire
+        end
+    end
+end)
+table.insert(Connections, aimbotConn)
+
+-- Expert Input - Stabil Key Handling
+local inputConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    local isSilentKey = input.UserInputType == AimbotSettings.SilentAimKeybind or input.KeyCode == AimbotSettings.SilentAimKeybind
+    if isSilentKey then
+        TriggerSilentAim()
+        return
+    end
+    local isAimbotKey = input.UserInputType == AimbotSettings.Keybind or input.KeyCode == AimbotSettings.Keybind
+    if isAimbotKey and AimbotSettings.Enabled then
+        if AimbotSettings.Mode == "Hold" or AimbotSettings.Mode == "Always" then
+            AimbotLocked = true
+        elseif AimbotSettings.Mode == "Toggle" then
+            AimbotLocked = not AimbotLocked
+            if AimbotLocked then
+                local _, part = GetClosestPlayer()
+                local player, tpart = GetClosestPlayer()
+                FixedTargetPart = tpart
+                FixedTargetPlayer = player
+            else
+                FixedTargetPart = nil
+                FixedTargetPlayer = nil
+            end
+        end
+    end
+end)
+table.insert(Connections, inputConn)
+
+local inputEndConn = UserInputService.InputEnded:Connect(function(input)
+    if AimbotSettings.Mode == "Hold" then
+        local isKeybind = input.UserInputType == AimbotSettings.Keybind or input.KeyCode == AimbotSettings.Keybind
+        if isKeybind then
+            AimbotLocked = false
+            AimbotTarget = nil
+        end
+    end
+end)
+table.insert(Connections, inputEndConn)
+
+-- Main Left Groupbox - Core
+local MainGroupBox = Tabs.Aimbot:AddLeftGroupbox('Main Aimbot')
+MainGroupBox:AddToggle('AimbotToggle', {
+    Text = 'Enable Ultra Blatant Aimbot',
+    Default = false,
+    Tooltip = '0 Delay Instant Lock - Synapse X Ultimate',
+    Risky = true,
+    Callback = function(Value)
+        AimbotSettings.Enabled = Value
+        if Value and AimbotSettings.Mode == "Always" then
+            AimbotLocked = true
+        else
+            AimbotLocked = false
+        end
+        AimbotTarget = nil
+        FixedTargetPart = nil
+        FixedTargetPlayer = nil
+    end
+})
+MainGroupBox:AddDropdown('AimbotMode', {
+    Values = {'Always', 'Toggle', 'Hold'},
+    Default = 'Always',
+    Text = 'Aimbot Mode',
+    Callback = function(Value)
+        AimbotSettings.Mode = Value
+        if Value ~= "Always" then
+            AimbotLocked = false
+        elseif AimbotSettings.Enabled then
+            AimbotLocked = true
+        end
+    end
+})
+MainGroupBox:AddLabel('Aimbot Key'):AddKeyPicker('AimbotKeybind', {
+    Default = 'MB2',
+    Mode = 'Toggle',
+    Text = 'Aimbot Key',
+    ChangedCallback = function(New)
+        AimbotSettings.Keybind = New
+    end
+})
+MainGroupBox:AddToggle('SilentAimToggle', {
+    Text = 'Silent Aim (VR)',
+    Default = true,
+    Tooltip = 'Instant Headshot on Key',
+    Callback = function(Value)
+        AimbotSettings.SilentAimEnabled = Value
+    end
+})
+MainGroupBox:AddLabel('Silent Key'):AddKeyPicker('SilentAimKeybind', {
+    Default = 'MB1',
+    Mode = 'Toggle',
+    Text = 'Silent Aim Key',
+    ChangedCallback = function(New)
+        AimbotSettings.SilentAimKeybind = New
+    end
+})
+MainGroupBox:AddToggle('TriggerbotToggle', {
+    Text = 'Triggerbot (Hold Fire)',
+    Default = true,
+    Tooltip = 'Auto Full Auto on Enemy',
+    Risky = true,
+    Callback = function(Value)
+        AimbotSettings.Triggerbot = Value
+        if not Value then
+            mouse1release()
+            TriggerbotFiring = false
+        end
+    end
+})
+MainGroupBox:AddSlider('HitChanceSlider', {
+    Text = 'Hit Chance %',
+    Default = 100,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        AimbotSettings.HitChance = Value
+    end
+})
+MainGroupBox:AddToggle('TeamCheckToggle', {
+    Text = 'Team Check',
+    Default = false,
+    Tooltip = 'Only Enemies (Police/Heroes vs Prisoners/Criminals/Villains)',
+    Callback = function()
+        UpdatePlayerCache(true)
+    end
+})
+MainGroupBox:AddToggle('AntiRecoilToggle', {
+    Text = 'Anti Recoil',
+    Default = true,
+    Callback = function(Value)
+        AimbotSettings.AntiRecoil = Value
+        ApplyNoRecoil()
+    end
+})
+
+-- Advanced Right Groupbox - Expert Options
+local AdvGroupBox = Tabs.Aimbot:AddRightGroupbox('Advanced')
+AdvGroupBox:AddToggle('TargetAimbotToggle', {
+    Text = 'Target Specific Player',
+    Default = false,
+    Callback = function(Value)
+        AimbotSettings.TargetAimbot = Value
+    end
+})
+AdvGroupBox:AddDropdown('TargetPlayerDropdown', {
+    SpecialType = 'Player',
+    Text = 'Target Player',
+    Callback = function(Value)
+        AimbotSettings.TargetPlayer = Value
+    end
+})
+AdvGroupBox:AddDropdown('PriorityDropdown', {
+    Values = {'ClosestToCrosshair', 'ClosestDistance', 'LowestHealth'},
+    Default = 'ClosestToCrosshair',
+    Text = 'Target Priority',
+    Callback = function(Value)
+        AimbotSettings.AimbotPriority = Value
+    end
+})
+AdvGroupBox:AddDropdown('BodyPartDropdown', {
+    Values = {'Head', 'HumanoidRootPart', 'Torso', 'UpperTorso', 'LowerTorso', 'Random'},
+    Default = 'Head',
+    Text = 'Target Part',
+    Callback = function(Value)
+        AimbotSettings.AimbotBodyPart = Value
+        UpdatePlayerCache(true)
+    end
+})
+AdvGroupBox:AddSlider('FOVSlider', {
+    Text = 'FOV (0 = Unlimited)',
+    Default = 0,
+    Min = 0,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        AimbotSettings.FOV = Value
+    end
+})
+AdvGroupBox:AddToggle('FOVVisibleToggle', {
+    Text = 'Show FOV Circle',
+    Default = false,
+    Callback = function(Value)
+        AimbotSettings.FOVVisible = Value
+    end
+})
+AdvGroupBox:AddLabel('FOV Color'):AddColorPicker('FOVColorPicker', {
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(Value)
+        AimbotSettings.FOVColor = Value
+    end
+})
+AdvGroupBox:AddSlider('FOVThicknessSlider', {
+    Text = 'FOV Thickness',
+    Default = 2,
+    Min = 1,
+    Max = 5,
+    Rounding = 0,
+    Callback = function(Value)
+        AimbotSettings.FOVThickness = Value
+    end
+})
+AdvGroupBox:AddSlider('FOVTransparencySlider', {
+    Text = 'FOV Transparency',
+    Default = 0.1,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        AimbotSettings.FOVTransparency = Value
+    end
+})
+AdvGroupBox:AddSlider('MaxDistanceSlider', {
+    Text = 'Max Distance',
+    Default = 5000,
+    Min = 100,
+    Max = 50000,
+    Rounding = 0,
+    Callback = function(Value)
+        AimbotSettings.MaxDistance = Value
+    end
+})
+AdvGroupBox:AddToggle('WallCheckToggle', {
+    Text = 'Wall Check',
+    Default = false,
+    Callback = function()
+        UpdatePlayerCache(true)
+    end
+})
+AdvGroupBox:AddToggle('VisibleCheckToggle', {
+    Text = 'Visible Check',
+    Default = false,
+    Callback = function()
+        UpdatePlayerCache(true)
+    end
+})
+
+
+-- Ultra Temiz Unload
+Library:OnUnload(function()
+    for _, conn in ipairs(Connections) do
+        if conn then conn:Disconnect() end
+    end
+    FOVCircle:Remove()
+    mouse1release()
+    PlayerCache = {}
+    PartCache = {}
+    print('Aimbot yüklendi')
+end)
+
+-- Init
+ApplyNoRecoil()
+UpdatePlayerCache(true)
+
+local Watchlist = {
+    [373061764] = "Laci2800",
+    [721771859] = "ZeroBlueHawk",
+    [83641955] = "Enphixo",
+    [146462043] = "DJPelta",
+    [966027914] = "CraftiCookie",
+    [958389997] = "ofetark",
+    [94467335] = "OmegaAnoobis",
+    [70556831] = "DarkAgeSky",
+    [430348004] = "nic10telf",
+    [16161864] = "Gemini_II",
+    [4610703127] = "MadCityUploader",
+    [62346773] = "PixelatedCandy",
+    [59967] = "taymaster",
+    [28995792] = "TacticalFrostyy",
+    [17897891] = "FamedChris",
+    [116481933] = "Rootie_DaHoodie",
+    [4426328480] = "AlreadyPrototype",
+    [127514028] = "GohMaxPro",
+    [1933300649] = "BornYeti",
+    [371367028] = "odavido123",
+    [33219560] = "peepguyx",
+    [50549672] = "cjchurcher",
+    [122673807] = "DatBrian",
+    [870905642] = "Sushy647",
+    [132717362] = "ZDMD",
+    [983056393] = "TheRealConlord",
+    [7750807951] = "LuiseNinja25",
+    [1316039944] = "Itsakile",
+    [9551275] = "ItsMeKlc",
+    [3461560666] = "VesuIka",
+    [3715956963] = "MadCityVigilante",
+    [28962045] = "JennyBeanRose",
+    [1647502388] = "M34T5",
+    [3183391648] = "TatendaOtobon",
+    [225259944] = "Dxmaqe",
+    [731501956] = "Blackfyro",
+    [146493490] = "JackSkywalker_JA",
+    [608027295] = "Kryfist",
+    [2678001507] = "SpyderSammy",
+    [35479046] = "theloudscream",
+    [211222858] = "atomikatz",
+    [58387889] = "ilyannna",
+    [191803941] = "BasicRobo",
+    [30944240] = "TheHyb",
+    [75151198] = "Lucid_Gemini",
+    [92812719] = "KristjanSyc",
+    [702252975] = "wilkkugod",
+    [1131551308] = "yeahhhaaron",
+    [153343142] = "MarioSonic2987",
+    [24883415] = "i5k",
+    [1805793503] = "Camjango",
+    [749064269] = "AbsoluteDays",
+    [1084171270] = "puggy_gaming123",
+    [1169232379] = "NoodleGamingTV",
+    [974223821] = "GHUZY",
+    [109225997] = "EndoExternal",
+    [74810618] = "1QueenOfAwesomeness",
+    [885920088] = "Daijon_03",
+    [68728334] = "Perhapz",
+    [13629636] = "PointlessDoovid",
+    [1216109201] = "Ender_III",
+    [72579861] = "DarkAssassin860",
+    [134262088] = "Drrakw",
+    [943911395] = "FrostyTheNewbie",
+    [157180286] = "sk3tchyt",
+    [18394351] = "endlessfun",
+}
+
+local GROUP_ID = 3642592  -- Grup ID'si
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1438493172366966794/xKQ0p6Xd2mEDV-NtT6JA8ZzoNCFmgMRNG_NEY8V0m_xBY3yf74vtnDljx-6uwupvuN3N"  -- Webhook URL
+
+-- Cache'ler için tablolar (Performans optimizasyonu)
+local roleCache = {}
+local gameDetailsCache = nil
+local playerDetailsCache = {}
+
+-- Yardımcı Fonksiyonlar (Modüler ve hatasız)
+local function GetGroupRole(player)
+    local userId = player.UserId
+    if roleCache[userId] then return roleCache[userId] end
+    if not GROUP_ID then return "Bilinmiyor" end
+    local success, role = pcall(player.GetRoleInGroup, player, GROUP_ID)
+    role = success and role ~= "" and role or "Bilinmiyor"
+    roleCache[userId] = role
+    return role
+end
+
+local function GetAvatarUrl(userId)
+    return string.format("https://thumbnails.roblox.com/v1/users/avatar?userIds=%d&size=352x352&format=Png", userId)
+end
+
+local function GetGameDetails()
+    if gameDetailsCache then return gameDetailsCache end
+    local success, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, game.PlaceId)
+    gameDetailsCache = success and info or { Name = "Bilinmeyen Oyun", Description = "Açıklama Yok", IconImageAssetId = 0, PlaceId = game.PlaceId }
+    return gameDetailsCache
+end
+
+local function GetPlayerDetails(player)
+    local userId = player.UserId
+    if playerDetailsCache[userId] then return playerDetailsCache[userId] end
+    local details = {
+        Name = player.Name,
+        DisplayName = player.DisplayName,
+        AccountAge = player.AccountAge,
+        MembershipType = tostring(player.MembershipType),
+        Team = player.Team and player.Team.Name or "Takımsız",
+        Position = player.Character and player.Character.PrimaryPart and tostring(player.Character.PrimaryPart.Position) or "Bilinmiyor"
+    }
+    playerDetailsCache[userId] = details
+    return details
+end
+
+local function GetServerPlayerList()
+    local playerList = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        table.insert(playerList, string.format("%s (UserId: %d)", player.Name, player.UserId))
+    end
+    return table.concat(playerList, "\n")
+end
+
+local function CraftTimestamp()
+    local now = os.date("*t")
+    return {
+        iso = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        full = os.date("%Y-%m-%d %H:%M:%S"),
+        day = os.date("%A"),
+        date = os.date("%Y-%m-%d"),
+        time = os.date("%H:%M:%S"),
+        unix = os.time()
+    }
+end
+
+local function GetServerJoinUrl()
+    return string.format("roblox://placeID=%d&serverID=%s", game.PlaceId, game.JobId or "Bilinmeyen Job ID")
+end
+
+-- Webhook Queue Sistemi (Rate limit önleme, stabilite için)
+local webhookQueue = {}
+local isProcessing = false
+
+local function ProcessQueue()
+    if isProcessing or #webhookQueue == 0 then return end
+    isProcessing = true
+    task.spawn(function()
+        while #webhookQueue > 0 do
+            local payload = table.remove(webhookQueue, 1)
+            local success, err = pcall(function()
+                request({
+                    Url = WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = HttpService:JSONEncode(payload)
+                })
+            end)
+            if not success then
+                warn("[WiaKorumaV1 Üstün] Webhook Gönderme Hatası: " .. tostring(err))
+            end
+            task.wait(1.5)  -- Rate limit için bekleme
+        end
+        isProcessing = false
+    end)
+end
+
+local function EnqueueWebhook(payload)
+    table.insert(webhookQueue, payload)
+    ProcessQueue()
+end
+
+-- Tehdit İşleme Fonksiyonu (Gelişmiş loglama ve embed)
+local function HandleThreat(player)
+    local role = GetGroupRole(player)
+    local name = player.Name
+    local userId = player.UserId
+    local threatAvatar = GetAvatarUrl(userId)
+    local localAvatar = GetAvatarUrl(LocalPlayer.UserId)
+    local gameInfo = GetGameDetails()
+    local timestamp = CraftTimestamp()
+    local jobId = game.JobId or "Bilinmeyen Job ID"
+    local serverJoinUrl = GetServerJoinUrl()
+    local localDetails = GetPlayerDetails(LocalPlayer)
+    local threatDetails = GetPlayerDetails(player)
+    local serverPlayerCount = #Players:GetPlayers()
+    local serverPlayerList = GetServerPlayerList()
+    local fps = math.floor(1 / RunService.RenderStepped:Wait())  -- Yaklaşık FPS
+    local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+
+    local kickMessage = string.format(
+        "⚠️ Yüksek Seviye Tehdit Tespit Edildi: %s (%s) [UserId: %d] sunucuya girdi. Oyun: %s (Job ID: %s). Koruma aktif - Anında çıkış yapılıyor.",
+        role, name, userId, gameInfo.Name, jobId
+    )
+
+    -- Bildirim Gönder
+    task.spawn(function()
+        pcall(StarterGui.SetCore, StarterGui, "SendNotification", {
+            Title = "WiaKorumaV1 Üstün - Tehdit Algılandı",
+            Text = kickMessage,
+            Duration = 15,
+            Icon = "rbxassetid://"..gameInfo.IconImageAssetId
+        })
+    end)
+
+    -- Gelişmiş Embed Yapısı
+    local embed = {
+        title = "🚨 Üstün Tehdit Uyarısı: Yüksek Öncelikli Tehdit Tespit Edildi 🚨",
+        description = string.format(
+            "**Tehdit Özeti:** Yüksek öncelikli tehdit oyuncusu %s (%s) [UserId: %d] sunucuya giriş yaptı. Anında koruma önlemleri aktifleştirildi ve yerel oyuncu kurtarıldı.\n**Olay Detayı:** %s",
+            role, name, userId, gameInfo.Description:sub(1, 200) .. "..."
+        ),
+        color = 0xFF0000,  -- Kırmızı alarm rengi
+        thumbnail = { url = threatAvatar },
+        author = {
+            name = string.format("Koruma Sağlayan: %s (UserId: %d)", LocalPlayer.Name, LocalPlayer.UserId),
+            icon_url = localAvatar
+        },
+        fields = {
+            {
+                name = "Tehdit Profili",
+                value = string.format(
+                    "**İsim:** %s\n**Görünen İsim:** %s\n**User ID:** %d\n**Grup Rolü:** %s\n**Hesap Yaşı:** %d gün\n**Üyelik Tipi:** %s\n**Takım:** %s\n**Konum:** %s\n**Profil Linki:** [Görüntüle](https://www.roblox.com/users/%d/profile)\n**Tehdit Liste Adı:** %s",
+                    name, threatDetails.DisplayName, userId, role, threatDetails.AccountAge, threatDetails.MembershipType, threatDetails.Team, threatDetails.Position, userId, Watchlist[userId] or "Bilinmiyor"
+                ),
+                inline = false
+            },
+            {
+                name = "Yerel Oyuncu Profili (Kicklenen)",
+                value = string.format(
+                    "**İsim:** %s\n**Görünen İsim:** %s\n**User ID:** %d\n**Hesap Yaşı:** %d gün\n**Üyelik Tipi:** %s\n**Takım:** %s\n**Konum:** %s\n**Profil Linki:** [Görüntüle](https://www.roblox.com/users/%d/profile)",
+                    LocalPlayer.Name, localDetails.DisplayName, LocalPlayer.UserId, localDetails.AccountAge, localDetails.MembershipType, localDetails.Team, localDetails.Position, LocalPlayer.UserId
+                ),
+                inline = false
+            },
+            {
+                name = "Oyun ve Sunucu Tarama",
+                value = string.format(
+                    "**Oyun Adı:** %s\n**Place ID:** %d\n**Sunucu Job ID:** %s\n**Sunucu Giriş URL'si:** %s\n**Sunucu Oyuncu Sayısı:** %d\n**Sunucudaki Oyuncular:**\n%s\n**Yerel FPS:** %d\n**Yerel Ping:** %d ms",
+                    gameInfo.Name, game.PlaceId, jobId, serverJoinUrl, serverPlayerCount, serverPlayerList, fps, ping
+                ),
+                inline = false
+            },
+            {
+                name = "Zaman Damgaları",
+                value = string.format(
+                    "**Tespit Zamanı (Tam):** %s\n**Gün:** %s\n**Tarih:** %s\n**Saat:** %s\n**Unix Zamanı:** %d",
+                    timestamp.full, timestamp.day, timestamp.date, timestamp.time, timestamp.unix
+                ),
+                inline = false
+            },
+            {
+                name = "Olay Analizi ve Koruma Özeti",
+                value = "WiaKorumaV1 Üstün tarafından tehdit anında tespit edildi. Yerel oyuncu otomatik olarak kicklendi. Sistem stabilite: %100. Ek önlemler: Loglama tamamlandı, webhook gönderildi.",
+                inline = false
+            },
+            {
+                name = "Ek Güvenlik Detayları",
+                value = string.format(
+                    "**Sistem Versiyonu:** WiaKorumaV1 Üstün (En Gelişmiş)\n**Potansiyel Risk Seviyesi:** Yüksek\n**Tavsiye:** Sunucuyu terk edin ve raporlayın."
+                ),
+                inline = false
+            }
+        },
+        footer = {
+            text = "WiaKorumaV1",
+            icon_url = "https://example.com/security-icon.png"  -- Opsiyonel ikon
+        },
+        timestamp = timestamp.iso
+    }
+
+    -- Webhook Payload (@everyone ile)
+    local payload = {
+        content = "@everyone",  -- Acil etiket
+        embeds = { embed }
+    }
+
+    EnqueueWebhook(payload)
+
+    -- Anında Kick
+    LocalPlayer:Kick(kickMessage)
+end
+
+-- Tehdit Algılama Aktivasyonu (Başlangıç ve Event)
+local ThreatListener = nil
+
+local function ActivateDetection()
+    GetGameDetails()  -- Ön yükleme
+
+    -- Mevcut oyuncuları tarama (Sunucuda zaten varsa kick)
+    task.spawn(function()
+        local players = Players:GetPlayers()
+        for _, player in ipairs(players) do
+            if player ~= LocalPlayer and Watchlist[player.UserId] then
+                HandleThreat(player)
+                return
+            end
+        end
+    end)
+
+    -- Yeni girenleri dinleme
+    ThreatListener = Players.PlayerAdded:Connect(function(player)
+        if Watchlist[player.UserId] then
+            HandleThreat(player)
+        end
+    end)
+end
+
+-- UI Elemanları (Güvenlik Sekmesi)
+local SecurityGroup = Tabs.Security:AddLeftGroupbox('Üstün Tehdit Koruma Sistemi')
+SecurityGroup:AddToggle('EnableThreatDetection', {
+    Text = 'Tehdit Algılamayı Etkinleştir',
+    Default = true,
+    Tooltip = 'En gelişmiş koruma: Anında tespit, detaylı loglama, stabil queue sistemi ve webhook entegrasyonu.',
+    Callback = function(state)
+        if state then
+            ActivateDetection()
+        else
+            if ThreatListener then
+                ThreatListener:Disconnect()
+                ThreatListener = nil
+            end
+        end
+    end
+})
+
+-- Otomatik Aktivasyon
+task.defer(function()
+    if Toggles.EnableThreatDetection.Value then
+        ActivateDetection()
+    end
+end)
+
+-- Kapatma İşlemleri (Temizlik ve Son Queue İşleme)
+Library:OnUnload(function()
+    if ThreatListener then
+        ThreatListener:Disconnect()
+        ThreatListener = nil
+    end
+    ProcessQueue()  -- Kalan webhook'ları gönder
+    print('WiaKorumaV1 Üstün Başarıyla Kapatıldı! Tüm işlemler temizlendi.')
+    Library.Unloaded = true
+end)
+
+local CombatGroup = Tabs.Main:AddLeftGroupbox('ESP Araçları V2')
+
+-- ESP Settings
+local ESPSettings = {
+    Enabled = false,
+    MaxDistance = 200, -- Default when disabled
+    AlwaysOnTop = false, -- Default when disabled
+}
+
+-- Global Connections Table for Cleanup
+local ESPGlobalConnections = {}
+local PlayerESPData = {} -- Per-player data: {connections = {}, nameTag = nil}
+
+-- Utility: Safe Disconnect
+local function safeDisconnect(conn)
+    if conn and typeof(conn) == "RBXScriptConnection" then
+        conn:Disconnect()
+    end
+end
+
+-- Utility: Cleanup All Global Connections
+local function cleanupGlobalConnections()
+    for _, conn in ipairs(ESPGlobalConnections) do
+        safeDisconnect(conn)
+    end
+    ESPGlobalConnections = {}
+end
+
+-- Utility: Cleanup Player ESP
+local function cleanupPlayerESP(player)
+    local data = PlayerESPData[player]
+    if data then
+        for _, conn in ipairs(data.connections) do
+            safeDisconnect(conn)
+        end
+        -- Reset NameTag if exists
+        if data.nameTag then
+            data.nameTag.AlwaysOnTop = ESPSettings.AlwaysOnTop
+            data.nameTag.MaxDistance = ESPSettings.MaxDistance
+            data.nameTag.Enabled = ESPSettings.Enabled
+            data.nameTag = nil
+        end
+        PlayerESPData[player] = nil
+    end
+end
+
+-- Utility: Apply NameTag Settings
+local function applyNameTagSettings(nameTag, enabled)
+    if not nameTag then return end
+    nameTag.AlwaysOnTop = enabled
+    nameTag.MaxDistance = enabled and 10000 or ESPSettings.MaxDistance
+    nameTag.Enabled = enabled
+end
+
+-- Setup Property Change Listeners for NameTag
+local function setupNameTagListeners(nameTag, enabled)
+    local conns = {}
+    -- Force settings on property changes
+    table.insert(conns, nameTag:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
+        nameTag.AlwaysOnTop = enabled
+    end))
+    table.insert(conns, nameTag:GetPropertyChangedSignal("MaxDistance"):Connect(function()
+        nameTag.MaxDistance = enabled and 10000 or ESPSettings.MaxDistance
+    end))
+    table.insert(conns, nameTag:GetPropertyChangedSignal("Enabled"):Connect(function()
+        nameTag.Enabled = enabled
+    end))
+    return conns
+end
+
+-- Setup Per-Player ESP
+local function setupPlayerESP(player, enabled)
+    if player == LocalPlayer then return end
+    cleanupPlayerESP(player) -- Ensure clean start
+
+    local data = { connections = {}, nameTag = nil }
+    PlayerESPData[player] = data
+
+    -- Handle Current Character
+    local function handleCharacter(char)
+        if not char then return end
+        local nameTag = char:WaitForChild("NameTag", 5) -- Increased timeout for stability
+        if nameTag then
+            applyNameTagSettings(nameTag, enabled)
+            data.nameTag = nameTag
+            -- Append property listeners
+            local propConns = setupNameTagListeners(nameTag, enabled)
+            for _, conn in ipairs(propConns) do
+                table.insert(data.connections, conn)
+            end
+            -- Listen for NameTag destruction/replacement
+            table.insert(data.connections, nameTag.AncestryChanged:Connect(function(_, parent)
+                if not parent then
+                    data.nameTag = nil
+                    handleCharacter(char) -- Re-setup if destroyed
+                end
+            end))
+        end
+    end
+
+    if player.Character then
+        handleCharacter(player.Character)
+    end
+
+    -- Character Added/Changed
+    table.insert(data.connections, player.CharacterAdded:Connect(handleCharacter))
+    table.insert(data.connections, player:GetPropertyChangedSignal("Character"):Connect(function()
+        handleCharacter(player.Character)
+    end))
+
+    -- Player Removing Cleanup
+    table.insert(data.connections, player.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            cleanupPlayerESP(player)
+        end
+    end))
+end
+
+-- Toggle ESP Function (Optimized: No Heartbeat Loop Needed)
+local function toggleESP(enabled)
+    ESPSettings.Enabled = enabled
+    ESPSettings.AlwaysOnTop = enabled
+    ESPSettings.MaxDistance = enabled and 10000 or 200 -- Dynamic based on state
+
+    -- Cleanup previous global connections
+    cleanupGlobalConnections()
+
+    if enabled then
+        -- Setup for existing players
+        for _, player in ipairs(Players:GetPlayers()) do
+            setupPlayerESP(player, true)
+        end
+        -- Player Added Listener
+        local playerAddedConn = Players.PlayerAdded:Connect(function(player)
+            setupPlayerESP(player, true)
+        end)
+        table.insert(ESPGlobalConnections, playerAddedConn)
+        -- Player Removing Global Listener (redundant but for extra stability)
+        local playerRemovingConn = Players.PlayerRemoving:Connect(function(player)
+            cleanupPlayerESP(player)
+        end)
+        table.insert(ESPGlobalConnections, playerRemovingConn)
+        Library:Notify("ESP Aktif (10000 Max Mesafe, AlwaysOnTop ve Enabled Açık)", 2)
+    else
+        -- Cleanup all players
+        for player in pairs(PlayerESPData) do
+            cleanupPlayerESP(player)
+        end
+        Library:Notify("ESP Kapatıldı (200 Mesafe, AlwaysOnTop ve Enabled Kapalı)", 2)
+    end
+end
+
+-- Integrate with Library Unload for Full Cleanup
+local originalUnload = Library:OnUnload(function()
+    toggleESP(false) -- Force disable ESP on unload
+    cleanupGlobalConnections()
+    WatermarkConnection:Disconnect()
+    print('Unloaded!')
+    Library.Unloaded = true
+end)
+
+-- UI Toggle
+CombatGroup:AddToggle('ESPToggle', {
+    Text = 'ESP Etkinleştir',
+    Default = false,
+    Tooltip = 'ESP aç/kapat (AlwaysOnTop, Enabled ve Mesafe otomatik ayarlanır)',
+    Callback = function(value)
+        toggleESP(value)
+    end
+})
+
+local CombatGroup = Tabs.Main:AddLeftGroupbox('Keycard Exploit')
+
+CombatGroup:AddButton({
+    Text = 'Keycard',
+    Func = function()
+        task.spawn(function()
+            local success, err = pcall(function()
+                for i = 1, 50 do
+                    for _, v in pairs(Players:GetChildren()) do
+                        if v and v:IsA("Player") then
+                            local args = {
+                                [1] = "Pickpocket",
+                                [2] = v
+                            }
+                            Event:FireServer(unpack(args))
+                        end
+                    end
+                end
+            end)
+            if success then
+                Library:Notify("Keycard Tamamlandı (50x All Players, Stabil)", 3)
+            else
+                Library:Notify("Keycard Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+local TestTab = Window:AddTab('Test')
+
+local TestGroup = TestTab:AddLeftGroupbox('Test Tools')
+
+TestGroup:AddButton({
+    Text = 'Rejoin',
+    Func = function()
+        task.spawn(function()
+            local success, err = pcall(function()
+                local TeleportService = game:GetService("TeleportService")
+                local StarterGui = game:GetService("StarterGui")
+                local placeId = game.PlaceId
+                local jobId = game.JobId
+                local plr = Players.LocalPlayer
+                local maxRetries = 3
+                local retryCount = 0
+                local retryDelay = 0.2
+
+                local function notify(msg)
+                    pcall(function()
+                        StarterGui:SetCore("SendNotification", {
+                            Title = "Rejoin Script",
+                            Text = msg,
+                            Duration = 3
+                        })
+                    end)
+                end
+
+                local function rejoin()
+                    if retryCount >= maxRetries then
+                        notify("Maksimum rejoin denemesi yapıldı")
+                        return
+                    end
+                    retryCount = retryCount + 1
+                    local success, err = pcall(function()
+                        TeleportService:TeleportToPlaceInstance(placeId, jobId, plr)
+                    end)
+                    if not success then
+                        local errMsg = tostring(err):lower()
+                        if errMsg:find("server is full") or errMsg:find("full") then
+                            notify("Sunucu dolu, rejoin yapılamıyor")
+                            return
+                        elseif errMsg:find("failed") or errMsg:find("error") then
+                            notify("Rejoin başarısız, tekrar deneniyor")
+                            task.delay(retryDelay, rejoin)
+                            return
+                        else
+                            notify("Bilinmeyen hata: " .. tostring(err))
+                            return
+                        end
+                    end
+                end
+
+                rejoin()
+            end)
+            if success then
+                Library:Notify("Rejoin Başlatıldı (Stabil Retry)", 3)
+            else
+                Library:Notify("Rejoin Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+local PVPTab = Window:AddTab("PVP")
+local PVPGroup = PVPTab:AddLeftGroupbox("FastShoot Controls")
+
+-- ==============================
+-- Required Services
+-- ==============================
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- ==============================
+-- Global aux loader with error handling
+-- ==============================
+local aux = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Upbolt/Hydroxide/revision/ohaux.lua"))() or error("Failed to load Hydroxide aux library")
+
+-- ==============================
+-- Weapon Configurations (Easily extensible)
+-- ==============================
+local weaponConfigs = {
+    AWP = {
+        closureName = "RifleScript",
+        upvalueIndex = 3,
+        closureConstants = {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"},
+        mouseHold = false
+    },
+    Deagle = {
+        closureName = "PistolScript",
+        upvalueIndex = 5,
+        closureConstants = {[1]="Visible",[2]="Weapon",[3]="Icon",[4]="script",[6]="Parent",[7]="TextureId"},
+        mouseHold = false
+    },
+    M4A1 = {
+        closureName = "RifleScript",
+        upvalueIndex = 1,
+        closureConstants = {[1]="wait",[2]=aux.placeholderUserdataConstant,[3]=0.1,[4]="Running",[5]="Health",[6]="RayCheck"},
+        mouseHold = true
+    },
+    Shotgun = {
+        closureName = "ShotgunScript",
+        upvalueIndex = 3,
+        closureConstants = {[1]="UserInputType",[2]="Enum",[3]="Keyboard",[4]=Enum.UserInputType.Keyboard,[5]="KeyCode",[6]="R"},
+        mouseHold = false
+    }
+}
+
+-- ==============================
+-- Global State Management
+-- ==============================
+local enabled = {} -- toolName -> boolean
+local closures = {} -- toolName -> closure (cached for performance)
+local holdingMouse = false
+
+-- Global mouse input tracking (connected once for efficiency)
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        holdingMouse = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        holdingMouse = false
+    end
+end)
+
+-- ==============================
+-- Global FastShoot Loop (Single loop for all weapons, efficient and stable)
+-- ==============================
+spawn(function()
+    while true do
+        for toolName, isEnabled in pairs(enabled) do
+            if isEnabled then
+                local config = weaponConfigs[toolName]
+                if config then
+                    local tool = LocalPlayer.Backpack:FindFirstChild(toolName) or LocalPlayer.Character:FindFirstChild(toolName)
+                    if tool then
+                        local scriptPath = tool:FindFirstChild(config.closureName) or tool:FindFirstChildWhichIsA("LocalScript")
+                        if scriptPath then
+                            local closure = closures[toolName]
+                            if not closure then
+                                closure = aux.searchClosure(scriptPath, "Unnamed function", config.upvalueIndex, config.closureConstants)
+                                if closure then
+                                    closures[toolName] = closure
+                                end
+                            end
+                            if closure then
+                                pcall(function()
+                                    local currentValue = debug.getupvalue(closure, config.upvalueIndex)
+                                    if config.mouseHold then
+                                        if holdingMouse then
+                                            debug.setupvalue(closure, config.upvalueIndex, true)
+                                        end
+                                        -- No forced reset when not holding (let script handle it)
+                                    else
+                                        if currentValue == true then
+                                            debug.setupvalue(closure, config.upvalueIndex, false)
+                                        end
+                                    end
+                                end)
+                            end
+                        else
+                            closures[toolName] = nil -- Reset cache if script not found
+                        end
+                    else
+                        closures[toolName] = nil -- Reset cache if tool not found
+                    end
+                end
+            end
+        end
+        task.wait(0.05) -- Balanced delay: responsive yet FPS-friendly (adjustable if needed)
+    end
+end)
+
+-- ==============================
+-- Create FastShoot Option (Toggle for auto-loop, Button for manual one-time apply)
+-- ==============================
+local function CreateFastShootOption(toolName, toggleName, parentGroup)
+    local config = weaponConfigs[toolName]
+    if not config then return end
+
+    -- Auto Toggle (enables/disables continuous loop)
+    parentGroup:AddToggle(toggleName, {
+        Text = toolName .. " FastShoot (Auto)",
+        Default = false,
+        Tooltip = "Enables automatic fast shoot loop for " .. toolName,
+        Callback = function(v)
+            enabled[toolName] = v
+            if not v then
+                closures[toolName] = nil -- Clear cache on disable for memory efficiency
+            end
+        end
+    })
+
+    -- Manual Apply Button (one-time application without loop)
+    parentGroup:AddButton({
+        Text = "Apply " .. toolName .. " (Manual)",
+        Tooltip = "Applies fast shoot once for " .. toolName,
+        Func = function()
+            local tool = LocalPlayer.Backpack:FindFirstChild(toolName) or LocalPlayer.Character:FindFirstChild(toolName)
+            if tool then
+                local scriptPath = tool:FindFirstChild(config.closureName) or tool:FindFirstChildWhichIsA("LocalScript")
+                if scriptPath then
+                    local closure = aux.searchClosure(scriptPath, "Unnamed function", config.upvalueIndex, config.closureConstants)
+                    if closure then
+                        pcall(function()
+                            local currentValue = debug.getupvalue(closure, config.upvalueIndex)
+                            if config.mouseHold then
+                                debug.setupvalue(closure, config.upvalueIndex, true) -- Force true for manual (mimics hold)
+                            else
+                                if currentValue == true then
+                                    debug.setupvalue(closure, config.upvalueIndex, false)
+                                end
+                            end
+                        end)
+                        Library:Notify(toolName .. " FastShoot Applied (Manual)!", 3)
+                    else
+                        Library:Notify("Failed to find closure for " .. toolName, 3)
+                    end
+                else
+                    Library:Notify("Script not found for " .. toolName, 3)
+                end
+            else
+                Library:Notify(toolName .. " not found in inventory or equipped", 3)
+            end
+        end
+    })
+end
+
+-- ==============================
+-- Create Options for All Weapons
+-- ==============================
+CreateFastShootOption("AWP", "AWPToggle", PVPGroup)
+CreateFastShootOption("Deagle", "DeagleToggle", PVPGroup)
+CreateFastShootOption("M4A1", "M4A1Toggle", PVPGroup)
+CreateFastShootOption("Shotgun", "ShotgunToggle", PVPGroup)
