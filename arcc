@@ -630,3 +630,13 @@ CombatGroup:AddButton({
         end
     end
 })
+
+SpawnBox:AddButton('📍 Aracımı Yanıma Işınla', function()
+    pcall(function()
+        local veh = getPlayerVehicle()
+        if veh and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            veh.PrimaryPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
+            addLog("Araç yanıma ışınlandı!")
+        end
+    end)
+end)
