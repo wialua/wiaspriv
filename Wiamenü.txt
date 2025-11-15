@@ -1,2 +1,5 @@
-loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/vmneu94",true))()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/arcc",true))()
+-- İlk menüyü yükle
+loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/vmneu94", true))()
+
+-- İkinci menüyü yükle
+loadstring(game:HttpGet("https://raw.githubusercontent.com/wialua/wiaspriv/refs/heads/main/arcc", true))()
