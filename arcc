@@ -1,0 +1,410 @@
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
+local Event = ReplicatedStorage:WaitForChild("Event")
+local Lighting = game:GetService("Lighting")
+
+
+-- Oyun Bilgisi
+local gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
+
+-- Window Oluşturma
+local Window = Library:CreateWindow({
+    Title = '🔥 ' .. gameName .. ' 🔥',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = false,
+    UnlockMouseWhileOpen = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0,
+})
+
+local Tabs = {
+    Vehicles = Window:AddTab('🚗 Araç'),
+}
+
+-- Sol ve sağ kutular
+local VehicleSpawnBox = Tabs.Vehicles:AddLeftGroupbox('🚗 Araç Spawn')
+local VehicleModBox   = Tabs.Vehicles:AddRightGroupbox('🛠️ Araç Modifiye')
+
+-- Seçilen araç, SaveManager ile yükle/kaydet
+local selectedVehicle = SaveManager:Load("AraçListesi") or "Nero"
+VehicleSpawnBox:AddDropdown('AraçListesi', {
+    Text    = 'Araç Seç',
+    Values  = { "Nero", "Rhino", "Nighthawk", "Light Bike", "Thunderbird", "Warhawk", "Buzzard", "Archangel" },
+    Default = table.find({"Nero","Rhino","Nighthawk","Light Bike","Thunderbird","Warhawk","Buzzard","Archangel"}, selectedVehicle) or 1,
+    Callback = function(v)
+        selectedVehicle = v
+        SaveManager:Save("AraçListesi", v)
+    end
+})
+
+VehicleSpawnBox:AddButton({
+    Text = '🚘 Spawnla',
+    Func = function()
+        if selectedVehicle ~= "" then
+            Event:FireServer("SpawnVehicle", selectedVehicle)
+        end
+    end
+})
+
+-- Ortak fonksiyon: her çağrıldığında güncel gc tablolarında çalışır
+local function applyProperties(props)
+    for _, obj in pairs(getgc(true)) do
+        if type(obj) == "table" then
+            for k, v in pairs(props) do
+                if rawget(obj, k) ~= nil then
+                    obj[k] = v
+                end
+            end
+        end
+    end
+end
+
+-- Varsayılan property setleri
+local defaults = {
+    carProps   = { Sway=60, Torque=10, BrakeForce=4, MaxSpeed=400, TurnSpeed=1.7, DriftVelLerp=0.45, DriftRotLerp=0.12 },
+    heliProps  = { Acceleration=5, Deceleration=5, SpeedDecay=1, BrakeForce=15, DescentSpeed=2, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=14, ResponseSpeed=1, MaxSideTilt=20, MinHeightAboveGround=5, MissileCooldown=0, MissileLock=0 },
+    ufoProps   = { Acceleration=10, Deceleration=1, MaxSpeed=340, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=4, DescentSpeed=4, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=14, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40 },
+    boatProps  = { Height=1, TurnSpeed=7.5, Torque=5, MaxSpeed=160, BrakeForce=1, SpeedDecay=0.5 },
+    planeProps = { Bombs=true, Acceleration=1, DampeningAcceleration=0.8, MaxVerticalTilt=10, VerticalTiltUpSpeed=1, VerticalTiltDownSpeed=1, VerticalTiltDampening=0.95, VerticalSpeedLimit=30, HorizontalTiltSpeed=5.2, MaxSideTilt=25, SideTiltSpeed=1.5, SideTiltDampening=0.95, MissileTargetRange=540, MissileCooldown=0, MissileLock=0 },
+    ArchProps  = { Acceleration=5, MaxSpeed=270, Deceleration=5, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=7, DescentSpeed=7, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=10, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40 },
+}
+
+-- Modifiye butonları
+VehicleModBox:AddButton({
+    Text = '🚀 Araba Modifiye Et',
+    Func = function()
+        -- Önce genel araç ayarlarını uygula
+        applyProperties(defaults.carProps)
+
+        -- Araç modelini bekle
+        local objectSelection = workspace:WaitForChild("ObjectSelection", 5)
+        if not objectSelection then return end
+
+        local vehicleName = LocalPlayer.Name .. "'s Vehicle"
+        local playerVehicle = objectSelection:WaitForChild(vehicleName, 5)
+        if not playerVehicle then return end
+
+        -- CarChassis'i bekle
+        local carChassis = playerVehicle:WaitForChild("CarChassis", 5)
+        if not carChassis then return end
+
+        -- Boost nesnesini bul veya oluştur
+        local boost = carChassis:FindFirstChild("Boost")
+        if not boost then
+            boost = Instance.new("NumberValue")
+            boost.Name = "Boost"
+            boost.Parent = carChassis
+        end
+
+        -- Değeri ayarla
+        boost.Value = 20
+    end
+})
+
+VehicleModBox:AddButton({ Text='🚁 Helikopter Modifiye Et', Func=function()
+    applyProperties(defaults.heliProps)
+end})
+
+VehicleModBox:AddButton({ Text='🛸 UFO Modifiye Et', Func=function()
+    applyProperties(defaults.ufoProps)
+end})
+
+VehicleModBox:AddButton({ Text='🛸 ArchAngel Modifiye Et', Func=function()
+    applyProperties(defaults.ArchProps)
+end})
+
+VehicleModBox:AddButton({ Text='🚤 Tekne Modifiye Et', Func=function()
+    applyProperties(defaults.boatProps)
+end})
+
+VehicleModBox:AddButton({ Text='✈️ Uçak Modifiye Et', Func=function()
+    applyProperties(defaults.planeProps)
+end})
+
+-- Reset düğmesi
+VehicleModBox:AddButton({ Text='🔄 Modları Sıfırla', Func=function()
+    applyProperties(defaults.carProps)
+end})
+
+local bombActive = false
+local bombInputConn = nil
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local Remote = ReplicatedStorage:WaitForChild("Event")
+
+VehicleSpawnBox:AddToggle('BombToggle', {
+    Text = '💣 Sonsuz Bombalama (G)',
+    Default = false,
+    Tooltip = 'G tuşuna her bastığında bir bomba bırakır. FPS dostu, ultra stabil.',
+    Callback = function(state)
+        bombActive = state
+
+        if bombActive then
+            -- Mevcut bağlantı varsa kopar (çift bağlanmayı engelle)
+            if bombInputConn then
+                bombInputConn:Disconnect()
+                bombInputConn = nil
+            end
+
+            bombInputConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end
+                if input.KeyCode == Enum.KeyCode.G then
+                    task.defer(function()
+                        pcall(function()
+                            Remote:FireServer("DropBomb")
+                        end)
+                    end)
+                end
+            end)
+
+            Library:Notify("💣 G tuşuyla bombalama aktif!", 2)
+        else
+            -- Kapatıldığında bağlantıyı yok et
+            if bombInputConn then
+                bombInputConn:Disconnect()
+                bombInputConn = nil
+            end
+            Library:Notify("🛑 Bombalama kapatıldı", 2)
+        end
+    end
+})
+
+local VehicleSpawnBox = Tabs.Vehicles:AddLeftGroupbox('🚗 Araç Spawn')
+local VehicleModBox = Tabs.Vehicles:AddRightGroupbox('🛠️ Araç Modifiye')
+
+VehicleSpawnBox:AddToggle('GlobalUnlockToggle', {
+    Text = 'Tüm Oyuncuların Araç Kilidini Kapalı Yap',
+    Default = false,
+    Tooltip = 'Açıkken Tüm Kilitler Açılır',
+    Callback = function(value)
+        if value then
+            Connections.GlobalUnlockLoop = RunService.Stepped:Connect(function()
+                pcall(function()
+                    local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                    if objectSelection then
+                        for _, pl in ipairs(Players:GetPlayers()) do
+                            local veh = objectSelection:FindFirstChild(pl.Name .. "'s Vehicle")
+                            if veh then
+                                local lock = veh:FindFirstChild("VehicleLock")
+                                if lock and lock:IsA("StringValue") then
+                                    lock.Value = "OFF"
+                                end
+                            end
+                        end
+                    end
+                end)
+            end)
+            Library:Notify("Tüm Araç Kilidi OFF Aktif (Global Stabil Loop)", 2)
+        else
+            if Connections.GlobalUnlockLoop then
+                Connections.GlobalUnlockLoop:Disconnect()
+                Connections.GlobalUnlockLoop = nil
+            end
+            Library:Notify("Tüm Araç Kilidi OFF Kapandı (Global)", 2)
+        end
+    end
+})
+
+local selectedTargets = {}
+VehicleSpawnBox:AddDropdown('TargetPlayersDropdown', {
+    Text = 'Hedef Oyuncular (Multi-Select)',
+    Values = {},
+    Default = 1,
+    Multi = true,
+    Searchable = true,
+    Callback = function(value)
+        selectedTargets = {}
+        for key, val in pairs(value) do
+            if val then
+                selectedTargets[key] = true
+            end
+        end
+        Library:Notify("Hedef Oyuncular Güncellendi (" .. #selectedTargets .. " seçili)", 2)
+    end
+})
+
+local function updatePlayerList()
+    local values = {}
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer then
+            table.insert(values, pl.Name)
+        end
+    end
+    Options.TargetPlayersDropdown:SetValues(values)
+end
+updatePlayerList()
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+
+VehicleSpawnBox:AddToggle('TargetUnlockToggle', {
+    Text = '🎯 Seçili Oyuncuların Araç Kilidini OFF Yap',
+    Default = false,
+    Tooltip = 'Toggle açıkken seçili hedeflerin VehicleLock\'ları sürekli OFF kalır (İleri Seviye Stabil)',
+    Callback = function(value)
+        if value then
+            Connections.TargetUnlockLoop = RunService.Stepped:Connect(function()
+                pcall(function()
+                    local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                    if objectSelection then
+                        for targetName in pairs(selectedTargets) do
+                            local veh = objectSelection:FindFirstChild(targetName .. "'s Vehicle")
+                            if veh then
+                                local lock = veh:FindFirstChild("VehicleLock")
+                                if lock and lock:IsA("StringValue") then
+                                    lock.Value = "OFF"
+                                end
+                            end
+                        end
+                    end
+                end)
+            end)
+            Library:Notify("Hedef Araç Kilidi OFF Aktif (" .. #selectedTargets .. " hedef)", 2)
+        else
+            if Connections.TargetUnlockLoop then
+                Connections.TargetUnlockLoop:Disconnect()
+                Connections.TargetUnlockLoop = nil
+            end
+            Library:Notify("Hedef Araç Kilidi OFF Kapandı", 2)
+        end
+    end
+})
+
+Library:OnUnload(function()
+    if Connections.GlobalUnlockLoop then Connections.GlobalUnlockLoop:Disconnect() end
+    if Connections.TargetUnlockLoop then Connections.TargetUnlockLoop:Disconnect() end
+end)
+
+VehicleModBox:AddToggle('HoverModeToggle', {
+    Text = 'Hover Mode (Local Vehicle)',
+    Default = false,
+    Tooltip = 'LocalPlayer\'ın aracının HoverMode\'unu aç/kapat (Ultra Stabil & Async)',
+    Callback = function(value)
+        task.spawn(function()
+            local success, err = pcall(function()
+                local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                if not objectSelection then
+                    Library:Notify("ObjectSelection bulunamadı (Hover Mode)", 2)
+                    return
+                end
+                local vehicleName = LocalPlayer.Name .. "'s Vehicle"
+                local vehicle = objectSelection:FindFirstChild(vehicleName)
+                if not vehicle or not vehicle.Parent then
+                    Library:Notify("Araç bulunamadı (Hover Mode: " .. vehicleName .. ")", 2)
+                    return
+                end
+                local chassis = vehicle:FindFirstChild("CarChassis")
+                if not chassis or not chassis.Parent then
+                    Library:Notify("CarChassis bulunamadı (Hover Mode)", 2)
+                    return
+                end
+                local hoverMode = chassis:FindFirstChild("HoverMode")
+                if not hoverMode or not hoverMode:IsA("BoolValue") then
+                    Library:Notify("HoverMode BoolValue bulunamadı", 2)
+                    return
+                end
+                hoverMode.Value = value
+                Library:Notify("Hover Mode " .. (value and "Açıldı" or "Kapandı") .. " (" .. LocalPlayer.Name .. "'s Vehicle)", 1)
+            end)
+            if not success then
+                Library:Notify("Hover Mode Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+VehicleModBox:AddSlider('SuspensionSlider', {
+    Text = 'Suspension (Local Vehicle)',
+    Default = 0,
+    Min = 0,
+    Max = 1000,
+    Rounding = 0,
+    Tooltip = 'LocalPlayer\'ın aracının Suspension değerini ayarla (0-1000, Ultra Stabil)',
+    Callback = function(value)
+        task.spawn(function()
+            local success, err = pcall(function()
+                local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                if not objectSelection then
+                    Library:Notify("ObjectSelection bulunamadı (Suspension)", 2)
+                    return
+                end
+                local vehicleName = LocalPlayer.Name .. "'s Vehicle"
+                local vehicle = objectSelection:FindFirstChild(vehicleName)
+                if not vehicle or not vehicle.Parent then
+                    Library:Notify("Araç bulunamadı (Suspension: " .. vehicleName .. ")", 2)
+                    return
+                end
+                local chassis = vehicle:FindFirstChild("CarChassis")
+                if not chassis or not chassis.Parent then
+                    Library:Notify("CarChassis bulunamadı (Suspension)", 2)
+                    return
+                end
+                local suspension = chassis:FindFirstChild("Suspension")
+                if not suspension or not suspension:IsA("NumberValue") then
+                    Library:Notify("Suspension NumberValue bulunamadı", 2)
+                    return
+                end
+                suspension.Value = value
+                Library:Notify("Suspension: " .. value .. " (" .. LocalPlayer.Name .. "'s Vehicle)", 1)
+            end)
+            if not success then
+                Library:Notify("Suspension Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
+
+VehicleModBox:AddButton({
+    Text = 'Suspension Sıfırla',
+    Func = function()
+        Options.SuspensionSlider:SetValue(0)
+        task.spawn(function()
+            local success, err = pcall(function()
+                local objectSelection = Workspace:FindFirstChild("ObjectSelection")
+                if not objectSelection then
+                    Library:Notify("ObjectSelection bulunamadı (Sıfırlama)", 2)
+                    return
+                end
+                local vehicleName = LocalPlayer.Name .. "'s Vehicle"
+                local vehicle = objectSelection:FindFirstChild(vehicleName)
+                if not vehicle or not vehicle.Parent then
+                    Library:Notify("Araç bulunamadı (Sıfırlama: " .. vehicleName .. ")", 2)
+                    return
+                end
+                local chassis = vehicle:FindFirstChild("CarChassis")
+                if not chassis or not chassis.Parent then
+                    Library:Notify("CarChassis bulunamadı (Sıfırlama)", 2)
+                    return
+                end
+                local suspension = chassis:FindFirstChild("Suspension")
+                if not suspension or not suspension:IsA("NumberValue") then
+                    Library:Notify("Suspension NumberValue bulunamadı (Sıfırlama)", 2)
+                    return
+                end
+                suspension.Value = 0
+                Library:Notify("Suspension Sıfırlandı (Varsayılan: " .. LocalPlayer.Name .. "'s Vehicle)", 1)
+            end)
+            if not success then
+                Library:Notify("Sıfırlama Hatası: " .. tostring(err), 3)
+            end
+        end)
+    end
+})
