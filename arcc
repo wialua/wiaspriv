@@ -37,6 +37,7 @@ local Window = Library:CreateWindow({
 
 local Tabs = {
     Vehicles = Window:AddTab('🚗 Araç'),
+    Combat = Window:AddTab('⚔️ Combat'),
 }
 
 -- Sol ve sağ kutular
@@ -406,5 +407,150 @@ VehicleModBox:AddButton({
                 Library:Notify("Sıfırlama Hatası: " .. tostring(err), 3)
             end
         end)
+    end
+})
+
+local CombatGroup = Tabs.Combat:AddLeftGroupbox('ESP Araçları V2')
+
+-- AYARLAR
+local ESPSettings = {
+    Enabled = false,
+    MaxDistance = 200,
+}
+
+local ESPConnections = {}
+local PlayerListeners = {}
+
+-- Utility: Bağlantıları Temizle
+local function cleanupPlayerListeners(player)
+    local list = PlayerListeners[player]
+    if list then
+        for _, conn in ipairs(list) do
+            if conn and conn.Disconnect then
+                conn:Disconnect()
+            end
+        end
+        PlayerListeners[player] = nil
+    end
+end
+
+-- NameTag Ayarları
+local function applyNameTagSettings(nt, isEnabled)
+    if not nt then return end
+    nt.AlwaysOnTop = isEnabled
+    nt.MaxDistance = isEnabled and 10000 or 200
+    nt.Enabled = isEnabled
+end
+
+-- Oyuncu için ESP Bağlantı Kurulumu
+local function setupPlayerESP(player, isEnabled)
+    cleanupPlayerListeners(player)
+
+    local conns = {}
+    PlayerListeners[player] = conns
+
+    local function handleCharacter(char)
+        local nt = char:FindFirstChild("NameTag")
+        if nt then
+            applyNameTagSettings(nt, isEnabled)
+
+            -- NameTag izleme
+            table.insert(conns, nt:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
+                nt.AlwaysOnTop = isEnabled
+            end))
+            table.insert(conns, nt:GetPropertyChangedSignal("MaxDistance"):Connect(function()
+                nt.MaxDistance = isEnabled and 10000 or 200
+            end))
+            table.insert(conns, nt:GetPropertyChangedSignal("Enabled"):Connect(function()
+                nt.Enabled = isEnabled
+            end))
+        end
+    end
+
+    if player.Character then
+        handleCharacter(player.Character)
+    end
+
+    table.insert(conns, player.CharacterAdded:Connect(function(char)
+        char:WaitForChild("NameTag", 2)
+        handleCharacter(char)
+    end))
+
+    table.insert(conns, player:GetPropertyChangedSignal("Character"):Connect(function()
+        if player.Character then
+            handleCharacter(player.Character)
+        end
+    end))
+end
+
+-- ESP Ana Fonksiyon
+local espLoop
+local function toggleESP(enabled)
+    ESPSettings.Enabled = enabled
+    ESPSettings.MaxDistance = enabled and 10000 or 200
+
+    -- Bağlantı varsa kapat
+    if espLoop then
+        espLoop:Disconnect()
+        espLoop = nil
+    end
+
+    -- Tüm oyunculara uygula
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            setupPlayerESP(plr, enabled)
+        end
+    end
+
+    -- Yeni oyuncular eklendikçe uygula
+    local addConn = Players.PlayerAdded:Connect(function(plr)
+        if plr ~= LocalPlayer then
+            setupPlayerESP(plr, enabled)
+        end
+    end)
+    table.insert(ESPConnections, addConn)
+
+    -- Döngü: sadece gerekli durumlarda çalışacak şekilde optimize edildi
+    if enabled then
+        espLoop = RunService.Heartbeat:Connect(function()
+            local lpChar = LocalPlayer.Character
+            if not lpChar or not lpChar:FindFirstChild("HumanoidRootPart") then return end
+
+            local myPos = lpChar.HumanoidRootPart.Position
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
+                    if dist <= ESPSettings.MaxDistance then
+                        local nt = plr.Character:FindFirstChild("NameTag")
+                        if nt then
+                            applyNameTagSettings(nt, true)
+                        end
+                    end
+                end
+            end
+        end)
+        Library:Notify("ESP Aktif (10000 Max Mesafe, AlwaysOnTop ve Enabled Açık)", 2)
+    else
+        -- Tüm oyunculardan bağlantıları kaldır, değerleri sıfırla
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character then
+                local nt = plr.Character:FindFirstChild("NameTag")
+                if nt then
+                    applyNameTagSettings(nt, false)
+                end
+            end
+            cleanupPlayerListeners(plr)
+        end
+        Library:Notify("ESP Kapatıldı (200 Mesafe, AlwaysOnTop ve Enabled Kapalı)", 2)
+    end
+end
+
+-- UI Toggle
+CombatGroup:AddToggle('ESPToggle', {
+    Text = 'ESP Etkinleştir',
+    Default = false,
+    Tooltip = 'ESP aç/kapat (AlwaysOnTop, Enabled ve Mesafe otomatik ayarlanır)',
+    Callback = function(value)
+        toggleESP(value)
     end
 })
