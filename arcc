@@ -631,6 +631,7 @@ CombatGroup:AddButton({
     end
 })
 
+-- Bu fonksiyonu script'inin başına, service'lerden sonra ekle (Event'ten sonra mesela)
 local function getPlayerVehicle(plr)
     plr = plr or LocalPlayer
     local objectSelection = workspace:FindFirstChild("ObjectSelection")
@@ -638,12 +639,18 @@ local function getPlayerVehicle(plr)
     return objectSelection:FindFirstChild(plr.Name .. "'s Vehicle")
 end
 
-VehicleSpawnBox:AddButton('📍 Aracımı Yanıma Işınla', function()
-    pcall(function()
-        local veh = getPlayerVehicle()
-        if veh and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            veh.PrimaryPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
-            Library:Notify("Araç yanıma ışınlandı!", 2)
-        end
-    end)
-end)
+-- Bu butonu VehicleSpawnBox'a ekle (dropdown ve spawn butonundan SONRA)
+VehicleSpawnBox:AddButton({
+    Text = '📍 Aracımı Yanıma Işınla',
+    Func = function()
+        pcall(function()
+            local veh = getPlayerVehicle()
+            if veh and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and veh.PrimaryPart then
+                veh.PrimaryPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
+                Library:Notify("Araç yanıma ışınlandı!", 2)
+            else
+                Library:Notify("Araç veya karakter bulunamadı!", 3)
+            end
+        end)
+    end
+})
