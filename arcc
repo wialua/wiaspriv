@@ -631,12 +631,19 @@ CombatGroup:AddButton({
     end
 })
 
-SpawnBox:AddButton('📍 Aracımı Yanıma Işınla', function()
+local function getPlayerVehicle(plr)
+    plr = plr or LocalPlayer
+    local objectSelection = workspace:FindFirstChild("ObjectSelection")
+    if not objectSelection then return end
+    return objectSelection:FindFirstChild(plr.Name .. "'s Vehicle")
+end
+
+VehicleSpawnBox:AddButton('📍 Aracımı Yanıma Işınla', function()
     pcall(function()
         local veh = getPlayerVehicle()
         if veh and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             veh.PrimaryPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
-            addLog("Araç yanıma ışınlandı!")
+            Library:Notify("Araç yanıma ışınlandı!", 2)
         end
     end)
 end)
