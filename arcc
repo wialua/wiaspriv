@@ -87,7 +87,7 @@ local defaults = {
     ufoProps   = { Acceleration=10, Deceleration=1, MaxSpeed=340, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=4, DescentSpeed=4, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.3, HorizontalRotationSpeed=14, ResponseSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40 },
     boatProps  = { Height=1, TurnSpeed=7.5, Torque=5, MaxSpeed=160, BrakeForce=1, SpeedDecay=0.5 },
     planeProps = { Bombs=true, Acceleration=1, DampeningAcceleration=0.8, MaxVerticalTilt=10, VerticalTiltUpSpeed=1, VerticalTiltDownSpeed=1, VerticalTiltDampening=0.95, VerticalSpeedLimit=30, HorizontalTiltSpeed=5.2, MaxSideTilt=25, SideTiltSpeed=1.5, SideTiltDampening=0.95, MissileTargetRange=540, MissileCooldown=0, MissileLock=0 },
-    ArchProps  = { Acceleration=5, Deceleration=5, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=4, DescentSpeed=4, MaxVerticalTiltAngle=25, VerticalTiltSpeed=0.1, HorizontalRotationSpeed=1, HideCharacter=true, MaxSideTilt=20, MinHeightAboveGround=5, CameraOffset=40 },
+    ArchProps  = { Acceleration=5, Deceleration=5, SpeedDecay=0.95, BrakeForce=15, MaxAltitude=640, AscentSpeed=4, DescentSpeed=4, CameraOffset=40 },
 }
 
 -- Modifiye butonları
