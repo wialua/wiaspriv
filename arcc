@@ -19,6 +19,8 @@ local Event = ReplicatedStorage:WaitForChild("Event")
 local Lighting = game:GetService("Lighting")
 local cam = workspace.CurrentCamera
 local plr = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local ContextActionService = game:GetService("ContextActionService")
 
 
 -- Oyun Bilgisi
@@ -736,6 +738,313 @@ CombatGroup:AddButton({
 
             print("Blast sent to all targets!")
 
+local Freecam = {}
+Freecam.Enabled = false
+Freecam.NavSpeed = 1
+Freecam.MouseSensitivity = 0.005
+Freecam.CameraPos = Vector3.new()
+Freecam.CameraRot = Vector2.new()
+
+-- Spring for Velocity
+local Spring = {}
+Spring.__index = Spring
+
+function Spring.new(freq, pos)
+    local self = setmetatable({}, Spring)
+    self.f = freq
+    self.p = pos
+    self.v = Vector3.new(0,0,0)
+    return self
+end
+
+function Spring:Update(dt, goal)
+    local f = self.f * 2 * math.pi
+    local p0 = self.p
+    local v0 = self.v
+
+    local offset = goal - p0
+    local decay = math.exp(-f * dt)
+
+    local p1 = goal + (v0 * dt - offset * (f * dt + 1)) * decay
+    local v1 = (f * dt * (offset * f - v0) + v0) * decay
+
+    self.p = p1
+    self.v = v1
+
+    return p1
+end
+
+function Spring:Reset(pos)
+    self.p = pos
+    self.v = Vector3.new(0,0,0)
+end
+
+Freecam.VelSpring = Spring.new(1.5, Vector3.new())
+
+-- Constants
+local PI = math.pi
+local CLAMP = math.clamp or function(x, min, max) return math.max(min, math.min(max, x)) end
+local RAD = math.rad
+local PITCH_LIMIT = RAD(90)
+local NAV_GAIN = Vector3.new(3, 3, 3) * 64
+local TOGGLE_INPUT_PRIORITY = Enum.ContextActionPriority.Low.Value
+local INPUT_PRIORITY = Enum.ContextActionPriority.High.Value
+local FREECAM_MACRO_KB = {Enum.KeyCode.LeftShift, Enum.KeyCode.P}
+
+-- Input States
+Freecam.Keyboard = { W = 0, A = 0, S = 0, D = 0, E = 0, Q = 0, Up = 0, Down = 0 }
+Freecam.MouseDelta = Vector2.new()
+
+local NAV_KEYBOARD_SPEED = Vector3.new(1, 1, 1)
+local NAV_SHIFT_MUL = 0.25
+local NAV_ADJ_SPEED = 0.75
+
+function Freecam:UpdateKeyboard(action, state, input)
+    local isDown = state == Enum.UserInputState.Begin and 1 or 0
+    if input.KeyCode == Enum.KeyCode.W then self.Keyboard.W = isDown
+    elseif input.KeyCode == Enum.KeyCode.A then self.Keyboard.A = isDown
+    elseif input.KeyCode == Enum.KeyCode.S then self.Keyboard.S = isDown
+    elseif input.KeyCode == Enum.KeyCode.D then self.Keyboard.D = isDown
+    elseif input.KeyCode == Enum.KeyCode.E then self.Keyboard.E = isDown
+    elseif input.KeyCode == Enum.KeyCode.Q then self.Keyboard.Q = isDown
+    elseif input.KeyCode == Enum.KeyCode.Up then self.Keyboard.Up = isDown
+    elseif input.KeyCode == Enum.KeyCode.Down then self.Keyboard.Down = isDown
+    end
+    return Enum.ContextActionResult.Sink
+end
+
+function Freecam:OnMouseMove(action, state, input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        self.MouseDelta = self.MouseDelta + Vector2.new(-input.Delta.Y, -input.Delta.X)
+    end
+    return Enum.ContextActionResult.Sink
+end
+
+function Freecam:GetVelocity(dt)
+    self.NavSpeed = CLAMP(self.NavSpeed + dt * (self.Keyboard.Up - self.Keyboard.Down) * NAV_ADJ_SPEED, 0.1, 10)
+
+    local shiftPressed = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+    local speedMultiplier = self.NavSpeed * (shiftPressed and NAV_SHIFT_MUL or 1)
+
+    local moveDir = Vector3.new(
+        (self.Keyboard.D - self.Keyboard.A),
+        (self.Keyboard.E - self.Keyboard.Q),
+        (self.Keyboard.S - self.Keyboard.W)
+    ) * NAV_KEYBOARD_SPEED * speedMultiplier
+
+    return moveDir
+end
+
+function Freecam:Step(dt)
+    local targetVel = self:GetVelocity(dt)
+    local vel = self.VelSpring:Update(dt, targetVel)
+
+    self.CameraRot = self.CameraRot + self.MouseDelta * self.MouseSensitivity
+    self.MouseDelta = Vector2.new(0, 0)
+
+    self.CameraRot = Vector2.new(CLAMP(self.CameraRot.X, -PITCH_LIMIT, PITCH_LIMIT), self.CameraRot.Y % (2 * PI))
+
+    local zoomFactor = 1
+    local cf = CFrame.new(self.CameraPos) * CFrame.fromOrientation(self.CameraRot.X, self.CameraRot.Y, 0)
+    self.CameraPos = (cf * CFrame.new(vel * NAV_GAIN * dt * zoomFactor)).Position
+
+    local Camera = Workspace.CurrentCamera
+    Camera.CFrame = CFrame.new(self.CameraPos) * CFrame.fromOrientation(self.CameraRot.X, self.CameraRot.Y, 0)
+    Camera.Focus = Camera.CFrame
+end
+
+function Freecam:StartInputCapture()
+    ContextActionService:BindActionAtPriority("FreecamKeyboard", function(...) return self:UpdateKeyboard(...) end, false, INPUT_PRIORITY,
+        Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
+        Enum.KeyCode.E, Enum.KeyCode.Q,
+        Enum.KeyCode.Up, Enum.KeyCode.Down
+    )
+    ContextActionService:BindActionAtPriority("FreecamMouseMove", function(...) return self:OnMouseMove(...) end, false, INPUT_PRIORITY, Enum.UserInputType.MouseMovement)
+end
+
+function Freecam:StopInputCapture()
+    self.NavSpeed = Options.FreecamNavSpeed.Value
+    self.MouseDelta = Vector2.new()
+
+    self.Keyboard = { W=0, A=0, S=0, D=0, E=0, Q=0, Up=0, Down=0 }
+
+    ContextActionService:UnbindAction("FreecamKeyboard")
+    ContextActionService:UnbindAction("FreecamMouseMove")
+end
+
+-- Player State Management
+local PlayerState = {}
+do
+    local mouseBehavior, mouseIconEnabled
+    local cameraType, cameraFocus, cameraCFrame, cameraFieldOfView
+    local coreGuis = { Backpack = true, Chat = true, Health = true, PlayerList = true }
+    local screenGuis = {}
+    local setCores = { BadgesNotificationsActive = true, PointsNotificationsActive = true }
+
+    function PlayerState.Push()
+        cameraFieldOfView = Workspace.CurrentCamera.FieldOfView
+
+        for name in pairs(coreGuis) do
+            coreGuis[name] = StarterGui:GetCoreGuiEnabled(Enum.CoreGuiType[name])
+            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType[name], false)
+        end
+        for name in pairs(setCores) do
+            setCores[name] = StarterGui:GetCore(name)
+            StarterGui:SetCore(name, false)
+        end
+
+        local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if playerGui then
+            for _, gui in pairs(playerGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and gui.Enabled then
+                    table.insert(screenGuis, gui)
+                    gui.Enabled = false
+                end
+            end
+        end
+
+        local Camera = Workspace.CurrentCamera
+        cameraType = Camera.CameraType
+        Camera.CameraType = Enum.CameraType.Custom
+
+        cameraCFrame = Camera.CFrame
+        cameraFocus = Camera.Focus
+
+        mouseIconEnabled = UserInputService.MouseIconEnabled
+        UserInputService.MouseIconEnabled = false
+
+        mouseBehavior = UserInputService.MouseBehavior
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
+
+    function PlayerState.Pop()
+        for name, enabled in pairs(coreGuis) do
+            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType[name], enabled)
+        end
+        for name, enabled in pairs(setCores) do
+            StarterGui:SetCore(name, enabled)
+        end
+        for _, gui in pairs(screenGuis) do
+            if gui.Parent then
+                gui.Enabled = true
+            end
+        end
+        screenGuis = {}
+
+        local Camera = Workspace.CurrentCamera
+        Camera.FieldOfView = cameraFieldOfView
+        Camera.CameraType = cameraType
+        Camera.CFrame = cameraCFrame
+        Camera.Focus = cameraFocus
+
+        UserInputService.MouseIconEnabled = mouseIconEnabled
+        UserInputService.MouseBehavior = mouseBehavior
+
+        UserInputService.MouseIconEnabled = true
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
+end
+
+function Freecam:Start()
+    local Camera = Workspace.CurrentCamera
+    local camCFrame = Camera.CFrame
+    self.CameraPos = camCFrame.Position
+    self.CameraRot = Vector2.new(camCFrame:ToEulerAnglesYXZ())
+
+    self.VelSpring:Reset(Vector3.new())
+
+    PlayerState.Push()
+    self:StartInputCapture()
+    RunService:BindToRenderStep("Freecam", Enum.RenderPriority.Camera.Value, function(dt) self:Step(dt) end)
+    Library:Notify("Freecam enabled! Use WASD to move, QE to up/down, mouse to look. (Shift+P to toggle) - FOV preserved.", 5)
+end
+
+function Freecam:Stop()
+    RunService:UnbindFromRenderStep("Freecam")
+    self:StopInputCapture()
+    PlayerState.Pop()
+
+    UserInputService.MouseIconEnabled = true
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
+    Library:Notify("Freecam disabled.", 3)
+end
+
+function Freecam:Toggle()
+    if self.Enabled then
+        self:Stop()
+    else
+        self:Start()
+    end
+    self.Enabled = not self.Enabled
+end
+
+local function CheckMacro()
+    for i = 1, #FREECAM_MACRO_KB - 1 do
+        if not UserInputService:IsKeyDown(FREECAM_MACRO_KB[i]) then
+            return false
+        end
+    end
+    return true
+end
+
+local function HandleToggleInput(action, state, input)
+    if state == Enum.UserInputState.Begin and input.KeyCode == FREECAM_MACRO_KB[#FREECAM_MACRO_KB] then
+        if CheckMacro() then Freecam:Toggle() end
+    end
+    return Enum.ContextActionResult.Pass
+end
+
+ContextActionService:BindActionAtPriority("FreecamToggle", HandleToggleInput, false, TOGGLE_INPUT_PRIORITY, FREECAM_MACRO_KB[#FREECAM_MACRO_KB])
+
+-- Freecam UI
+local FreecamGroup = MainTab:AddLeftGroupbox('Freecam System')
+FreecamGroup:AddToggle('FreecamEnabled', {
+    Text = 'Enable Freecam',
+    Default = false,
+    Tooltip = 'Toggles the freecam mode. Direct mouse rotation, no smoothing. Controls: WASD move, QE up/down, mouse look. Use Shift+P to toggle. Fully FOV-compatible (no interference with changers).',
+    Callback = function(value)
+        Freecam.Enabled = value
+        if value then
+            Freecam:Start()
+        else
+            Freecam:Stop()
+        end
+    end
+})
+
+local FreecamDep = FreecamGroup:AddDependencyBox()
+FreecamDep:AddSlider('FreecamNavSpeed', {
+    Text = 'Navigation Speed',
+    Default = 1,
+    Min = 0.1,
+    Max = 10,
+    Rounding = 2,
+    Suffix = 'x',
+    Tooltip = 'Base movement speed multiplier. Use Shift to slow down, Up/Down keys to adjust dynamically.',
+    Callback = function(value)
+        Freecam.NavSpeed = value
+    end
+})
+
+FreecamDep:AddSlider('FreecamSensitivity', {
+    Text = 'Mouse Sensitivity',
+    Default = 0.005,
+    Min = 0.001,
+    Max = 0.01,
+    Rounding = 4,
+    Suffix = '',
+    Tooltip = 'Mouse look sensitivity. Higher = faster rotation.',
+    Callback = function(value)
+        Freecam.MouseSensitivity = value
+    end
+})
+
+FreecamDep:SetupDependencies({ { Toggles.FreecamEnabled, true } })
+
+Toggles.FreecamEnabled:OnChanged(function()
+    Freecam.Enabled = Toggles.FreecamEnabled.Value
+end)
         end)
     end
 })
