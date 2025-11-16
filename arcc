@@ -660,122 +660,83 @@ VehicleSpawnBox:AddButton({
 
 local CombatGroup = Tabs.Combat:AddLeftGroupbox('Missile Spam')
 
-CombatGroup:AddToggle('MissileSpam', {
-    Text = 'Enable Missile Spam',
-    Default = false,
-    Tooltip = 'Kimsenin görmüyeceği bi yerde Füzeli bir araça bin ve bas',
+CombatGroup:AddButton({
+    Text = 'Instant 1000x Missile Blast',
+    Func = function()
 
-    Callback = function(Value)
-        if Value then
-            task.spawn(function()
-                local Players = game:GetService("Players")
-                local ReplicatedStorage = game:GetService("ReplicatedStorage")
-                local RunService = game:GetService("RunService")
-                local localPlayer = Players.LocalPlayer
-                local localName = localPlayer.Name
-                
-                local shooter = workspace:WaitForChild(localName)
-                local shooterBody = workspace:WaitForChild("ObjectSelection"):WaitForChild(localName .. "'s Vehicle"):WaitForChild("Body")
-                local rightMissile = shooterBody:WaitForChild("RightMissile")
-                local leftMissile = shooterBody:WaitForChild("LeftMissile")
-                
-                local excludeNames = {localName, "MAD_CITYAIMBOTLOL"}
-                
-                local rightBaseArgs = {
-                    [1] = "ShootBuzzardMissiles",
-                    [2] = shooter,
-                    [3] = shooterBody,
-                    [5] = rightMissile,
-                    [6] = 999
-                }
-                local leftBaseArgs = {
-                    [1] = "ShootBuzzardMissiles",
-                    [2] = shooter,
-                    [3] = shooterBody,
-                    [5] = leftMissile,
-                    [6] = 999
-                }
-                
-                local targets = {}
-                for _, targetPlayer in pairs(Players:GetPlayers()) do
-                    local shouldExclude = false
-                    for _, exclude in pairs(excludeNames) do
-                        if targetPlayer.Name == exclude then
-                            shouldExclude = true
-                            break
-                        end
-                    end
-                    if shouldExclude then continue end
-                    
-                    local character = targetPlayer.Character or targetPlayer.CharacterAdded:Wait()
-                    local rootPart = character:FindFirstChild("HumanoidRootPart")
-                    if rootPart then
-                        table.insert(targets, rootPart)
+        task.spawn(function()
+            local Players = game:GetService("Players")
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+            local localPlayer = Players.LocalPlayer
+            local localName = localPlayer.Name
+
+            -- Araç
+            local shooter = workspace:WaitForChild(localName)
+            local shooterBody = workspace:WaitForChild("ObjectSelection"):WaitForChild(localName .. "'s Vehicle"):WaitForChild("Body")
+            local rightMissile = shooterBody:WaitForChild("RightMissile")
+            local leftMissile  = shooterBody:WaitForChild("LeftMissile")
+
+            local exclude = {
+                [localName] = true,
+                ["MAD_CITYAIMBOTLOL"] = true
+            }
+
+            -- Hedef listesi
+            local targets = {}
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if not exclude[plr.Name] then
+                    local char = plr.Character or plr.CharacterAdded:Wait()
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        table.insert(targets, root)
                     end
                 end
-                
-                if #targets == 0 then
-                    Toggles.MissileSpam:SetValue(false)
-                    return
+            end
+
+            if #targets == 0 then
+                print("No available targets.")
+                return
+            end
+
+            -- ANLIK BLAST (batch’li / ultra düşük lag)
+            for _, target in ipairs(targets) do
+
+                local blastPack = {}
+
+                -- 500 right
+                for i = 1, 500 do
+                    blastPack[#blastPack+1] = {
+                        "ShootBuzzardMissiles",
+                        shooter,
+                        shooterBody,
+                        target,
+                        rightMissile,
+                        999
+                    }
                 end
-                
-                local currentTarget = 1
-                local currentFires = 0
-                local maxFires = 2000  -- 1000L + 1000R, much more powerful
-                local firesPerTick = 100  -- Distributed: ~20 ticks/sec, ~20s full spam per target (zero lag/ping)
-                local connection
-                
-                local function spamTarget()
-                    local targetPart = targets[currentTarget]
-                    local rightArgs = rightBaseArgs
-                    local leftArgs = leftBaseArgs
-                    rightArgs[4] = targetPart
-                    leftArgs[4] = targetPart
-                    
-                    connection = RunService.Heartbeat:Connect(function()
-                        if currentFires >= maxFires then
-                            connection:Disconnect()
-                            currentTarget = currentTarget + 1
-                            currentFires = 0
-                            if currentTarget > #targets then
-                                Toggles.MissileSpam:SetValue(false)
-                                return
-                            else
-                                spamTarget()  -- Next target
-                            end
-                            return
-                        end
-                        
-                        for i = 1, firesPerTick do
-                            if currentFires >= maxFires then break end
-                            task.spawn(function()
-                                -- Alternate L/R for balance
-                                if currentFires % 2 == 0 then
-                                    ReplicatedStorage.Event:FireServer(unpack(rightArgs))
-                                else
-                                    ReplicatedStorage.Event:FireServer(unpack(leftArgs))
-                                end
-                            end)
-                            currentFires = currentFires + 1
-                        end
-                    end)
+
+                -- 500 left
+                for i = 1, 500 do
+                    blastPack[#blastPack+1] = {
+                        "ShootBuzzardMissiles",
+                        shooter,
+                        shooterBody,
+                        target,
+                        leftMissile,
+                        999
+                    }
                 end
-                
-                spamTarget()
-            end)
-        end
+
+                -- Tek seferde batch fire (en az lag yapan yöntem)
+                for _, args in ipairs(blastPack) do
+                    ReplicatedStorage.Event:FireServer(unpack(args))
+                end
+            end
+
+            print("Blast sent to all targets!")
+
+        end)
     end
 })
 
--- Optional: Add a slider for fire rate (more power control)
-CombatGroup:AddSlider('SpamIntensity', {
-    Text = 'Spam Intensity (per tick)',
-    Default = 100,
-    Min = 50,
-    Max = 500,
-    Rounding = 0,
-
-    Callback = function(Value)
-        -- Dynamically adjust firesPerTick if needed (implement in toggle logic if desired)
-    end
-})
