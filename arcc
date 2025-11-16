@@ -738,6 +738,9 @@ CombatGroup:AddButton({
 
             print("Blast sent to all targets!")
 
+local PVPTab = Window:AddTab('PVP')
+local PVPGroupBox = PVPTab:AddLeftGroupbox('PVP Controls')
+
 local Freecam = {}
 Freecam.Enabled = false
 Freecam.NavSpeed = 1
