@@ -414,150 +414,111 @@ VehicleModBox:AddButton({
     end
 })
 
-local CombatGroup = Tabs.Combat:AddLeftGroupbox('ESP Araçları V2')
+local CombatGroup = Tabs.Combat:AddLeftGroupbox('Esp Stabil')
 
--- AYARLAR
-local ESPSettings = {
-    Enabled = false,
-    MaxDistance = 200,
-}
-
-local ESPConnections = {}
-local PlayerListeners = {}
-
--- Utility: Bağlantıları Temizle
-local function cleanupPlayerListeners(player)
-    local list = PlayerListeners[player]
-    if list then
-        for _, conn in ipairs(list) do
-            if conn and conn.Disconnect then
-                conn:Disconnect()
-            end
-        end
-        PlayerListeners[player] = nil
-    end
-end
-
--- NameTag Ayarları
-local function applyNameTagSettings(nt, isEnabled)
-    if not nt then return end
-    nt.AlwaysOnTop = isEnabled
-    nt.MaxDistance = isEnabled and 10000 or 200
-    nt.Enabled = isEnabled
-end
-
--- Oyuncu için ESP Bağlantı Kurulumu
-local function setupPlayerESP(player, isEnabled)
-    cleanupPlayerListeners(player)
-
-    local conns = {}
-    PlayerListeners[player] = conns
-
-    local function handleCharacter(char)
-        local nt = char:FindFirstChild("NameTag")
-        if nt then
-            applyNameTagSettings(nt, isEnabled)
-
-            -- NameTag izleme
-            table.insert(conns, nt:GetPropertyChangedSignal("AlwaysOnTop"):Connect(function()
-                nt.AlwaysOnTop = isEnabled
-            end))
-            table.insert(conns, nt:GetPropertyChangedSignal("MaxDistance"):Connect(function()
-                nt.MaxDistance = isEnabled and 10000 or 200
-            end))
-            table.insert(conns, nt:GetPropertyChangedSignal("Enabled"):Connect(function()
-                nt.Enabled = isEnabled
-            end))
-        end
-    end
-
-    if player.Character then
-        handleCharacter(player.Character)
-    end
-
-    table.insert(conns, player.CharacterAdded:Connect(function(char)
-        char:WaitForChild("NameTag", 2)
-        handleCharacter(char)
-    end))
-
-    table.insert(conns, player:GetPropertyChangedSignal("Character"):Connect(function()
-        if player.Character then
-            handleCharacter(player.Character)
-        end
-    end))
-end
-
--- ESP Ana Fonksiyon
-local espLoop
-local function toggleESP(enabled)
-    ESPSettings.Enabled = enabled
-    ESPSettings.MaxDistance = enabled and 10000 or 200
-
-    -- Bağlantı varsa kapat
-    if espLoop then
-        espLoop:Disconnect()
-        espLoop = nil
-    end
-
-    -- Tüm oyunculara uygula
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then
-            setupPlayerESP(plr, enabled)
-        end
-    end
-
-    -- Yeni oyuncular eklendikçe uygula
-    local addConn = Players.PlayerAdded:Connect(function(plr)
-        if plr ~= LocalPlayer then
-            setupPlayerESP(plr, enabled)
-        end
-    end)
-    table.insert(ESPConnections, addConn)
-
-    -- Döngü: sadece gerekli durumlarda çalışacak şekilde optimize edildi
-    if enabled then
-        espLoop = RunService.Heartbeat:Connect(function()
-            local lpChar = LocalPlayer.Character
-            if not lpChar or not lpChar:FindFirstChild("HumanoidRootPart") then return end
-
-            local myPos = lpChar.HumanoidRootPart.Position
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                    local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
-                    if dist <= ESPSettings.MaxDistance then
-                        local nt = plr.Character:FindFirstChild("NameTag")
-                        if nt then
-                            applyNameTagSettings(nt, true)
-                        end
-                    end
-                end
-            end
-        end)
-        Library:Notify("ESP Aktif (10000 Max Mesafe, AlwaysOnTop ve Enabled Açık)", 2)
-    else
-        -- Tüm oyunculardan bağlantıları kaldır, değerleri sıfırla
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character then
-                local nt = plr.Character:FindFirstChild("NameTag")
-                if nt then
-                    applyNameTagSettings(nt, false)
-                end
-            end
-            cleanupPlayerListeners(plr)
-        end
-        Library:Notify("ESP Kapatıldı (200 Mesafe, AlwaysOnTop ve Enabled Kapalı)", 2)
-    end
-end
-
--- UI Toggle
-CombatGroup:AddToggle('ESPToggle', {
-    Text = 'ESP Etkinleştir',
+CombatGroup:AddToggle('NameTagESP', {
+    Text = 'Enable NameTag ESP',
     Default = false,
-    Tooltip = 'ESP aç/kapat (AlwaysOnTop, Enabled ve Mesafe otomatik ayarlanır)',
-    Callback = function(value)
-        toggleESP(value)
+    Tooltip = 'Makes player nametags visible through walls with extended range',
+
+    Callback = function(Value)
+        print('[cb] NameTagESP toggled:', Value)
     end
 })
+
+local connections = {}  -- Table to store all connections for cleanup
+
+local function updateNameTag(character)
+    if not character then return end
+    local nameTag = character:FindFirstChild("NameTag")
+    if nameTag and nameTag:IsA("BillboardGui") then
+        if Toggles.NameTagESP.Value then
+            nameTag.AlwaysOnTop = true
+            nameTag.Enabled = true  -- Ensure enabled when toggle is on
+            nameTag.MaxDistance = 10000
+        else
+            nameTag.MaxDistance = 200
+            nameTag.AlwaysOnTop = false
+            -- Do not touch Enabled when toggling off
+        end
+    end
+end
+
+local function setupPlayer(player)
+    -- Handle existing character
+    if player.Character then
+        updateNameTag(player.Character)
+    end
+    
+    -- Listen for character added (respawn, etc.)
+    local charAddedConn = player.CharacterAdded:Connect(function(char)
+        char:WaitForChild("NameTag", 5)  -- Wait briefly for NameTag if needed
+        updateNameTag(char)
+    end)
+    table.insert(connections, charAddedConn)
+end
+
+local function enableESP()
+    -- Clear existing connections if any (safety)
+    for _, conn in ipairs(connections) do
+        conn:Disconnect()
+    end
+    connections = {}
+    
+    -- Setup for all current players
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer then  -- Exclude local player if desired
+            setupPlayer(player)
+        end
+    end
+    
+    -- Listen for new players joining
+    local playerAddedConn = Players.PlayerAdded:Connect(function(player)
+        setupPlayer(player)
+    end)
+    table.insert(connections, playerAddedConn)
+    
+    -- Listen for players leaving (cleanup optional but good for perf)
+    local playerRemovingConn = Players.PlayerRemoving:Connect(function(player)
+        -- No specific cleanup needed per player since connections are per event
+    end)
+    table.insert(connections, playerRemovingConn)
+    
+    -- Heartbeat listener for continuous enforcement when enabled
+    -- Optimized: Only runs when toggle is on, and updates only if necessary
+    local heartbeatConn = RunService.Heartbeat:Connect(function()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.Character then
+                updateNameTag(player.Character)
+            end
+        end
+    end)
+    table.insert(connections, heartbeatConn)
+end
+
+local function disableESP()
+    -- Disconnect all connections
+    for _, conn in ipairs(connections) do
+        conn:Disconnect()
+    end
+    connections = {}
+    
+    -- Revert settings for all current players
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character then
+            updateNameTag(player.Character)  -- Applies the off state
+        end
+    end
+end
+
+-- Hook into toggle change
+Toggles.NameTagESP:OnChanged(function()
+    if Toggles.NameTagESP.Value then
+        enableESP()
+    else
+        disableESP()
+    end
+end)
 
 local CombatTab = Window:AddTab('Bypass')
 local CombatGroup = CombatTab:AddLeftGroupbox('Kamera Bypass')
