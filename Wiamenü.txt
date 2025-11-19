@@ -16,6 +16,12 @@ local StarterGui = game:GetService("StarterGui")
 local HttpService = game:GetService("HttpService")
 local Event = ReplicatedStorage:WaitForChild("Event")
 local Lighting = game:GetService("Lighting")
+local cam = workspace.CurrentCamera
+local plr = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local ContextActionService = game:GetService("ContextActionService")
+local UIS = game:GetService("UserInputService")
+local Teams = game:GetService("Teams")
 
 local LocalPlayer = Players.LocalPlayer
 local Options = Library.Options
@@ -1708,3 +1714,4 @@ Toggles.NameTagESP:OnChanged(function()
         disableESP()
     end
 end)
+
