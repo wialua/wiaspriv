@@ -2186,50 +2186,7 @@ VehicleSpawnBox:AddButton({
     end
 })
 
-local SecGroup = Tabs.Security:AddLeftGroupbox('Anti Crash')
-
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-SecGroup:AddToggle('ShotgunDestroyer', {
-    Text = 'Anti Crash',
-    Default = true,
-    Tooltip = '',
-    Callback = function(Value)
-        if Value then
-            cleanupShotguns()
-        end
-    end
-})
-
-local function setupContainer(cont)
-    cont.ChildAdded:Connect(function(child)
-        if getgenv().Toggles.ShotgunDestroyer.Value and child.Name == "Shotgun" and child:IsA("Tool") then
-            child:Destroy()
-        end
-    end)
-end
-
-local function onPlayerAdded(player)
-    if player == LocalPlayer then return end
-    player.ChildAdded:Connect(function(child)
-        if child.Name == "Backpack" then
-            setupContainer(child)
-        end
-    end)
-    player.CharacterAdded:Connect(function(char)
-        setupContainer(char)
-    end)
-    local backpack = player:FindFirstChildOfClass("Backpack")
-    if backpack then
-        setupContainer(backpack)
-    end
-end
-
-for _, p in Players:GetPlayers() do
-    onPlayerAdded(p)
-end
-Players.PlayerAdded:Connect(onPlayerAdded)
+local SecGroup = Tabs.Security:AddLeftGroupbox('Shotgun Koruması')
 
 local function cleanupShotguns()
     for _, p in Players:GetPlayers() do
@@ -2245,6 +2202,59 @@ local function cleanupShotguns()
     end
 end
 
+SecGroup:AddToggle('ShotgunDestroyer', {
+    Text = 'Anti Crash',
+    Default = true,
+    Tooltip = ''
+})
+
 if getgenv().Toggles.ShotgunDestroyer.Value then
     cleanupShotguns()
+    getgenv().ShotgunConnection = RunService.Heartbeat:Connect(function()
+        for _, p in Players:GetPlayers() do
+            if p ~= LocalPlayer then
+                if p.Character and p.Character:FindFirstChild("Shotgun") then
+                    p.Character.Shotgun:Destroy()
+                end
+                local backpack = p:FindFirstChildOfClass("Backpack")
+                if backpack and backpack:FindFirstChild("Shotgun") then
+                    backpack.Shotgun:Destroy()
+                end
+            end
+        end
+    end)
 end
+
+getgenv().Toggles.ShotgunDestroyer:OnChanged(function()
+    local Value = getgenv().Toggles.ShotgunDestroyer.Value
+    if Value then
+        cleanupShotguns()
+        if not getgenv().ShotgunConnection then
+            getgenv().ShotgunConnection = RunService.Heartbeat:Connect(function()
+                for _, p in Players:GetPlayers() do
+                    if p ~= LocalPlayer then
+                        if p.Character and p.Character:FindFirstChild("Shotgun") then
+                            p.Character.Shotgun:Destroy()
+                        end
+                        local backpack = p:FindFirstChildOfClass("Backpack")
+                        if backpack and backpack:FindFirstChild("Shotgun") then
+                            backpack.Shotgun:Destroy()
+                        end
+                    end
+                end
+            end)
+        end
+    else
+        if getgenv().ShotgunConnection then
+            getgenv().ShotgunConnection:Disconnect()
+            getgenv().ShotgunConnection = nil
+        end
+    end
+end)
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    if getgenv().ShotgunConnection then
+        getgenv().ShotgunConnection:Disconnect()
+    end
+end)
