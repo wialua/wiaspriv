@@ -2085,3 +2085,103 @@ VehicleModBox:AddButton({
         end)
     end
 })
+
+local CombatTab = Window:AddTab('Bypass')
+local CombatGroup = CombatTab:AddLeftGroupbox('Kamera Bypass')
+
+local CameraLoopConnection = nil -- Döngü bağlantısı
+
+-- Kamera karaktere kilitli kalsın fonksiyonu
+local function StartCameraLock()
+    -- Önce eski bağlantıyı temizle
+    if CameraLoopConnection then
+        CameraLoopConnection:Disconnect()
+        CameraLoopConnection = nil
+    end
+
+    -- Yeni bağlantı başlat
+    CameraLoopConnection = RunService.RenderStepped:Connect(function()
+        local char = plr.Character
+        if not char then return end
+
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid and cam.CameraSubject ~= humanoid then
+            cam.CameraSubject = humanoid
+        end
+    end)
+end
+
+-- Toggle ekle
+CombatGroup:AddToggle('LockCameraToCharacter', {
+    Text = 'Kamera karaktere kilitli kalsın',
+    Default = true,
+    Tooltip = 'Kameranın karakterinizde sabit kalmasını sağlar.',
+    Callback = function(state)
+        if state then
+            StartCameraLock()
+        elseif CameraLoopConnection then
+            CameraLoopConnection:Disconnect()
+            CameraLoopConnection = nil
+        end
+    end
+})
+
+-- UI açıldığında toggle aktifse otomatik başlat
+task.defer(function()
+    if Toggles.LockCameraToCharacter and Toggles.LockCameraToCharacter.Value then
+        StartCameraLock()
+    end
+end)
+
+local CombatGroup = Tabs.Combat:AddLeftGroupbox("Combat Settings")
+
+CombatGroup:AddButton({
+    Text = "AntiSallanma",
+    Tooltip = "Kamera sallanmasını devre dışı bırakır.",
+    Func = function()
+        local success, err = pcall(function()
+            local get = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("CameraShaker"))
+            local returnnil = function() return nil end
+
+            get.StartShake = returnnil
+            get.ShakeOnce = returnnil
+            get.ShakeSustain = returnnil
+            get.CameraShakeInstance = returnnil
+            get.Shake = returnnil
+            get.Start = returnnil
+        end)
+
+        if success then
+            Library:Notify("✅ AntiSallanma aktif edildi!")
+        else
+            Library:Notify("❌ Modül bulunamadı veya hata oluştu.", 6)
+            warn("AntiSallanma Hatası:", err)
+        end
+    end
+})
+
+-- Bu fonksiyonu script'inin başına, service'lerden sonra ekle (Event'ten sonra mesela)
+local function getPlayerVehicle(plr)
+    plr = plr or LocalPlayer
+    local objectSelection = workspace:FindFirstChild("ObjectSelection")
+    if not objectSelection then return end
+    return objectSelection:FindFirstChild(plr.Name .. "'s Vehicle")
+end
+
+VehicleSpawnBox:AddButton({
+    Text = '📍 Aracımı Yanıma Işınla (Uzak)',
+    Func = function()
+        pcall(function()
+            local veh = getPlayerVehicle()
+            local char = LocalPlayer.Character
+            if veh and char and char:FindFirstChild("HumanoidRootPart") and veh.PrimaryPart then
+                local root = char.HumanoidRootPart
+                local offset = root.CFrame.RightVector * 5 + Vector3.new(0, 5, 0)  -- 5 metre sağa ve 5 metre yukarı
+                veh.PrimaryPart.CFrame = root.CFrame + offset
+                Library:Notify("Araç 5 metre sağa ışınlandı!", 2)
+            else
+                Library:Notify("Araç veya karakter bulunamadı!", 3)
+            end
+        end)
+    end
+})
